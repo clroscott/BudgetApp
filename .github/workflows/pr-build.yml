@@ -30,12 +30,12 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: budgetapp.client/package-lock.json
+          cache-dependency-path: BudgetApp/budgetapp.client/package-lock.json
 
       - name: Install client dependencies
-        working-directory: budgetapp.client
+        working-directory: BudgetApp/budgetapp.client
         run: npm ci
 
       - name: Build client
-        working-directory: budgetapp.client
+        working-directory: BudgetApp/budgetapp.client
         run: npm run build
