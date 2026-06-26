@@ -20,10 +20,10 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore .NET
-        run: dotnet restore BudgetApp.slnx
+        run: dotnet restore BudgetApp/BudgetApp.slnx
 
       - name: Build .NET
-        run: dotnet build BudgetApp.slnx --configuration Release --no-restore
+        run: dotnet build BudgetApp/BudgetApp.slnx --configuration Release --no-restore
 
       - name: Setup Node
         uses: actions/setup-node@v4
