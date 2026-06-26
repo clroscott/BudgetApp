@@ -1,0 +1,41 @@
+name: PR Build
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build server and client
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore .NET
+        run: dotnet restore BudgetApp/BudgetApp.slnx
+
+      - name: Build .NET
+        run: dotnet build BudgetApp/BudgetApp.slnx --configuration Release --no-restore
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: BudgetApp/budgetapp.client/package-lock.json
+
+      - name: Install client dependencies
+        working-directory: BudgetApp/budgetapp.client
+        run: npm ci
+
+      - name: Build client
+        working-directory: BudgetApp/budgetapp.client
+        run: npm run build
