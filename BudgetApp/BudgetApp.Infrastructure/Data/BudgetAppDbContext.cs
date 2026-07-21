@@ -1,6 +1,19 @@
+using BudgetApp.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace BudgetApp.Infrastructure.Data;
 
 public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> options)
-    : DbContext(options);
+    : IdentityUserContext<ApplicationUser, Guid>(options)
+{
+    protected override void OnModelCreating(ModelBuilder builder)
+    {
+        base.OnModelCreating(builder);
+
+        builder.Entity<ApplicationUser>()
+            .Property(user => user.DisplayName)
+            .HasMaxLength(100)
+            .IsRequired();
+    }
+}

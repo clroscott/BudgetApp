@@ -1,8 +1,12 @@
 using BudgetApp.Infrastructure;
 using BudgetApp.Server.Middleware;
+using BudgetApp.Server.Security;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using Serilog.Events;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 var errorLogPath = Path.Combine(
@@ -33,13 +37,64 @@ try
             ActivityTrackingOptions.SpanId);
 
     builder.Services.AddSerilog();
-    builder.Services.AddControllers();
+    builder.Services.AddControllers(options =>
+        options.Filters.Add<ValidateAntiforgeryHeaderFilter>());
+    builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
+        .AddIdentityCookies();
+    builder.Services.ConfigureApplicationCookie(options =>
+    {
+        options.Cookie.Name = "__Host-BudgetApp.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+        options.Events = new CookieAuthenticationEvents
+        {
+            OnRedirectToLogin = context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return Task.CompletedTask;
+            },
+            OnRedirectToAccessDenied = context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return Task.CompletedTask;
+            }
+        };
+    });
+    builder.Services.AddAuthorization();
+    builder.Services.AddAntiforgery(options =>
+    {
+        options.HeaderName = "X-XSRF-TOKEN";
+        options.Cookie.Name = "__Host-BudgetApp.Antiforgery";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    });
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddPolicy("authentication", context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 10,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                }));
+    });
     // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
     builder.Services.AddOpenApi();
     builder.Services.AddInfrastructure(
         builder.Configuration.GetConnectionString("BudgetApp")
             ?? throw new InvalidOperationException(
-                "Connection string 'BudgetApp' is not configured."));
+                "Connection string 'BudgetApp' is not configured."))
+        .AddSignInManager();
 
     var app = builder.Build();
 
@@ -62,6 +117,12 @@ try
 
     app.UseHttpsRedirection();
 
+    app.UseRouting();
+
+    app.UseRateLimiter();
+
+    app.UseAuthentication();
+
     app.UseAuthorization();
 
     app.MapControllers();
@@ -76,7 +137,7 @@ try
 
     app.Run();
 }
-catch (Exception exception)
+catch (Exception exception) when (exception is not HostAbortedException)
 {
     Log.Fatal(exception, "BudgetApp.Server terminated unexpectedly");
     Environment.ExitCode = 1;
@@ -85,3 +146,5 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+public partial class Program;

@@ -1,4 +1,6 @@
 using BudgetApp.Infrastructure.Data;
+using BudgetApp.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -6,7 +8,7 @@ namespace BudgetApp.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(
+    public static IdentityBuilder AddInfrastructure(
         this IServiceCollection services,
         string connectionString)
     {
@@ -15,6 +17,22 @@ public static class DependencyInjection
         services.AddDbContext<BudgetAppDbContext>(options =>
             options.UseSqlServer(connectionString));
 
-        return services;
+        return services
+            .AddIdentityCore<ApplicationUser>(options =>
+            {
+                options.User.RequireUniqueEmail = true;
+                options.SignIn.RequireConfirmedAccount = false;
+
+                options.Password.RequiredLength = 12;
+                options.Password.RequireDigit = false;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireNonAlphanumeric = false;
+                options.Password.RequireUppercase = false;
+
+                options.Lockout.AllowedForNewUsers = true;
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+            })
+            .AddEntityFrameworkStores<BudgetAppDbContext>();
     }
 }

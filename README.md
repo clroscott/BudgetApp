@@ -25,10 +25,12 @@ BudgetApp is a household budgeting application for managing accounts, importing 
 
 ## Development Status
 
-Initial project setup.
+Backend foundations for configuration, EF Core, SQL Server, technical logging, and cookie-based Identity authentication are in place. Feature development is moving into household and financial domain workflows.
 
 ## Documentation
 
 - [Core data model](docs/core-data-model.md)
 - [Principal workflows](docs/workflows.md)
 - [Local development and secrets](docs/local-development.md)
+- [Technical logging](docs/logging.md)
+- [Authentication](docs/authentication.md)
