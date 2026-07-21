@@ -1,4 +1,265 @@
-﻿main {
-    padding: 2rem;
-    font-family: Arial, sans-serif;
+.centered-page,
+.auth-page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+}
+
+.auth-page {
+  background:
+    radial-gradient(circle at top left, rgba(42, 111, 91, 0.14), transparent 32rem),
+    var(--page-bg);
+}
+
+.auth-card,
+.status-card {
+  width: min(100%, 28rem);
+  padding: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  box-sizing: border-box;
+}
+
+.status-card {
+  text-align: center;
+}
+
+.status-card h1 {
+  margin: 1rem 0 0.5rem;
+}
+
+.status-card button {
+  margin-top: 1.25rem;
+}
+
+.brand-mark {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  color: white;
+  font-weight: 800;
+}
+
+.auth-header {
+  margin-bottom: 1.5rem;
+}
+
+.auth-header .brand-mark {
+  margin-bottom: 1rem;
+}
+
+.eyebrow {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.auth-header h1,
+.dashboard-content h1 {
+  margin: 0.35rem 0 0.5rem;
+}
+
+.auth-header p:last-child,
+.dashboard-intro {
+  color: var(--muted-text);
+}
+
+form {
+  display: grid;
+  gap: 0.55rem;
+}
+
+form label:not(.checkbox-row) {
+  margin-top: 0.55rem;
+  color: var(--heading);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+input {
+  min-width: 0;
+  padding: 0.78rem 0.9rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  color: var(--heading);
+  font: inherit;
+}
+
+input:focus {
+  border-color: var(--accent);
+  outline: 3px solid var(--accent-soft);
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0.65rem 0;
+  color: var(--muted-text);
+  font-size: 0.9rem;
+}
+
+.checkbox-row input {
+  width: 1rem;
+  height: 1rem;
+}
+
+.field-help {
+  color: var(--muted-text);
+  font-size: 0.8rem;
+}
+
+button {
+  padding: 0.75rem 1rem;
+  border: 0;
+  border-radius: 0.65rem;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--accent-soft);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.primary-button {
+  margin-top: 0.8rem;
+  background: var(--accent);
+  color: white;
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.secondary-button {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--heading);
+}
+
+.auth-switch {
+  margin-top: 1.5rem;
+  text-align: center;
+  color: var(--muted-text);
+  font-size: 0.9rem;
+}
+
+a {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.error-summary {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0 0 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--danger-border);
+  border-radius: 0.65rem;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.88rem;
+}
+
+.dashboard-page {
+  min-height: 100svh;
+  background: var(--page-bg);
+}
+
+.app-header {
+  min-height: 4.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 2rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--heading);
+  font-weight: 800;
+}
+
+.dashboard-content {
+  width: min(100% - 2rem, 64rem);
+  margin: 0 auto;
+  padding: 4rem 0;
+  box-sizing: border-box;
+}
+
+.dashboard-intro {
+  max-width: 38rem;
+  margin-bottom: 2rem;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+}
+
+.summary-card {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.summary-card span,
+.summary-card small {
+  color: var(--muted-text);
+}
+
+.summary-card strong {
+  color: var(--heading);
+  overflow-wrap: anywhere;
+}
+
+.summary-card small {
+  overflow-wrap: anywhere;
+}
+
+.muted-card {
+  border-style: dashed;
+}
+
+@media (max-width: 40rem) {
+  .auth-card,
+  .status-card {
+    padding: 1.4rem;
+  }
+
+  .app-header {
+    padding: 0 1rem;
+  }
+
+  .dashboard-content {
+    padding: 2.5rem 0;
+  }
 }
