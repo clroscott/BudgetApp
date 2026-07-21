@@ -1,7 +1,11 @@
 <Solution>
+  <Project Path="BudgetApp.Application/BudgetApp.Application.csproj" Id="eb1b79a6-d2e6-49a5-949e-0ffd6077c8b1" />
   <Project Path="budgetapp.client/budgetapp.client.esproj">
     <Build />
     <Deploy />
   </Project>
+  <Project Path="BudgetApp.Domain/BudgetApp.Domain.csproj" Id="7b709476-b4b0-45b0-b99c-4d3a37dbecfc" />
+  <Project Path="BudgetApp.Infrastructure/BudgetApp.Infrastructure.csproj" Id="53001956-2475-449e-89dd-c946eb273f1c" />
   <Project Path="BudgetApp.Server/BudgetApp.Server.csproj" />
+  <Project Path="BudgetApp.Tests/BudgetApp.Tests.csproj" Id="ca22bff2-8179-4c15-8c63-fee1bc6b7c62" />
 </Solution>
