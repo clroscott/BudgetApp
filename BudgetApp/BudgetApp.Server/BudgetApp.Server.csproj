@@ -7,6 +7,7 @@
     <SpaRoot>..\budgetapp.client</SpaRoot>
     <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
     <SpaProxyServerUrl>https://localhost:57251</SpaProxyServerUrl>
+    <UserSecretsId>0180621a-0e7f-46a0-a1ff-26a720d24301</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
