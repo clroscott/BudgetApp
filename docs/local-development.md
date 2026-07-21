@@ -21,7 +21,7 @@ dotnet user-secrets set "ConnectionStrings:BudgetApp" "<your-local-connection-st
 For example, Windows LocalDB can use a local-only development value:
 
 ```powershell
-dotnet user-secrets set "ConnectionStrings:BudgetApp" "Server=(localdb)\MSSQLLocalDB;Database=BudgetApp;Trusted_Connection=True;TrustServerCertificate=True" --project BudgetApp/BudgetApp.Server/BudgetApp.Server.csproj
+dotnet user-secrets set "ConnectionStrings:BudgetApp" "Server=(localdb)\MSSQLLocalDB;Database=BudgetAppDb;Trusted_Connection=True;TrustServerCertificate=True" --project BudgetApp/BudgetApp.Server/BudgetApp.Server.csproj
 ```
 
 List the configured keys:
@@ -57,6 +57,28 @@ ConnectionStrings__BudgetApp
 ```
 
 Production configuration is intentionally deferred. No production connection string belongs in source control.
+
+## EF Core Migrations
+
+Restore the repository-local EF Core command-line tool:
+
+```powershell
+dotnet tool restore
+```
+
+Create a migration after changing the EF Core model:
+
+```powershell
+dotnet tool run dotnet-ef migrations add <MigrationName> --project BudgetApp/BudgetApp.Infrastructure/BudgetApp.Infrastructure.csproj --startup-project BudgetApp/BudgetApp.Server/BudgetApp.Server.csproj --output-dir Data/Migrations
+```
+
+Apply pending migrations to the configured local database:
+
+```powershell
+dotnet tool run dotnet-ef database update --project BudgetApp/BudgetApp.Infrastructure/BudgetApp.Infrastructure.csproj --startup-project BudgetApp/BudgetApp.Server/BudgetApp.Server.csproj
+```
+
+The Infrastructure project owns the `BudgetAppDbContext` and migrations. The Server project is the startup project and supplies local configuration such as the connection string.
 
 ## Frontend Environment Files
 
