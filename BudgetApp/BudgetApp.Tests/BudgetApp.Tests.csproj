@@ -12,7 +12,10 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <PrivateAssets>all</PrivateAssets>
@@ -24,6 +27,7 @@
     <ProjectReference Include="..\BudgetApp.Application\BudgetApp.Application.csproj" />
     <ProjectReference Include="..\BudgetApp.Domain\BudgetApp.Domain.csproj" />
     <ProjectReference Include="..\BudgetApp.Infrastructure\BudgetApp.Infrastructure.csproj" />
+    <ProjectReference Include="..\BudgetApp.Server\BudgetApp.Server.csproj" />
   </ItemGroup>
 
   <ItemGroup>
