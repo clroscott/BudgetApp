@@ -27,7 +27,8 @@ BudgetApp is a household budgeting application for managing accounts, importing 
 
 Initial project setup.
 
-## Planning Documentation
+## Documentation
 
 - [Core data model](docs/core-data-model.md)
 - [Principal workflows](docs/workflows.md)
+- [Local development and secrets](docs/local-development.md)
