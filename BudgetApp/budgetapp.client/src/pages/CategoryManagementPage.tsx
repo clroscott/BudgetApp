@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import {
   createCategory,
@@ -14,6 +22,40 @@ import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 
 const categoryTypes: CategoryType[] = ['Expense', 'Income', 'Transfer']
+type DropPosition = 'before' | 'after'
+
+function applySiblingOrder(
+  roots: CategoryItem[],
+  orderedIds: string[],
+): CategoryItem[] {
+  const orderedIdSet = new Set(orderedIds)
+  const byId = new Map<string, CategoryItem>()
+  for (const root of roots) {
+    byId.set(root.id, root)
+    for (const child of root.children) byId.set(child.id, child)
+  }
+
+  let rootOrderIndex = 0
+  if (roots.filter(root => orderedIdSet.has(root.id)).length === orderedIds.length) {
+    return roots.map(root => orderedIdSet.has(root.id)
+      ? byId.get(orderedIds[rootOrderIndex++]) ?? root
+      : root)
+  }
+
+  return roots.map(root => {
+    if (root.children.filter(child => orderedIdSet.has(child.id)).length !== orderedIds.length) {
+      return root
+    }
+
+    let childOrderIndex = 0
+    return {
+      ...root,
+      children: root.children.map(child => orderedIdSet.has(child.id)
+        ? byId.get(orderedIds[childOrderIndex++]) ?? child
+        : child),
+    }
+  })
+}
 
 export function CategoryManagementPage() {
   const { currentHousehold } = useHouseholds()
@@ -26,22 +68,27 @@ export function CategoryManagementPage() {
   const [editingName, setEditingName] = useState('')
   const [addingToId, setAddingToId] = useState<string | null>(null)
   const [subcategoryName, setSubcategoryName] = useState('')
+  const [draggedCategoryId, setDraggedCategoryId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<{
+    categoryId: string
+    position: DropPosition
+  } | null>(null)
 
   const canManage = currentHousehold?.role !== 'Viewer'
 
-  const loadCategories = useCallback(async () => {
+  const loadCategories = useCallback(async (showLoadingState = true) => {
     if (!currentHousehold) {
       return
     }
 
-    setIsLoading(true)
+    if (showLoadingState) setIsLoading(true)
     setErrors([])
     try {
       setCategories(await getCategories(currentHousehold.id))
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {
-      setIsLoading(false)
+      if (showLoadingState) setIsLoading(false)
     }
   }, [currentHousehold])
 
@@ -63,7 +110,7 @@ export function CategoryManagementPage() {
     setErrors([])
     try {
       await change()
-      await loadCategories()
+      await loadCategories(false)
       return true
     } catch (error) {
       setErrors(getErrorMessages(error))
@@ -109,21 +156,96 @@ export function CategoryManagementPage() {
     }
   }
 
-  const move = async (
+  const saveOrder = async (
+    siblings: CategoryItem[],
+    draggedId: string,
+    targetId: string,
+    position: DropPosition,
+  ) => {
+    const orderedIds = siblings.map(category => category.id)
+    if (!orderedIds.includes(draggedId) || !orderedIds.includes(targetId) ||
+        draggedId === targetId) return
+
+    orderedIds.splice(orderedIds.indexOf(draggedId), 1)
+    const targetIndex = orderedIds.indexOf(targetId)
+    orderedIds.splice(position === 'after' ? targetIndex + 1 : targetIndex, 0, draggedId)
+
+    const previousCategories = categories
+    setCategories(current => applySiblingOrder(current, orderedIds))
+    setIsSaving(true)
+    setErrors([])
+    try {
+      await reorderCategories(currentHousehold.id, orderedIds)
+    } catch (error) {
+      setCategories(previousCategories)
+      setErrors(getErrorMessages(error))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleDragStart = (
+    event: DragEvent<HTMLButtonElement>,
+    categoryId: string,
+  ) => {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', categoryId)
+    setDraggedCategoryId(categoryId)
+    setDropTarget(null)
+  }
+
+  const handleDragOver = (
+    event: DragEvent<HTMLDivElement>,
+    siblings: CategoryItem[],
+    targetId: string,
+  ) => {
+    if (!draggedCategoryId || draggedCategoryId === targetId ||
+        !siblings.some(category => category.id === draggedCategoryId)) return
+
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    const bounds = event.currentTarget.getBoundingClientRect()
+    setDropTarget({
+      categoryId: targetId,
+      position: event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after',
+    })
+  }
+
+  const finishDragging = () => {
+    setDraggedCategoryId(null)
+    setDropTarget(null)
+  }
+
+  const handleDrop = async (
+    event: DragEvent<HTMLDivElement>,
+    siblings: CategoryItem[],
+    targetId: string,
+  ) => {
+    event.preventDefault()
+    const position = dropTarget?.categoryId === targetId
+      ? dropTarget.position
+      : 'before'
+    const draggedId = draggedCategoryId
+    finishDragging()
+    if (draggedId) await saveOrder(siblings, draggedId, targetId, position)
+  }
+
+  const handleReorderKey = async (
+    event: KeyboardEvent<HTMLButtonElement>,
     siblings: CategoryItem[],
     categoryId: string,
-    offset: -1 | 1,
   ) => {
+    if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+    event.preventDefault()
     const currentIndex = siblings.findIndex(category => category.id === categoryId)
-    const nextIndex = currentIndex + offset
-    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= siblings.length) {
-      return
-    }
-
-    const orderedIds = siblings.map(category => category.id)
-    ;[orderedIds[currentIndex], orderedIds[nextIndex]] =
-      [orderedIds[nextIndex], orderedIds[currentIndex]]
-    await performChange(() => reorderCategories(currentHousehold.id, orderedIds))
+    const targetIndex = currentIndex + (event.key === 'ArrowUp' ? -1 : 1)
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= siblings.length) return
+    await saveOrder(
+      siblings,
+      categoryId,
+      siblings[targetIndex].id,
+      event.key === 'ArrowUp' ? 'before' : 'after',
+    )
   }
 
   const renderRow = (
@@ -132,55 +254,60 @@ export function CategoryManagementPage() {
     isChild: boolean,
   ) => {
     const activeChildCount = category.children.filter(child => child.isActive).length
-    const index = siblings.findIndex(sibling => sibling.id === category.id)
+    const dropClass = dropTarget?.categoryId === category.id
+      ? ` category-drop-${dropTarget.position}`
+      : ''
 
     return (
       <div
-        className={`category-row${isChild ? ' subcategory-row' : ''}${category.isActive ? '' : ' inactive-row'}`}
+        className={`category-row${isChild ? ' subcategory-row' : ''}${category.isActive ? '' : ' inactive-row'}${draggedCategoryId === category.id ? ' category-row-dragging' : ''}${dropClass}`}
         key={category.id}
+        onDragOver={event => handleDragOver(event, siblings, category.id)}
+        onDrop={event => void handleDrop(event, siblings, category.id)}
       >
-        <div className="category-name-block">
-          {editingId === category.id ? (
-            <div className="inline-edit">
-              <input
-                aria-label={`Rename ${category.name}`}
-                value={editingName}
-                maxLength={100}
-                onChange={event => setEditingName(event.target.value)}
-              />
-              <button
-                type="button"
-                disabled={isSaving || !editingName.trim()}
-                onClick={() => void handleRename(category.id)}
-              >Save</button>
-              <button className="text-button" type="button" onClick={() => setEditingId(null)}>
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <>
-              <strong>{category.name}</strong>
-              {!category.isActive && <span className="status-pill">Deactivated</span>}
-            </>
+        <div className="category-drag-content">
+          {canManage && editingId !== category.id && (
+            <button
+              className="category-drag-handle"
+              type="button"
+              draggable={!isSaving}
+              disabled={isSaving}
+              aria-label={`Drag ${category.name} to reorder`}
+              title="Drag to reorder. Use Alt+Up or Alt+Down with the keyboard."
+              onDragStart={event => handleDragStart(event, category.id)}
+              onDragEnd={finishDragging}
+              onKeyDown={event => void handleReorderKey(event, siblings, category.id)}
+            >⠿</button>
           )}
+          <div className="category-name-block">
+            {editingId === category.id ? (
+              <div className="inline-edit">
+                <input
+                  aria-label={`Rename ${category.name}`}
+                  value={editingName}
+                  maxLength={100}
+                  onChange={event => setEditingName(event.target.value)}
+                />
+                <button
+                  type="button"
+                  disabled={isSaving || !editingName.trim()}
+                  onClick={() => void handleRename(category.id)}
+                >Save</button>
+                <button className="text-button" type="button" onClick={() => setEditingId(null)}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <>
+                <strong>{category.name}</strong>
+                {!category.isActive && <span className="status-pill">Deactivated</span>}
+              </>
+            )}
+          </div>
         </div>
 
         {canManage && editingId !== category.id && (
           <div className="category-actions">
-            <button
-              className="icon-button"
-              type="button"
-              aria-label={`Move ${category.name} up`}
-              disabled={isSaving || index === 0}
-              onClick={() => void move(siblings, category.id, -1)}
-            >↑</button>
-            <button
-              className="icon-button"
-              type="button"
-              aria-label={`Move ${category.name} down`}
-              disabled={isSaving || index === siblings.length - 1}
-              onClick={() => void move(siblings, category.id, 1)}
-            >↓</button>
             <button
               className="text-button"
               type="button"
