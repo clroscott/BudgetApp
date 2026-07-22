@@ -112,6 +112,8 @@ public sealed class ImportTransactionDraftTests
         Assert.Equal(ImportDraftReviewDecision.Pending, draft.ReviewDecision);
         Assert.Null(draft.ReviewedByUserId);
         Assert.Null(draft.ReviewedAtUtc);
+        Assert.Equal(ImportDraftDuplicateStatus.NotChecked, draft.DuplicateStatus);
+        Assert.Null(draft.PossibleMatchingTransactionId);
     }
 
     [Fact]

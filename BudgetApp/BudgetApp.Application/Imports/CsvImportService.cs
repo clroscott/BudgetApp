@@ -10,6 +10,7 @@ public sealed class CsvImportService(
     IAccountRepository accountRepository,
     IImportRepository importRepository,
     ICsvImportReader csvImportReader,
+    ImportReviewService importReviewService,
     HouseholdAuthorizationService authorizationService,
     TimeProvider timeProvider)
 {
@@ -71,6 +72,10 @@ public sealed class CsvImportService(
         var validRows = drafts.Count(draft =>
             draft.ValidationStatus == ImportDraftValidationStatus.Valid);
         var invalidRows = drafts.Count - validRows;
+        await importReviewService.ApplyDuplicateResults(
+            account.Id,
+            drafts,
+            cancellationToken);
         var statistics = new ImportStatistics(
             drafts.Count,
             validRows,
@@ -78,7 +83,8 @@ public sealed class CsvImportService(
             approvedRows: 0,
             rejectedRows: 0,
             skippedRows: 0,
-            duplicateRows: 0);
+            duplicateRows: drafts.Count(draft =>
+                draft.DuplicateStatus == ImportDraftDuplicateStatus.PossibleDuplicate));
 
         importFile.MarkReadyForReview(statistics, now);
         await importRepository.AddAsync(importFile, drafts, cancellationToken);

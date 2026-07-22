@@ -37,6 +37,7 @@ public static class DependencyInjection
         services.AddScoped<IImportRepository, ImportRepository>();
         services.AddScoped<ICsvImportReader, CsvImportReader>();
         services.AddScoped<CsvImportService>();
+        services.AddScoped<ImportReviewService>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<TransactionManagementService>();
         services.AddSingleton(TimeProvider.System);

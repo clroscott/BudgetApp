@@ -203,8 +203,11 @@ export function CsvImportPage() {
               <span><strong>{result.invalidRows}</strong>Needs correction</span>
             </div>
             <p className="field-help">
-              Row review and approval will be available in the next import-review feature.
+              Review every row before creating official transactions.
             </p>
+            <AppLink to={`/imports/review?importId=${result.importFileId}`}>
+              Review this import
+            </AppLink>
           </section>
         )}
       </section>

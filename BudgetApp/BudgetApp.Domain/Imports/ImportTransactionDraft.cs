@@ -157,6 +157,8 @@ public sealed class ImportTransactionDraft
         Description = validatedDescription;
         SelectedCategoryId = validatedCategoryId;
         ApplyValidation(parserMessage: null);
+        DuplicateStatus = ImportDraftDuplicateStatus.NotChecked;
+        PossibleMatchingTransactionId = null;
         ResetReview();
         UpdatedAtUtc = updatedAtUtc;
     }

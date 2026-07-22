@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using BudgetApp.Domain.Imports;
+using BudgetApp.Domain.Transactions;
 using BudgetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -71,9 +72,20 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         Assert.Equal("Market, Main Street", drafts[0].OriginalDescription);
         Assert.Equal(ImportDraftValidationStatus.Valid, drafts[0].ValidationStatus);
         Assert.Equal(ImportDraftValidationStatus.Invalid, drafts[1].ValidationStatus);
-        Assert.Equal(ImportDraftDuplicateStatus.NotChecked, drafts[0].DuplicateStatus);
+        Assert.Equal(ImportDraftDuplicateStatus.NoMatch, drafts[0].DuplicateStatus);
         Assert.False(await dbContext.Transactions.AnyAsync(
             transaction => transaction.ImportFileId == result.ImportFileId));
+
+        var discard = await DeleteWithAntiforgery(
+            client,
+            $"/api/households/{householdId}/imports/{result.ImportFileId}",
+            await GetAntiforgeryToken(client));
+        Assert.Equal(HttpStatusCode.NoContent, discard.StatusCode);
+        dbContext.ChangeTracker.Clear();
+        Assert.False(await dbContext.ImportFiles.AnyAsync(
+            importFile => importFile.Id == result.ImportFileId));
+        Assert.False(await dbContext.ImportTransactionDrafts.AnyAsync(
+            draft => draft.ImportFileId == result.ImportFileId));
     }
 
     [Fact]
@@ -133,6 +145,140 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Created, confirmed.StatusCode);
     }
 
+    [Fact]
+    public async Task Review_CorrectsDecidesAndCompletesRowsIdempotently()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        var userId = await Register(client);
+        var householdId = await CreateHousehold(client);
+        var accountId = await CreateAccount(client, householdId);
+        await AddExistingTransaction(householdId, accountId, userId);
+        const string csv =
+            "Date,Description,Amount\n" +
+            "2026-07-20,Existing purchase,-25.00\n" +
+            "2026-07-21,Do not import,-15.00\n" +
+            "bad-date,Correct me,-30.00\n";
+
+        var upload = await Upload(
+            client,
+            householdId,
+            accountId,
+            csv,
+            await GetAntiforgeryToken(client));
+        Assert.Equal(HttpStatusCode.Created, upload.StatusCode);
+        var uploaded = await upload.Content.ReadFromJsonAsync<CsvImportResponse>();
+        Assert.NotNull(uploaded);
+        Assert.Equal(1, uploaded.DuplicateRows);
+
+        var imports = await client.GetFromJsonAsync<ImportListResponse[]>(
+            $"/api/households/{householdId}/imports");
+        Assert.NotNull(imports);
+        Assert.Contains(imports, item => item.Id == uploaded.ImportFileId);
+
+        var review = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}");
+        Assert.NotNull(review);
+        Assert.Equal(3, review.Drafts.Count);
+        var duplicate = review.Drafts.Single(row => row.SourceRowNumber == 2);
+        var rejected = review.Drafts.Single(row => row.SourceRowNumber == 3);
+        var corrected = review.Drafts.Single(row => row.SourceRowNumber == 4);
+        Assert.Equal("PossibleDuplicate", duplicate.DuplicateStatus);
+        Assert.Equal("Invalid", corrected.ValidationStatus);
+
+        var unacknowledged = await PostJson(
+            client,
+            DecisionPath(householdId, uploaded.ImportFileId, duplicate.Id),
+            new { decision = "Approved", acknowledgePossibleDuplicate = false },
+            await GetAntiforgeryToken(client));
+        Assert.Equal(HttpStatusCode.BadRequest, unacknowledged.StatusCode);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await PostJson(
+            client,
+            DecisionPath(householdId, uploaded.ImportFileId, duplicate.Id),
+            new { decision = "Approved", acknowledgePossibleDuplicate = true },
+            await GetAntiforgeryToken(client))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await PostJson(
+            client,
+            DecisionPath(householdId, uploaded.ImportFileId, rejected.Id),
+            new { decision = "Rejected", acknowledgePossibleDuplicate = false },
+            await GetAntiforgeryToken(client))).StatusCode);
+
+        var correction = await PutJson(
+            client,
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}/drafts/{corrected.Id}",
+            new
+            {
+                transactionDate = "2026-07-22",
+                amount = -30m,
+                description = "Corrected purchase",
+                selectedCategoryId = (Guid?)null
+            },
+            await GetAntiforgeryToken(client));
+        Assert.Equal(HttpStatusCode.NoContent, correction.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await PostJson(
+            client,
+            DecisionPath(householdId, uploaded.ImportFileId, corrected.Id),
+            new { decision = "Approved", acknowledgePossibleDuplicate = false },
+            await GetAntiforgeryToken(client))).StatusCode);
+
+        var completed = await PostJson(
+            client,
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}/complete",
+            new { },
+            await GetAntiforgeryToken(client));
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+        var completion = await completed.Content.ReadFromJsonAsync<CompleteImportResponse>();
+        Assert.NotNull(completion);
+        Assert.Equal(2, completion.CreatedTransactionCount);
+        Assert.Equal("Completed", completion.Status);
+
+        var retry = await PostJson(
+            client,
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}/complete",
+            new { },
+            await GetAntiforgeryToken(client));
+        var retryResult = await retry.Content.ReadFromJsonAsync<CompleteImportResponse>();
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        Assert.NotNull(retryResult);
+        Assert.Equal(0, retryResult.CreatedTransactionCount);
+
+        var discardCompleted = await DeleteWithAntiforgery(
+            client,
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}",
+            await GetAntiforgeryToken(client));
+        Assert.Equal(HttpStatusCode.BadRequest, discardCompleted.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        var imported = await dbContext.Transactions
+            .Where(transaction => transaction.ImportFileId == uploaded.ImportFileId)
+            .ToListAsync();
+        Assert.Equal(2, imported.Count);
+        Assert.Contains(imported, transaction => transaction.Description == "Existing purchase");
+        Assert.Contains(imported, transaction => transaction.Description == "Corrected purchase");
+        Assert.DoesNotContain(imported, transaction => transaction.Description == "Do not import");
+    }
+
+    private async Task AddExistingTransaction(Guid householdId, Guid accountId, Guid userId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        dbContext.Transactions.Add(Transaction.CreateManual(
+            householdId,
+            accountId,
+            categoryId: null,
+            new DateOnly(2026, 7, 20),
+            postedDate: null,
+            -25m,
+            "Existing purchase",
+            merchantName: null,
+            notes: null,
+            isExcludedFromBudget: false,
+            userId,
+            DateTimeOffset.UtcNow));
+        await dbContext.SaveChangesAsync();
+    }
+
     private static async Task<HttpResponseMessage> Upload(
         HttpClient client,
         Guid householdId,
@@ -160,7 +306,7 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         return await client.SendAsync(request);
     }
 
-    private static async Task Register(HttpClient client)
+    private static async Task<Guid> Register(HttpClient client)
     {
         var response = await PostJson(
             client,
@@ -173,6 +319,9 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
             },
             await GetAntiforgeryToken(client));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var currentUser = await client.GetFromJsonAsync<CurrentUserResponse>("/api/auth/me");
+        return currentUser?.Id ?? throw new InvalidOperationException(
+            "The current-user endpoint did not return an ID.");
     }
 
     private static async Task<Guid> CreateHousehold(HttpClient client)
@@ -241,8 +390,36 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         return client.SendAsync(request);
     }
 
+    private static Task<HttpResponseMessage> PutJson<TRequest>(
+        HttpClient client,
+        string path,
+        TRequest body,
+        string token)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Put, path)
+        {
+            Content = JsonContent.Create(body)
+        };
+        request.Headers.Add("X-XSRF-TOKEN", token);
+        return client.SendAsync(request);
+    }
+
+    private static Task<HttpResponseMessage> DeleteWithAntiforgery(
+        HttpClient client,
+        string path,
+        string token)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, path);
+        request.Headers.Add("X-XSRF-TOKEN", token);
+        return client.SendAsync(request);
+    }
+
+    private static string DecisionPath(Guid householdId, Guid importFileId, Guid draftId) =>
+        $"/api/households/{householdId}/imports/{importFileId}/drafts/{draftId}/decision";
+
     private sealed record AntiforgeryResponse(string Token);
     private sealed record CreatedResponse(Guid Id);
+    private sealed record CurrentUserResponse(Guid Id);
     private sealed record CsvImportResponse(
         Guid ImportFileId,
         string OriginalFileName,
@@ -252,4 +429,14 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         int ValidRows,
         int InvalidRows,
         int DuplicateRows);
+    private sealed record ImportReviewResponse(IReadOnlyList<ImportDraftResponse> Drafts);
+    private sealed record ImportListResponse(Guid Id);
+    private sealed record ImportDraftResponse(
+        Guid Id,
+        int SourceRowNumber,
+        string ValidationStatus,
+        string DuplicateStatus);
+    private sealed record CompleteImportResponse(
+        int CreatedTransactionCount,
+        string Status);
 }
