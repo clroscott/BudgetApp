@@ -112,3 +112,27 @@ export async function apiPost<TResponse>(
     ? undefined as TResponse
     : await response.json() as TResponse
 }
+
+export async function apiPut<TResponse>(
+  path: string,
+  body: unknown,
+): Promise<TResponse> {
+  const token = await getAntiforgeryToken()
+  const response = await fetchWithCredentials(path, {
+    method: 'PUT',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-XSRF-TOKEN': token,
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    throw await readApiError(response)
+  }
+
+  return response.status === 204
+    ? undefined as TResponse
+    : await response.json() as TResponse
+}

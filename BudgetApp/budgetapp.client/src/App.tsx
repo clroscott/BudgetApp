@@ -5,6 +5,7 @@ import { useAuth } from './auth/useAuth'
 import { HouseholdProvider } from './households/HouseholdProvider'
 import { useHouseholds } from './households/useHouseholds'
 import { DashboardPage } from './pages/DashboardPage'
+import { CategoryManagementPage } from './pages/CategoryManagementPage'
 import { HouseholdSetupPage } from './pages/HouseholdSetupPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
@@ -146,6 +147,14 @@ function AppRoutes() {
           <HouseholdSetupRoute>
             <HouseholdSetupPage />
           </HouseholdSetupRoute>
+        </ProtectedRoute>
+      )
+    case '/settings/categories':
+      return (
+        <ProtectedRoute>
+          <HouseholdRequiredRoute>
+            <CategoryManagementPage />
+          </HouseholdRequiredRoute>
         </ProtectedRoute>
       )
     default:
