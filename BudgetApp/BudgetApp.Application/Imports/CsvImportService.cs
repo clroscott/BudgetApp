@@ -1,4 +1,5 @@
 using BudgetApp.Application.Accounts;
+using BudgetApp.Application.Categories;
 using BudgetApp.Application.Households;
 using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Households;
@@ -8,6 +9,7 @@ namespace BudgetApp.Application.Imports;
 
 public sealed class CsvImportService(
     IAccountRepository accountRepository,
+    ICategoryRepository categoryRepository,
     IImportRepository importRepository,
     ICsvImportReader csvImportReader,
     ImportReviewService importReviewService,
@@ -58,16 +60,11 @@ public sealed class CsvImportService(
             now);
         importFile.StartProcessing(now);
 
+        var categories = await categoryRepository.ListAsync(
+            householdId,
+            cancellationToken);
         var drafts = readResult.Rows
-            .Select(row => ImportTransactionDraft.Create(
-                importFile.Id,
-                row.SourceRowNumber,
-                row.RawData,
-                row.TransactionDate,
-                row.Amount,
-                row.Description,
-                row.ValidationMessage,
-                now))
+            .Select(row => CreateDraft(row, categories, importFile.Id, now))
             .ToList();
         var validRows = drafts.Count(draft =>
             draft.ValidationStatus == ImportDraftValidationStatus.Valid);
@@ -100,6 +97,68 @@ public sealed class CsvImportService(
             importFile.InvalidRowCount,
             importFile.DuplicateRowCount);
     }
+
+    private static ImportTransactionDraft CreateDraft(
+        CsvImportRow row,
+        IReadOnlyList<CategoryRecord> categories,
+        Guid importFileId,
+        DateTimeOffset now)
+    {
+        var draft = ImportTransactionDraft.Create(
+            importFileId,
+            row.SourceRowNumber,
+            row.RawData,
+            row.TransactionDate,
+            row.Amount,
+            row.Description,
+            row.ValidationMessage,
+            now);
+        var match = FindCategoryMatch(row, categories);
+        if (match is not null)
+        {
+            draft.SetSuggestedCategory(match.Id, now);
+            draft.SelectCategory(match.Id, now);
+        }
+
+        return draft;
+    }
+
+    private static CategoryRecord? FindCategoryMatch(
+        CsvImportRow row,
+        IReadOnlyList<CategoryRecord> categories)
+    {
+        var active = categories.Where(category => category.IsActive).ToList();
+        var categoryName = NormalizeCategoryName(row.CategoryName);
+        var subcategoryName = NormalizeCategoryName(row.SubcategoryName);
+
+        if (categoryName is not null)
+        {
+            var parent = active.FirstOrDefault(category =>
+                category.ParentCategoryId is null &&
+                category.NormalizedName == categoryName);
+            if (parent is null || subcategoryName is null)
+            {
+                return parent;
+            }
+
+            return active.FirstOrDefault(category =>
+                category.ParentCategoryId == parent.Id &&
+                category.NormalizedName == subcategoryName);
+        }
+
+        if (subcategoryName is null)
+        {
+            return null;
+        }
+
+        var matches = active.Where(category =>
+            category.ParentCategoryId.HasValue &&
+            category.NormalizedName == subcategoryName).ToList();
+        return matches.Count == 1 ? matches[0] : null;
+    }
+
+    private static string? NormalizeCategoryName(string? name) =>
+        string.IsNullOrWhiteSpace(name) ? null : name.Trim().ToUpperInvariant();
 
     private static string ValidateFileName(string originalFileName)
     {

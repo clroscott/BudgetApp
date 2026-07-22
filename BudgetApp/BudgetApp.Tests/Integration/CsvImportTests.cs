@@ -36,10 +36,10 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         var householdId = await CreateHousehold(client);
         var accountId = await CreateAccount(client, householdId);
         const string csv =
-            "Date,Description,Amount\n" +
-            "2026-07-20,\"Market, Main Street\",-47.25\n" +
-            "not-a-date,Needs correction,12.34\n" +
-            "2026-07-21,Payroll,1250.00\n";
+            "Date,Description,Amount,Category,Subcategory\n" +
+            "2026-07-20,\"Market, Main Street\",-47.25,Food & Dining,Groceries\n" +
+            "not-a-date,Needs correction,12.34,,\n" +
+            "2026-07-21,Payroll,1250.00,Income,Paycheque\n";
 
         var response = await Upload(
             client,
@@ -73,8 +73,20 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         Assert.Equal(ImportDraftValidationStatus.Valid, drafts[0].ValidationStatus);
         Assert.Equal(ImportDraftValidationStatus.Invalid, drafts[1].ValidationStatus);
         Assert.Equal(ImportDraftDuplicateStatus.NoMatch, drafts[0].DuplicateStatus);
+        var groceries = await dbContext.Categories.SingleAsync(category =>
+            category.HouseholdId == householdId && category.Name == "Groceries");
+        Assert.Equal(groceries.Id, drafts[0].SuggestedCategoryId);
+        Assert.Equal(groceries.Id, drafts[0].SelectedCategoryId);
         Assert.False(await dbContext.Transactions.AnyAsync(
             transaction => transaction.ImportFileId == result.ImportFileId));
+
+        var review = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{result.ImportFileId}");
+        Assert.NotNull(review);
+        var firstRow = review.Drafts.Single(row => row.SourceRowNumber == 2);
+        Assert.Equal("Food & Dining", firstRow.ImportedCategoryName);
+        Assert.Equal("Groceries", firstRow.ImportedSubcategoryName);
+        Assert.Equal(groceries.Id, firstRow.SelectedCategoryId);
 
         var discard = await DeleteWithAntiforgery(
             client,
@@ -435,7 +447,10 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         Guid Id,
         int SourceRowNumber,
         string ValidationStatus,
-        string DuplicateStatus);
+        string DuplicateStatus,
+        string? ImportedCategoryName,
+        string? ImportedSubcategoryName,
+        Guid? SelectedCategoryId);
     private sealed record CompleteImportResponse(
         int CreatedTransactionCount,
         string Status);

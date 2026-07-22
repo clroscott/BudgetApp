@@ -183,6 +183,11 @@ public sealed class CsvImportReader : ICsvImportReader
             "credit",
             "deposit",
             "deposits");
+        var categoryIndex = FindColumn(normalizedHeaders, "category");
+        var subcategoryIndex = FindColumn(
+            normalizedHeaders,
+            "subcategory",
+            "subcat");
 
         if (dateIndex < 0)
         {
@@ -208,7 +213,9 @@ public sealed class CsvImportReader : ICsvImportReader
             descriptionIndex,
             amountIndex,
             debitIndex,
-            creditIndex);
+            creditIndex,
+            categoryIndex,
+            subcategoryIndex);
     }
 
     private static CsvImportRejectedException UnsupportedHeaders(
@@ -236,6 +243,8 @@ public sealed class CsvImportReader : ICsvImportReader
                 GetField(fields, columns.CreditIndex),
                 errors);
         var description = GetField(fields, columns.DescriptionIndex)?.Trim();
+        var categoryName = GetField(fields, columns.CategoryIndex)?.Trim();
+        var subcategoryName = GetField(fields, columns.SubcategoryIndex)?.Trim();
         if (description?.Length > ImportTransactionDraft.ParsedDescriptionMaxLength)
         {
             errors.Add(
@@ -249,6 +258,8 @@ public sealed class CsvImportReader : ICsvImportReader
             transactionDate,
             amount,
             string.IsNullOrWhiteSpace(description) ? null : description,
+            string.IsNullOrWhiteSpace(categoryName) ? null : categoryName,
+            string.IsNullOrWhiteSpace(subcategoryName) ? null : subcategoryName,
             errors.Count == 0 ? null : string.Join(" ", errors.Distinct()));
     }
 
@@ -393,5 +404,7 @@ public sealed class CsvImportReader : ICsvImportReader
         int DescriptionIndex,
         int AmountIndex,
         int DebitIndex,
-        int CreditIndex);
+        int CreditIndex,
+        int CategoryIndex,
+        int SubcategoryIndex);
 }

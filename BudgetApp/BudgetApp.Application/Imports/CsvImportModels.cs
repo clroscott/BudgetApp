@@ -6,6 +6,8 @@ public sealed record CsvImportRow(
     DateOnly? TransactionDate,
     decimal? Amount,
     string? Description,
+    string? CategoryName,
+    string? SubcategoryName,
     string? ValidationMessage);
 
 public sealed record CsvImportReadResult(

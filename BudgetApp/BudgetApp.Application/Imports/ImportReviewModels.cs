@@ -21,6 +21,8 @@ public sealed record ImportDraftItem(
     DateOnly? TransactionDate,
     decimal? Amount,
     string? Description,
+    string? ImportedCategoryName,
+    string? ImportedSubcategoryName,
     Guid? SelectedCategoryId,
     string ValidationStatus,
     string? ValidationMessage,
