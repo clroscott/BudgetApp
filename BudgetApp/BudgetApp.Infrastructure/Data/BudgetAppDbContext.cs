@@ -1,6 +1,7 @@
 using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
+using BudgetApp.Domain.Imports;
 using BudgetApp.Domain.Transactions;
 using BudgetApp.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -18,6 +19,11 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
     public DbSet<Household> Households => Set<Household>();
 
     public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
+
+    public DbSet<ImportFile> ImportFiles => Set<ImportFile>();
+
+    public DbSet<ImportTransactionDraft> ImportTransactionDrafts =>
+        Set<ImportTransactionDraft>();
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
 

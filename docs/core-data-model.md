@@ -213,11 +213,12 @@ Key data:
 - Account ID
 - Uploaded-by user ID
 - Original filename
+- File size in bytes
 - File hash
 - Upload timestamp
 - Import status
 - Detected or selected import profile, optional
-- Row counts: total, valid, invalid, approved, rejected, and duplicate
+- Row counts: total, valid, invalid, approved, rejected, skipped, and duplicate
 - Failure summary, optional
 
 Rules:
@@ -236,11 +237,13 @@ Key data:
 - Import file ID
 - Source row number
 - Raw source values or a safe serialized representation
-- Parsed date, amount, and description
+- Immutable originally parsed date, amount, description, and validation message
+- Correctable date, amount, and description used for review
 - Suggested category ID, optional
 - User-selected category ID, optional
 - Validation status and messages
 - Duplicate detection result and possible matching transaction ID
+- Explicit acknowledgement when importing a possible duplicate
 - Review decision: Pending, Approved, Rejected, or Skipped
 - Approved transaction ID, optional
 
