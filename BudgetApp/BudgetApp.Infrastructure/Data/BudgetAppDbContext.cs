@@ -1,3 +1,4 @@
+using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
 using BudgetApp.Infrastructure.Identity;
@@ -9,6 +10,8 @@ namespace BudgetApp.Infrastructure.Data;
 public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> options)
     : IdentityUserContext<ApplicationUser, Guid>(options)
 {
+    public DbSet<Account> Accounts => Set<Account>();
+
     public DbSet<Category> Categories => Set<Category>();
 
     public DbSet<Household> Households => Set<Household>();
