@@ -648,6 +648,99 @@ a {
   align-items: flex-start;
 }
 
+.transaction-content {
+  max-width: 68rem;
+}
+
+.transaction-account-filter {
+  display: grid;
+  max-width: 22rem;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.transaction-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.transaction-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 0.8fr) minmax(12rem, 2fr) minmax(8rem, auto) auto auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.transaction-row-voided {
+  opacity: 0.65;
+}
+
+.transaction-date,
+.transaction-description {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.transaction-row small,
+.transaction-flags {
+  color: var(--muted-text);
+}
+
+.transaction-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+}
+
+.transaction-flags span {
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.35rem;
+  background: var(--page-bg);
+}
+
+.amount-out {
+  color: var(--heading);
+}
+
+.amount-in {
+  color: var(--accent);
+}
+
+.transaction-edit-form {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--accent);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.transaction-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.transaction-edit-grid label {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+}
+
+.transaction-edit-grid textarea {
+  resize: vertical;
+}
+
+.transaction-wide-field {
+  grid-column: 1 / -1;
+}
+
 .import-result {
   border-color: var(--accent);
 }
@@ -681,6 +774,14 @@ a {
 @media (max-width: 55rem) {
   .account-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .transaction-row {
+    grid-template-columns: 1fr 2fr auto;
+  }
+
+  .transaction-flags {
+    grid-column: 2;
   }
 }
 
@@ -721,6 +822,16 @@ a {
 
   .import-stat-grid {
     grid-template-columns: 1fr;
+  }
+
+  .transaction-row,
+  .transaction-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .transaction-flags,
+  .transaction-wide-field {
+    grid-column: 1;
   }
 
   .category-actions {

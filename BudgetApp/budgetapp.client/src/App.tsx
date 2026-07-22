@@ -11,6 +11,7 @@ import { CsvImportPage } from './pages/CsvImportPage'
 import { HouseholdSetupPage } from './pages/HouseholdSetupPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { TransactionManagementPage } from './pages/TransactionManagementPage'
 import { RouterProvider } from './routing/RouterProvider'
 import { useRouter } from './routing/useRouter'
 
@@ -156,6 +157,14 @@ function AppRoutes() {
         <ProtectedRoute>
           <HouseholdRequiredRoute>
             <CsvImportPage />
+          </HouseholdRequiredRoute>
+        </ProtectedRoute>
+      )
+    case '/transactions':
+      return (
+        <ProtectedRoute>
+          <HouseholdRequiredRoute>
+            <TransactionManagementPage />
           </HouseholdRequiredRoute>
         </ProtectedRoute>
       )

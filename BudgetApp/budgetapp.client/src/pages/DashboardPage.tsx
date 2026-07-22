@@ -75,6 +75,12 @@ export function DashboardPage() {
             <AppLink to="/settings/categories">Manage categories</AppLink>
           </article>
           <article className="summary-card">
+            <span>Transactions</span>
+            <strong>Official activity</strong>
+            <small>Review and correct approved household and personal transactions.</small>
+            <AppLink to="/transactions">View transactions</AppLink>
+          </article>
+          <article className="summary-card">
             <span>Import</span>
             <strong>CSV transactions</strong>
             <small>Stage bank transactions for validation and review.</small>
