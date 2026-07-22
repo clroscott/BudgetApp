@@ -19,6 +19,12 @@ public sealed record BudgetCategoryModel(
 
 public sealed record BudgetLineInput(Guid CategoryId, decimal BudgetedAmount);
 
+public sealed record BudgetMonthOption(
+    Guid Id,
+    int Year,
+    int Month,
+    string Status);
+
 public sealed record BudgetCategoryRecord(
     Guid Id,
     string Name,

@@ -98,28 +98,33 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
     }
 
     [Fact]
-    public async Task CopyPreviousMonth_CopiesLinesIntoNewDraft()
+    public async Task CopySelectedMonth_CopiesLinesIntoNewDraft()
     {
         using var client = factory.CreateAuthenticatedTestClient();
         await Register(client);
         var householdId = await CreateHousehold(client);
         var token = await GetAntiforgeryToken(client);
-        var junePath = $"/api/households/{householdId}/budgets/2026/6";
+        var sourcePath = $"/api/households/{householdId}/budgets/2026/5";
         var create = await SendWithAntiforgery(
-            client, HttpMethod.Post, junePath, new { scope = "Household" }, token);
-        var june = await create.Content.ReadFromJsonAsync<BudgetResponse>();
-        var food = Assert.Single(june!.Categories, category => category.Name == "Food & Dining");
+            client, HttpMethod.Post, sourcePath, new { scope = "Household" }, token);
+        var source = await create.Content.ReadFromJsonAsync<BudgetResponse>();
+        var food = Assert.Single(source!.Categories, category => category.Name == "Food & Dining");
         var save = await SendWithAntiforgery(
             client, HttpMethod.Put,
-            $"/api/households/{householdId}/budgets/{june.Id}",
+            $"/api/households/{householdId}/budgets/{source.Id}",
             new { lines = new[] { new { categoryId = food.Id, budgetedAmount = 600m } } },
             token);
         Assert.Equal(HttpStatusCode.OK, save.StatusCode);
+        var options = await client.GetFromJsonAsync<BudgetOptionResponse[]>(
+            $"/api/households/{householdId}/budgets?scope=Household") ?? [];
+        var sourceOption = Assert.Single(options, option => option.Id == source.Id);
+        Assert.Equal(2026, sourceOption.Year);
+        Assert.Equal(5, sourceOption.Month);
 
         var copy = await SendWithAntiforgery(
             client, HttpMethod.Post,
-            $"/api/households/{householdId}/budgets/2026/7/copy-previous",
-            new { scope = "Household" }, token);
+            $"/api/households/{householdId}/budgets/2026/7/copy",
+            new { scope = "Household", sourceYear = 2026, sourceMonth = 5 }, token);
 
         Assert.Equal(HttpStatusCode.OK, copy.StatusCode);
         var july = await copy.Content.ReadFromJsonAsync<BudgetResponse>();
@@ -240,6 +245,7 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
         string Currency,
         string? Status,
         IReadOnlyList<BudgetCategoryResponse> Categories);
+    private sealed record BudgetOptionResponse(Guid Id, int Year, int Month, string Status);
     private sealed record BudgetCategoryResponse(
         Guid Id,
         string Name,

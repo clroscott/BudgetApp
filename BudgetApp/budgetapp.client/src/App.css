@@ -1309,6 +1309,19 @@ a {
   margin-top: 0;
 }
 
+.budget-copy-source {
+  width: 100%;
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.budget-copy-source span {
+  color: var(--heading);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
 .recurring-content {
   max-width: 64rem;
 }

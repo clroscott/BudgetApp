@@ -19,6 +19,12 @@ public interface IBudgetRepository
         Guid userId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<BudgetMonthOption>> ListAvailableAsync(
+        Guid householdId,
+        BudgetScope scope,
+        Guid? ownerUserId,
+        CancellationToken cancellationToken);
+
     Task<string?> GetHouseholdCurrencyAsync(
         Guid householdId,
         CancellationToken cancellationToken);

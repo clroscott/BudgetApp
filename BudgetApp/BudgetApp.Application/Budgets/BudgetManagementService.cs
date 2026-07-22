@@ -67,12 +67,29 @@ public sealed class BudgetManagementService(
         return BuildModel(budget, year, month, budgetScope, currency, categories);
     }
 
-    public async Task<BudgetPageModel> CopyPreviousAsync(
+    public async Task<IReadOnlyList<BudgetMonthOption>> ListAvailableAsync(
+        Guid householdId,
+        Guid userId,
+        string scope,
+        CancellationToken cancellationToken)
+    {
+        await authorizationService.RequireViewAsync(householdId, userId, cancellationToken);
+        var budgetScope = ParseScope(scope);
+        return await budgetRepository.ListAvailableAsync(
+            householdId,
+            budgetScope,
+            budgetScope == BudgetScope.Personal ? userId : null,
+            cancellationToken);
+    }
+
+    public async Task<BudgetPageModel> CopyFromAsync(
         Guid householdId,
         Guid userId,
         int year,
         int month,
         string scope,
+        int sourceYear,
+        int sourceMonth,
         CancellationToken cancellationToken)
     {
         await authorizationService.RequireEditAsync(householdId, userId, cancellationToken);
@@ -81,15 +98,14 @@ public sealed class BudgetManagementService(
         Guid? ownerUserId = budgetScope == BudgetScope.Personal ? userId : null;
         await EnsureBudgetDoesNotExist(
             householdId, year, month, budgetScope, ownerUserId, cancellationToken);
-        if (year == BudgetMonth.MinimumYear && month == 1)
-            throw new InvalidOperationException("There is no previous calendar month to copy.");
-
-        var previousPeriod = new DateOnly(year, month, 1).AddMonths(-1);
-        var previous = await budgetRepository.GetAsync(
-            householdId, previousPeriod.Year, previousPeriod.Month,
+        ValidatePeriod(sourceYear, sourceMonth);
+        if (year == sourceYear && month == sourceMonth)
+            throw new InvalidOperationException("The source and target budget months must be different.");
+        var source = await budgetRepository.GetAsync(
+            householdId, sourceYear, sourceMonth,
             budgetScope, ownerUserId, forUpdate: false, cancellationToken)
             ?? throw new InvalidOperationException(
-                "No budget exists for the previous month in this scope.");
+                "The selected source budget does not exist in this scope.");
         var currency = await GetHouseholdCurrency(householdId, cancellationToken);
         var categories = await budgetRepository.ListExpenseCategoriesAsync(
             householdId, cancellationToken);
@@ -100,7 +116,7 @@ public sealed class BudgetManagementService(
         var budget = CreateBudget(
             householdId, userId, year, month, budgetScope, currency);
         var now = timeProvider.GetUtcNow();
-        foreach (var line in previous.Lines.Where(line => activeCategoryIds.Contains(line.CategoryId)))
+        foreach (var line in source.Lines.Where(line => activeCategoryIds.Contains(line.CategoryId)))
             budget.AddLine(line.CategoryId, line.BudgetedAmount, now);
         await budgetRepository.AddAsync(budget, cancellationToken);
         await budgetRepository.SaveChangesAsync(cancellationToken);
