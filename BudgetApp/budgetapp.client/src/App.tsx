@@ -9,6 +9,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { CategoryManagementPage } from './pages/CategoryManagementPage'
 import { CsvImportPage } from './pages/CsvImportPage'
 import { HouseholdSetupPage } from './pages/HouseholdSetupPage'
+import { ImportReviewPage } from './pages/ImportReviewPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { TransactionManagementPage } from './pages/TransactionManagementPage'
@@ -157,6 +158,14 @@ function AppRoutes() {
         <ProtectedRoute>
           <HouseholdRequiredRoute>
             <CsvImportPage />
+          </HouseholdRequiredRoute>
+        </ProtectedRoute>
+      )
+    case '/imports/review':
+      return (
+        <ProtectedRoute>
+          <HouseholdRequiredRoute>
+            <ImportReviewPage />
           </HouseholdRequiredRoute>
         </ProtectedRoute>
       )

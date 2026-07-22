@@ -179,6 +179,16 @@ button:disabled {
   text-decoration: underline;
 }
 
+.danger-button {
+  border: 1px solid #b42318;
+  background: var(--surface);
+  color: #b42318;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: #fff1f0;
+}
+
 .auth-switch {
   margin-top: 1.5rem;
   text-align: center;
@@ -771,6 +781,134 @@ a {
   font-size: 1.35rem;
 }
 
+.import-review-content {
+  max-width: 72rem;
+}
+
+.import-selector {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+
+.import-review-summary,
+.complete-import-panel {
+  margin-bottom: 1.25rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.import-review-summary .import-stat-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.import-draft-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.import-draft-card {
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-left: 0.35rem solid var(--border-strong);
+  border-radius: 0.8rem;
+  background: var(--surface);
+}
+
+.import-decision-approved {
+  border-left-color: var(--accent);
+}
+
+.import-decision-rejected,
+.import-decision-skipped {
+  opacity: 0.72;
+}
+
+.import-draft-heading,
+.import-draft-heading > div,
+.import-row-badges,
+.import-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.import-draft-heading {
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.import-draft-heading > div:first-child {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.import-draft-heading span,
+.import-row-badges span {
+  color: var(--muted-text);
+  font-size: 0.78rem;
+}
+
+.import-row-badges span {
+  padding: 0.25rem 0.45rem;
+  border-radius: 0.4rem;
+  background: var(--page-bg);
+}
+
+.row-validation-message,
+.duplicate-warning {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border-radius: 0.6rem;
+  background: #fff4e5;
+  color: #6f4300;
+}
+
+.duplicate-warning p {
+  margin-bottom: 0.4rem;
+}
+
+.import-draft-fields {
+  display: grid;
+  grid-template-columns: minmax(9rem, 0.8fr) minmax(8rem, 0.7fr) minmax(14rem, 2fr) minmax(12rem, 1fr);
+  gap: 0.75rem;
+}
+
+.import-draft-fields label {
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+}
+
+.import-row-actions {
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.import-row-actions .primary-button {
+  margin-top: 0;
+}
+
+.complete-import-panel {
+  margin-top: 1.5rem;
+}
+
+.import-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+.complete-import-panel p {
+  margin: 0.4rem 0;
+}
+
 @media (max-width: 55rem) {
   .account-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -782,6 +920,18 @@ a {
 
   .transaction-flags {
     grid-column: 2;
+  }
+
+  .import-review-summary .import-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .import-draft-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .import-description-field {
+    grid-column: 1 / -1;
   }
 }
 
@@ -832,6 +982,20 @@ a {
   .transaction-flags,
   .transaction-wide-field {
     grid-column: 1;
+  }
+
+  .import-review-summary .import-stat-grid,
+  .import-draft-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .import-description-field {
+    grid-column: 1;
+  }
+
+  .import-draft-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .category-actions {

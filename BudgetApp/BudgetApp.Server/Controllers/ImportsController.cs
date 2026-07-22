@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.ComponentModel.DataAnnotations;
+using BudgetApp.Application.Categories;
 using BudgetApp.Application.Accounts;
 using BudgetApp.Application.Households;
 using BudgetApp.Application.Imports;
@@ -12,8 +14,46 @@ namespace BudgetApp.Server.Controllers;
 [Route("api/households/{householdId:guid}/imports")]
 public sealed class ImportsController(
     CsvImportService csvImportService,
+    ImportReviewService importReviewService,
     ILogger<ImportsController> logger) : ControllerBase
 {
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<ImportListItem>>> List(
+        Guid householdId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            return Ok(await importReviewService.ListAsync(
+                householdId, userId, cancellationToken));
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
+    [HttpGet("{importFileId:guid}")]
+    public async Task<ActionResult<ImportReviewDetail>> Get(
+        Guid householdId,
+        Guid importFileId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            return Ok(await importReviewService.GetAsync(
+                householdId, userId, importFileId, cancellationToken));
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
     [HttpPost]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(CsvImportLimits.MaxRequestSizeBytes)]
@@ -72,12 +112,143 @@ public sealed class ImportsController(
         }
     }
 
+    [HttpPost("{importFileId:guid}/check-duplicates")]
+    public async Task<IActionResult> CheckDuplicates(
+        Guid householdId,
+        Guid importFileId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            await importReviewService.CheckDuplicatesAsync(
+                householdId, userId, importFileId, cancellationToken);
+            return NoContent();
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
+    [HttpPut("{importFileId:guid}/drafts/{draftId:guid}")]
+    public async Task<IActionResult> UpdateDraft(
+        Guid householdId,
+        Guid importFileId,
+        Guid draftId,
+        UpdateImportDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            await importReviewService.UpdateDraftAsync(
+                householdId,
+                userId,
+                importFileId,
+                draftId,
+                request.TransactionDate,
+                request.Amount,
+                request.Description,
+                request.SelectedCategoryId,
+                cancellationToken);
+            return NoContent();
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
+    [HttpPost("{importFileId:guid}/drafts/{draftId:guid}/decision")]
+    public async Task<IActionResult> SetDecision(
+        Guid householdId,
+        Guid importFileId,
+        Guid draftId,
+        ReviewImportDraftRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            await importReviewService.SetDecisionAsync(
+                householdId,
+                userId,
+                importFileId,
+                draftId,
+                request.Decision,
+                request.AcknowledgePossibleDuplicate,
+                cancellationToken);
+            return NoContent();
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
+    [HttpPost("{importFileId:guid}/complete")]
+    public async Task<ActionResult<CompleteImportResult>> Complete(
+        Guid householdId,
+        Guid importFileId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            var result = await importReviewService.CompleteAsync(
+                householdId, userId, importFileId, cancellationToken);
+            logger.LogInformation(
+                "User {UserId} completed import {ImportFileId} and created {TransactionCount} transactions",
+                userId,
+                importFileId,
+                result.CreatedTransactionCount);
+            return Ok(result);
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
+    [HttpDelete("{importFileId:guid}")]
+    public async Task<IActionResult> Discard(
+        Guid householdId,
+        Guid importFileId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            await importReviewService.DiscardAsync(
+                householdId, userId, importFileId, cancellationToken);
+            logger.LogInformation(
+                "User {UserId} discarded staged import {ImportFileId} in household {HouseholdId}",
+                userId,
+                importFileId,
+                householdId);
+            return NoContent();
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
     private bool TryGetUserId(out Guid userId) =>
         Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
 
     private static bool IsExpected(Exception exception) =>
         exception is HouseholdAccessDeniedException or
             AccountNotFoundException or
+            ImportNotFoundException or
+            ImportDraftNotFoundException or
+            CategoryNotFoundException or
             DuplicateCsvImportException or
             CsvImportRejectedException or
             ArgumentException or
@@ -91,6 +262,12 @@ public sealed class ImportsController(
                 (StatusCodes.Status403Forbidden, "Household access denied"),
             AccountNotFoundException =>
                 (StatusCodes.Status404NotFound, "Account not found"),
+            ImportNotFoundException =>
+                (StatusCodes.Status404NotFound, "Import not found"),
+            ImportDraftNotFoundException =>
+                (StatusCodes.Status404NotFound, "Import row not found"),
+            CategoryNotFoundException =>
+                (StatusCodes.Status400BadRequest, "Category not found"),
             DuplicateCsvImportException =>
                 (StatusCodes.Status409Conflict, "Possible duplicate file"),
             _ => (StatusCodes.Status400BadRequest, "CSV import was rejected")
@@ -112,3 +289,13 @@ public sealed class ImportsController(
             Detail = detail
         });
 }
+
+public sealed record UpdateImportDraftRequest(
+    DateOnly? TransactionDate,
+    decimal? Amount,
+    [param: StringLength(500)] string? Description,
+    Guid? SelectedCategoryId);
+
+public sealed record ReviewImportDraftRequest(
+    [param: Required] string Decision,
+    bool AcknowledgePossibleDuplicate);
