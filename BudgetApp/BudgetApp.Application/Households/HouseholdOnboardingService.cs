@@ -1,4 +1,5 @@
 using System.Globalization;
+using BudgetApp.Application.Categories;
 using BudgetApp.Domain.Households;
 
 namespace BudgetApp.Application.Households;
@@ -66,14 +67,21 @@ public sealed class HouseholdOnboardingService(
             throw new UnsupportedTimeZoneException(normalizedTimeZoneId);
         }
 
+        var createdAtUtc = timeProvider.GetUtcNow();
         var household = Household.Create(
             name,
             normalizedCurrency,
             normalizedTimeZoneId,
             userId,
-            timeProvider.GetUtcNow());
+            createdAtUtc);
+        var initialCategories = DefaultCategoryCatalog.CreateForHousehold(
+            household.Id,
+            createdAtUtc);
 
-        await householdRepository.AddAsync(household, cancellationToken);
+        await householdRepository.AddAsync(
+            household,
+            initialCategories,
+            cancellationToken);
 
         return new HouseholdMembership(
             household.Id,

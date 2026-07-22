@@ -1,4 +1,5 @@
 using BudgetApp.Application.Households;
+using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
 using BudgetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -42,9 +43,11 @@ internal sealed class HouseholdRepository(BudgetAppDbContext dbContext)
 
     public async Task AddAsync(
         Household household,
+        IReadOnlyCollection<Category> initialCategoryRoots,
         CancellationToken cancellationToken)
     {
         dbContext.Households.Add(household);
+        dbContext.Categories.AddRange(initialCategoryRoots);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

@@ -1,3 +1,4 @@
+using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
 
 namespace BudgetApp.Application.Households;
@@ -14,5 +15,6 @@ public interface IHouseholdRepository
 
     Task AddAsync(
         Household household,
+        IReadOnlyCollection<Category> initialCategoryRoots,
         CancellationToken cancellationToken);
 }

@@ -1,5 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using BudgetApp.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BudgetApp.Tests.Integration;
 
@@ -51,6 +54,17 @@ public sealed class HouseholdOnboardingTests(BudgetAppWebApplicationFactory fact
             "/api/households");
         var saved = Assert.Single(memberships ?? []);
         Assert.Equal(created, saved);
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        var categories = await dbContext.Categories
+            .AsNoTracking()
+            .Where(category => category.HouseholdId == created.Id)
+            .ToListAsync();
+
+        Assert.Equal(39, categories.Count);
+        Assert.Equal(10, categories.Count(category => category.ParentCategoryId == null));
+        Assert.Equal(29, categories.Count(category => category.ParentCategoryId != null));
     }
 
     [Fact]
