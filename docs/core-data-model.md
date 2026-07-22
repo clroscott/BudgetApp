@@ -189,6 +189,7 @@ Key data:
 - Source: Manual, Import, or Adjustment
 - Review status
 - Excluded-from-budget flag
+- Voided flag
 - Notes
 - Last modified by user and modification timestamp
 
@@ -200,7 +201,7 @@ Rules:
 - A discrepancy should normally be represented by an explicit adjustment transaction rather than an unexplained edit to another transaction.
 - Transfers, reimbursements, and transaction splits may need richer models later. Version 1 may begin with category type and exclusion flags.
 
-The amount sign convention must be selected before entity implementation and applied consistently to imports, budgeting calculations, and reporting.
+Amount uses a signed cash-flow convention in the account's currency: positive means money entering the account and negative means money leaving the account. CSV adapters must normalize bank-specific debit and credit formats into this convention before approval.
 
 ### ImportFile
 
@@ -372,7 +373,6 @@ AI suggestions will be introduced behind backend interfaces only. They may propo
 
 ## Decisions Required Before Implementation
 
-- Transaction amount sign convention
 - Initial personal-data visibility policy between household members
 - File size limits and uploaded-file retention policy
 - Whether version 1 permits manual transaction entry
