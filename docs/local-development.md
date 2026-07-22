@@ -94,6 +94,14 @@ If public frontend configuration is introduced later, add a documented `.env.exa
 
 AI providers and other secret-bearing services must be called by the ASP.NET backend behind application interfaces.
 
+## Sample Transaction Data
+
+The repository includes `docs/samples/expanded-transaction-search.csv` for local UI testing. It contains 120 entirely fictional transactions dated from March 25 through July 22, 2026, with varied descriptions, amounts, category types, categories, and subcategories.
+
+Upload the file through the normal CSV import workflow and select the development account that should receive the staged rows. Review and complete the import just as you would for any other file. The sample is intended to exercise date filtering, category filtering, description search, paging, editing, and long-page scrolling without using real financial data.
+
+Do not replace this committed sample with an export from a real bank account.
+
 ## Repository Safety Rules
 
 - Keep committed `appsettings` files free of secrets and machine-specific values.

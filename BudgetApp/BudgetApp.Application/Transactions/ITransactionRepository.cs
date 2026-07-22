@@ -4,12 +4,16 @@ namespace BudgetApp.Application.Transactions;
 
 public interface ITransactionRepository
 {
-    Task<IReadOnlyList<TransactionRecord>> ListVisibleAsync(
+    Task<TransactionQueryResult> ListVisibleAsync(
         Guid householdId,
         Guid userId,
         Guid? accountId,
         DateOnly? fromDate,
         DateOnly? toDate,
+        BudgetApp.Domain.Categories.CategoryType? categoryType,
+        Guid? categoryId,
+        string? descriptionSearch,
+        int skip,
         int take,
         CancellationToken cancellationToken);
 

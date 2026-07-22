@@ -1,0 +1,121 @@
+Date,Description,Amount,Category,Subcategory
+2026-03-25,Fresh Market 001,-42.00,Food & Dining,Groceries
+2026-03-26,Neighbourhood Cafe 002,-6.65,Food & Dining,Restaurants
+2026-03-27,Fuel Station 003,-67.00,Transportation,Fuel
+2026-03-28,Video Streaming 004,-17.99,Subscriptions,Streaming
+2026-03-29,Monthly Rent 005,-1500.00,Housing,Rent or Mortgage
+2026-03-30,Community Pharmacy 006,-31.75,Health,Pharmacy
+2026-03-31,Example Employer Payroll 007,2350.00,Income,Paycheque
+2026-04-01,Savings Transfer 008,-450.00,Transfers,Account Transfer
+2026-04-02,Home Supply Store 009,-27.00,Shopping,Household Items
+2026-04-03,Cinema Tickets 010,-24.00,Entertainment,Movies
+2026-04-04,Electric Utility 011,-106.80,Housing,Utilities
+2026-04-05,Local Restaurant 012,-45.35,Food & Dining,Restaurants
+2026-04-06,Fresh Market 013,-42.00,Food & Dining,Groceries
+2026-04-07,Neighbourhood Cafe 014,-6.65,Food & Dining,Restaurants
+2026-04-08,Fuel Station 015,-76.00,Transportation,Fuel
+2026-04-09,Video Streaming 016,-17.99,Subscriptions,Streaming
+2026-04-10,Monthly Rent 017,-1500.00,Housing,Rent or Mortgage
+2026-04-11,Community Pharmacy 018,-26.25,Health,Pharmacy
+2026-04-12,Example Employer Payroll 019,2350.00,Income,Paycheque
+2026-04-13,Savings Transfer 020,-450.00,Transfers,Account Transfer
+2026-04-14,Home Supply Store 021,-48.60,Shopping,Household Items
+2026-04-15,Cinema Tickets 022,-24.00,Entertainment,Movies
+2026-04-16,Electric Utility 023,-106.80,Housing,Utilities
+2026-04-17,Local Restaurant 024,-60.05,Food & Dining,Restaurants
+2026-04-18,Fresh Market 025,-42.00,Food & Dining,Groceries
+2026-04-19,Neighbourhood Cafe 026,-6.65,Food & Dining,Restaurants
+2026-04-20,Fuel Station 027,-62.50,Transportation,Fuel
+2026-04-21,Video Streaming 028,-17.99,Subscriptions,Streaming
+2026-04-22,Monthly Rent 029,-1500.00,Housing,Rent or Mortgage
+2026-04-23,Community Pharmacy 030,-20.75,Health,Pharmacy
+2026-04-24,Example Employer Payroll 031,2350.00,Income,Paycheque
+2026-04-25,Savings Transfer 032,-450.00,Transfers,Account Transfer
+2026-04-26,Home Supply Store 033,-27.00,Shopping,Household Items
+2026-04-27,Cinema Tickets 034,-24.00,Entertainment,Movies
+2026-04-28,Electric Utility 035,-106.80,Housing,Utilities
+2026-04-29,Local Restaurant 036,-38.00,Food & Dining,Restaurants
+2026-04-30,Fresh Market 037,-42.00,Food & Dining,Groceries
+2026-05-01,Neighbourhood Cafe 038,-6.65,Food & Dining,Restaurants
+2026-05-02,Fuel Station 039,-71.50,Transportation,Fuel
+2026-05-03,Video Streaming 040,-17.99,Subscriptions,Streaming
+2026-05-04,Monthly Rent 041,-1500.00,Housing,Rent or Mortgage
+2026-05-05,Community Pharmacy 042,-34.50,Health,Pharmacy
+2026-05-06,Example Employer Payroll 043,2350.00,Income,Paycheque
+2026-05-07,Savings Transfer 044,-450.00,Transfers,Account Transfer
+2026-05-08,Home Supply Store 045,-48.60,Shopping,Household Items
+2026-05-09,Cinema Tickets 046,-24.00,Entertainment,Movies
+2026-05-10,Electric Utility 047,-106.80,Housing,Utilities
+2026-05-11,Local Restaurant 048,-52.70,Food & Dining,Restaurants
+2026-05-12,Fresh Market 049,-42.00,Food & Dining,Groceries
+2026-05-13,Neighbourhood Cafe 050,-6.65,Food & Dining,Restaurants
+2026-05-14,Fuel Station 051,-58.00,Transportation,Fuel
+2026-05-15,Video Streaming 052,-17.99,Subscriptions,Streaming
+2026-05-16,Monthly Rent 053,-1500.00,Housing,Rent or Mortgage
+2026-05-17,Community Pharmacy 054,-29.00,Health,Pharmacy
+2026-05-18,Example Employer Payroll 055,2350.00,Income,Paycheque
+2026-05-19,Savings Transfer 056,-450.00,Transfers,Account Transfer
+2026-05-20,Home Supply Store 057,-27.00,Shopping,Household Items
+2026-05-21,Cinema Tickets 058,-24.00,Entertainment,Movies
+2026-05-22,Electric Utility 059,-106.80,Housing,Utilities
+2026-05-23,Local Restaurant 060,-67.40,Food & Dining,Restaurants
+2026-05-24,Fresh Market 061,-42.00,Food & Dining,Groceries
+2026-05-25,Neighbourhood Cafe 062,-6.65,Food & Dining,Restaurants
+2026-05-26,Fuel Station 063,-67.00,Transportation,Fuel
+2026-05-27,Video Streaming 064,-17.99,Subscriptions,Streaming
+2026-05-28,Monthly Rent 065,-1500.00,Housing,Rent or Mortgage
+2026-05-29,Community Pharmacy 066,-23.50,Health,Pharmacy
+2026-05-30,Example Employer Payroll 067,2350.00,Income,Paycheque
+2026-05-31,Savings Transfer 068,-450.00,Transfers,Account Transfer
+2026-06-01,Home Supply Store 069,-48.60,Shopping,Household Items
+2026-06-02,Cinema Tickets 070,-24.00,Entertainment,Movies
+2026-06-03,Electric Utility 071,-106.80,Housing,Utilities
+2026-06-04,Local Restaurant 072,-45.35,Food & Dining,Restaurants
+2026-06-05,Fresh Market 073,-42.00,Food & Dining,Groceries
+2026-06-06,Neighbourhood Cafe 074,-6.65,Food & Dining,Restaurants
+2026-06-07,Fuel Station 075,-76.00,Transportation,Fuel
+2026-06-08,Video Streaming 076,-17.99,Subscriptions,Streaming
+2026-06-09,Monthly Rent 077,-1500.00,Housing,Rent or Mortgage
+2026-06-10,Community Pharmacy 078,-18.00,Health,Pharmacy
+2026-06-11,Example Employer Payroll 079,2350.00,Income,Paycheque
+2026-06-12,Savings Transfer 080,-450.00,Transfers,Account Transfer
+2026-06-13,Home Supply Store 081,-27.00,Shopping,Household Items
+2026-06-14,Cinema Tickets 082,-24.00,Entertainment,Movies
+2026-06-15,Electric Utility 083,-106.80,Housing,Utilities
+2026-06-16,Local Restaurant 084,-60.05,Food & Dining,Restaurants
+2026-06-17,Fresh Market 085,-42.00,Food & Dining,Groceries
+2026-06-18,Neighbourhood Cafe 086,-6.65,Food & Dining,Restaurants
+2026-06-19,Fuel Station 087,-62.50,Transportation,Fuel
+2026-06-20,Video Streaming 088,-17.99,Subscriptions,Streaming
+2026-06-21,Monthly Rent 089,-1500.00,Housing,Rent or Mortgage
+2026-06-22,Community Pharmacy 090,-31.75,Health,Pharmacy
+2026-06-23,Example Employer Payroll 091,2350.00,Income,Paycheque
+2026-06-24,Savings Transfer 092,-450.00,Transfers,Account Transfer
+2026-06-25,Home Supply Store 093,-48.60,Shopping,Household Items
+2026-06-26,Cinema Tickets 094,-24.00,Entertainment,Movies
+2026-06-27,Electric Utility 095,-106.80,Housing,Utilities
+2026-06-28,Local Restaurant 096,-38.00,Food & Dining,Restaurants
+2026-06-29,Fresh Market 097,-42.00,Food & Dining,Groceries
+2026-06-30,Neighbourhood Cafe 098,-6.65,Food & Dining,Restaurants
+2026-07-01,Fuel Station 099,-71.50,Transportation,Fuel
+2026-07-02,Video Streaming 100,-17.99,Subscriptions,Streaming
+2026-07-03,Monthly Rent 101,-1500.00,Housing,Rent or Mortgage
+2026-07-04,Community Pharmacy 102,-26.25,Health,Pharmacy
+2026-07-05,Example Employer Payroll 103,2350.00,Income,Paycheque
+2026-07-06,Savings Transfer 104,-450.00,Transfers,Account Transfer
+2026-07-07,Home Supply Store 105,-27.00,Shopping,Household Items
+2026-07-08,Cinema Tickets 106,-24.00,Entertainment,Movies
+2026-07-09,Electric Utility 107,-106.80,Housing,Utilities
+2026-07-10,Local Restaurant 108,-52.70,Food & Dining,Restaurants
+2026-07-11,Fresh Market 109,-42.00,Food & Dining,Groceries
+2026-07-12,Neighbourhood Cafe 110,-6.65,Food & Dining,Restaurants
+2026-07-13,Fuel Station 111,-58.00,Transportation,Fuel
+2026-07-14,Video Streaming 112,-17.99,Subscriptions,Streaming
+2026-07-15,Monthly Rent 113,-1500.00,Housing,Rent or Mortgage
+2026-07-16,Community Pharmacy 114,-20.75,Health,Pharmacy
+2026-07-17,Example Employer Payroll 115,2350.00,Income,Paycheque
+2026-07-18,Savings Transfer 116,-450.00,Transfers,Account Transfer
+2026-07-19,Home Supply Store 117,-48.60,Shopping,Household Items
+2026-07-20,Cinema Tickets 118,-24.00,Entertainment,Movies
+2026-07-21,Electric Utility 119,-106.80,Housing,Utilities
+2026-07-22,Local Restaurant 120,-67.40,Food & Dining,Restaurants
