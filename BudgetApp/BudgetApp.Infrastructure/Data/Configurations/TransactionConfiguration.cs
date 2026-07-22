@@ -1,6 +1,7 @@
 using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
+using BudgetApp.Domain.Imports;
 using BudgetApp.Domain.Transactions;
 using BudgetApp.Infrastructure.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -108,6 +109,11 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
         builder.HasOne<Category>()
             .WithMany()
             .HasForeignKey(transaction => transaction.CategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<ImportFile>()
+            .WithMany()
+            .HasForeignKey(transaction => transaction.ImportFileId)
             .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne<ApplicationUser>()
