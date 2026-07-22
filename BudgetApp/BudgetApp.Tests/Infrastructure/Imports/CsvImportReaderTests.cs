@@ -57,6 +57,22 @@ public sealed class CsvImportReaderTests
     }
 
     [Fact]
+    public async Task ReadAsync_ParsesOptionalCategoryColumns()
+    {
+        const string csv =
+            "Date,Description,Amount,Category,Sub Category\n" +
+            "2026-07-20,Groceries,-55.10,Food & Dining,Groceries\n" +
+            "2026-07-21,Uncategorized,-12.25,,\n";
+
+        var result = await Read(csv);
+
+        Assert.Equal("Food & Dining", result.Rows[0].CategoryName);
+        Assert.Equal("Groceries", result.Rows[0].SubcategoryName);
+        Assert.Null(result.Rows[1].CategoryName);
+        Assert.Null(result.Rows[1].SubcategoryName);
+    }
+
+    [Fact]
     public async Task ReadAsync_WithUnknownLayout_IsRejected()
     {
         const string csv = "When,What,Value\n2026-07-20,Groceries,-10\n";

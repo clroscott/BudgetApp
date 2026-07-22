@@ -175,6 +175,18 @@ public sealed class ImportTransactionDraft
         UpdatedAtUtc = updatedAtUtc;
     }
 
+    public void SelectCategory(
+        Guid? selectedCategoryId,
+        DateTimeOffset updatedAtUtc)
+    {
+        EnsureNotLinked();
+        SelectedCategoryId = ValidateOptionalId(
+            selectedCategoryId,
+            nameof(selectedCategoryId),
+            "Selected category ID");
+        UpdatedAtUtc = updatedAtUtc;
+    }
+
     public void SetDuplicateResult(
         ImportDraftDuplicateStatus duplicateStatus,
         Guid? possibleMatchingTransactionId,

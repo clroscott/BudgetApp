@@ -19,21 +19,20 @@ import { AppLink } from '../routing/AppLink'
 
 const rowsPerPage = 50
 
-interface CategoryOption {
-  id: string
-  label: string
-  isActive: boolean
-}
+function findCategorySelection(categories: CategoryItem[], selectedCategoryId: string | null) {
+  if (!selectedCategoryId) return { categoryId: '', subcategoryId: '' }
 
-function flattenCategories(categories: CategoryItem[]): CategoryOption[] {
-  return categories.flatMap(category => [
-    { id: category.id, label: category.name, isActive: category.isActive },
-    ...category.children.map(child => ({
-      id: child.id,
-      label: `${category.name} / ${child.name}`,
-      isActive: child.isActive,
-    })),
-  ])
+  for (const category of categories) {
+    if (category.id === selectedCategoryId) {
+      return { categoryId: category.id, subcategoryId: '' }
+    }
+
+    if (category.children.some(child => child.id === selectedCategoryId)) {
+      return { categoryId: category.id, subcategoryId: selectedCategoryId }
+    }
+  }
+
+  return { categoryId: '', subcategoryId: '' }
 }
 
 function selectedImportFromUrl() {
@@ -44,7 +43,7 @@ interface DraftRowProps {
   householdId: string
   importFileId: string
   draft: ImportDraftItem
-  categories: CategoryOption[]
+  categories: CategoryItem[]
   canEdit: boolean
   isCompleted: boolean
   onChanged: () => Promise<void>
@@ -61,32 +60,54 @@ function DraftRow({
   onChanged,
   onError,
 }: DraftRowProps) {
+  const savedCategorySelection = findCategorySelection(categories, draft.selectedCategoryId)
   const [transactionDate, setTransactionDate] = useState(draft.transactionDate ?? '')
   const [amount, setAmount] = useState(draft.amount?.toString() ?? '')
   const [description, setDescription] = useState(draft.description ?? '')
-  const [categoryId, setCategoryId] = useState(draft.selectedCategoryId ?? '')
+  const [categoryId, setCategoryId] = useState(savedCategorySelection.categoryId)
+  const [subcategoryId, setSubcategoryId] = useState(savedCategorySelection.subcategoryId)
   const [acknowledgeDuplicate, setAcknowledgeDuplicate] = useState(
     draft.isDuplicateAcknowledged,
   )
   const [isBusy, setIsBusy] = useState(false)
   const editable = canEdit && !isCompleted && !draft.approvedTransactionId
+  const selectedCategoryId = subcategoryId || categoryId || null
+  const subcategories = categories.find(category => category.id === categoryId)?.children ?? []
+  const isDirty =
+    transactionDate !== (draft.transactionDate ?? '') ||
+    amount !== (draft.amount?.toString() ?? '') ||
+    description !== (draft.description ?? '') ||
+    selectedCategoryId !== draft.selectedCategoryId
+
+  const resetChanges = () => {
+    const savedSelection = findCategorySelection(categories, draft.selectedCategoryId)
+    setTransactionDate(draft.transactionDate ?? '')
+    setAmount(draft.amount?.toString() ?? '')
+    setDescription(draft.description ?? '')
+    setCategoryId(savedSelection.categoryId)
+    setSubcategoryId(savedSelection.subcategoryId)
+    setAcknowledgeDuplicate(draft.isDuplicateAcknowledged)
+  }
+
+  const persistVisibleValues = async () => {
+    const parsedAmount = amount.trim() === '' ? null : Number(amount)
+    if (parsedAmount !== null && !Number.isFinite(parsedAmount)) {
+      throw new Error('Amount must be a number.')
+    }
+
+    await updateImportDraft(householdId, importFileId, draft.id, {
+      transactionDate: transactionDate || null,
+      amount: parsedAmount,
+      description: description.trim() || null,
+      selectedCategoryId,
+    })
+  }
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const parsedAmount = amount.trim() === '' ? null : Number(amount)
-    if (parsedAmount !== null && !Number.isFinite(parsedAmount)) {
-      onError(new Error('Amount must be a number.'))
-      return
-    }
-
     setIsBusy(true)
     try {
-      await updateImportDraft(householdId, importFileId, draft.id, {
-        transactionDate: transactionDate || null,
-        amount: parsedAmount,
-        description: description.trim() || null,
-        selectedCategoryId: categoryId || null,
-      })
+      await persistVisibleValues()
       await onChanged()
     } catch (error) {
       onError(error)
@@ -98,6 +119,9 @@ function DraftRow({
   const decide = async (decision: 'Approved' | 'Rejected' | 'Skipped') => {
     setIsBusy(true)
     try {
+      if (decision === 'Approved' && isDirty) {
+        await persistVisibleValues()
+      }
       await reviewImportDraft(
         householdId,
         importFileId,
@@ -166,22 +190,47 @@ function DraftRow({
           <label>
             <span>Category</span>
             <select value={categoryId} disabled={!editable || isBusy}
-              onChange={event => setCategoryId(event.target.value)}>
+              onChange={event => {
+                setCategoryId(event.target.value)
+                setSubcategoryId('')
+              }}>
               <option value="">Uncategorized</option>
               {categories
-                .filter(category => category.isActive || category.id === draft.selectedCategoryId)
+                .filter(category => category.isActive || category.id === savedCategorySelection.categoryId)
                 .map(category => (
                   <option key={category.id} value={category.id}>
-                    {category.label}{category.isActive ? '' : ' (deactivated)'}
+                    {category.name}{category.isActive ? '' : ' (deactivated)'}
                   </option>
                 ))}
             </select>
+            {draft.importedCategoryName && <small>Imported: {draft.importedCategoryName}</small>}
+          </label>
+          <label>
+            <span>Subcategory</span>
+            <select value={subcategoryId} disabled={!editable || isBusy || !categoryId}
+              onChange={event => setSubcategoryId(event.target.value)}>
+              <option value="">None</option>
+              {subcategories
+                .filter(category => category.isActive || category.id === savedCategorySelection.subcategoryId)
+                .map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}{category.isActive ? '' : ' (deactivated)'}
+                  </option>
+                ))}
+            </select>
+            {draft.importedSubcategoryName && (
+              <small>Imported: {draft.importedSubcategoryName}</small>
+            )}
           </label>
         </div>
         {editable && (
           <div className="import-row-actions">
-            <button className="secondary-button" type="submit" disabled={isBusy}>
+            <button className="secondary-button" type="submit" disabled={isBusy || !isDirty}>
               Save corrections
+            </button>
+            <button className="text-button" type="button" disabled={isBusy || !isDirty}
+              onClick={resetChanges}>
+              Refresh
             </button>
             <button className="primary-button" type="button" disabled={
               isBusy ||
@@ -189,7 +238,7 @@ function DraftRow({
               draft.duplicateStatus === 'NotChecked' ||
               (draft.duplicateStatus === 'PossibleDuplicate' && !acknowledgeDuplicate)
             } onClick={() => void decide('Approved')}>
-              Approve
+              {isDirty ? 'Save and approve' : 'Approve'}
             </button>
             <button className="text-button" type="button" disabled={isBusy}
               onClick={() => void decide('Rejected')}>
@@ -211,7 +260,7 @@ export function ImportReviewPage() {
   const [imports, setImports] = useState<ImportListItem[]>([])
   const [selectedImportId, setSelectedImportId] = useState(selectedImportFromUrl)
   const [detail, setDetail] = useState<ImportReviewDetail | null>(null)
-  const [categories, setCategories] = useState<CategoryOption[]>([])
+  const [categories, setCategories] = useState<CategoryItem[]>([])
   const [draftPage, setDraftPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [isCompleting, setIsCompleting] = useState(false)
@@ -245,7 +294,7 @@ export function ImportReviewPage() {
     ]).then(([importItems, categoryItems]) => {
       if (!isCurrent) return
       setImports(importItems)
-      setCategories(flattenCategories(categoryItems))
+      setCategories(categoryItems)
       setSelectedImportId(current =>
         importItems.some(item => item.id === current)
           ? current

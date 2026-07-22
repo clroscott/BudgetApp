@@ -33,6 +33,8 @@ export interface ImportDraftItem {
   transactionDate: string | null
   amount: number | null
   description: string | null
+  importedCategoryName: string | null
+  importedSubcategoryName: string | null
   selectedCategoryId: string | null
   validationStatus: string
   validationMessage: string | null

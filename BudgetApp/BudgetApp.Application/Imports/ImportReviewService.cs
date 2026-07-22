@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BudgetApp.Application.Categories;
 using BudgetApp.Application.Households;
 using BudgetApp.Domain.Households;
@@ -346,12 +347,58 @@ public sealed class ImportReviewService(
             file.InvalidRowCount, file.ApprovedRowCount, file.RejectedRowCount,
             file.SkippedRowCount, file.DuplicateRowCount,
             CanEdit(access.IsPersonalAccount, access.AccountOwnerUserId, role, userId),
-            drafts.Select(draft => new ImportDraftItem(
-                draft.Id, draft.SourceRowNumber, draft.TransactionDate, draft.Amount,
-                draft.Description, draft.SelectedCategoryId,
-                draft.ValidationStatus.ToString(), draft.ValidationMessage,
-                draft.DuplicateStatus.ToString(), draft.PossibleMatchingTransactionId,
-                draft.ReviewDecision.ToString(), draft.IsDuplicateAcknowledged,
-                draft.ApprovedTransactionId)).ToList());
+            drafts.Select(ToDraftItem).ToList());
     }
+
+    private static ImportDraftItem ToDraftItem(ImportTransactionDraft draft)
+    {
+        var (categoryName, subcategoryName) = ReadImportedCategoryNames(draft.RawData);
+        return new ImportDraftItem(
+            draft.Id, draft.SourceRowNumber, draft.TransactionDate, draft.Amount,
+            draft.Description, categoryName, subcategoryName, draft.SelectedCategoryId,
+            draft.ValidationStatus.ToString(), draft.ValidationMessage,
+            draft.DuplicateStatus.ToString(), draft.PossibleMatchingTransactionId,
+            draft.ReviewDecision.ToString(), draft.IsDuplicateAcknowledged,
+            draft.ApprovedTransactionId);
+    }
+
+    private static (string? CategoryName, string? SubcategoryName)
+        ReadImportedCategoryNames(string rawData)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(rawData);
+            string? categoryName = null;
+            string? subcategoryName = null;
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (property.Value.ValueKind != JsonValueKind.String)
+                {
+                    continue;
+                }
+
+                var normalizedName = new string(property.Name
+                    .Where(char.IsLetterOrDigit)
+                    .Select(char.ToLowerInvariant)
+                    .ToArray());
+                if (normalizedName == "category")
+                {
+                    categoryName = NormalizeImportedValue(property.Value.GetString());
+                }
+                else if (normalizedName is "subcategory" or "subcat")
+                {
+                    subcategoryName = NormalizeImportedValue(property.Value.GetString());
+                }
+            }
+
+            return (categoryName, subcategoryName);
+        }
+        catch (JsonException)
+        {
+            return (null, null);
+        }
+    }
+
+    private static string? NormalizeImportedValue(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

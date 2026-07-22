@@ -159,7 +159,8 @@ export function CsvImportPage() {
               <h2>Supported columns</h2>
               <p>
                 Include Date, Description, and Amount columns, or use separate Debit and Credit
-                columns. Dates may use YYYY-MM-DD or MM/DD/YYYY.
+                columns. Category and Subcategory columns are optional. Dates may use YYYY-MM-DD
+                or MM/DD/YYYY.
               </p>
               <p>Negative amounts are money out; positive amounts are money in.</p>
               <a
