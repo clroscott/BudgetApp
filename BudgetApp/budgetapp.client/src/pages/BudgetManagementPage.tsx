@@ -198,7 +198,7 @@ export function BudgetManagementPage() {
         data-back-to-top-scroll-region
       >
         <div className="page-title-row">
-          <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time.</p></div>
+          <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time. <AppLink to="/budgeting/recurring-expenses">Manage recurring expenses</AppLink></p></div>
           {budget?.status && <span className={`budget-status budget-status-${budget.status.toLowerCase()}`}>{budget.status}</span>}
         </div>
 

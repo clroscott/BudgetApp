@@ -79,6 +79,7 @@ export function DashboardPage() {
             <strong>Monthly budget</strong>
             <small>Plan household or personal spending by category.</small>
             <AppLink to="/budgeting">Manage budget</AppLink>
+            <AppLink to="/budgeting/recurring-expenses">Manage recurring expenses</AppLink>
           </article>
           <article className="summary-card">
             <span>Transactions</span>
