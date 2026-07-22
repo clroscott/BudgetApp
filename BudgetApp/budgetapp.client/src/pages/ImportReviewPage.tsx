@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { getCategories, type CategoryItem } from '../categories/categoryApi'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import {
+  bulkReviewImportDrafts,
   checkImportDuplicates,
   completeImport,
   discardImport,
   getImport,
   getImports,
+  removeImportDraft,
   reviewImportDraft,
   updateImportDraft,
   type ImportDraftItem,
@@ -47,6 +49,8 @@ interface DraftRowProps {
   canEdit: boolean
   isCompleted: boolean
   onChanged: () => Promise<void>
+  onDirtyChange: (draftId: string, isDirty: boolean) => void
+  onRemove: (draftId: string, sourceRowNumber: number) => Promise<void>
   onError: (error: unknown) => void
 }
 
@@ -58,6 +62,8 @@ function DraftRow({
   canEdit,
   isCompleted,
   onChanged,
+  onDirtyChange,
+  onRemove,
   onError,
 }: DraftRowProps) {
   const savedCategorySelection = findCategorySelection(categories, draft.selectedCategoryId)
@@ -78,6 +84,14 @@ function DraftRow({
     amount !== (draft.amount?.toString() ?? '') ||
     description !== (draft.description ?? '') ||
     selectedCategoryId !== draft.selectedCategoryId
+
+  useEffect(() => {
+    onDirtyChange(draft.id, isDirty)
+  }, [draft.id, isDirty, onDirtyChange])
+
+  useEffect(() => () => {
+    onDirtyChange(draft.id, false)
+  }, [draft.id, onDirtyChange])
 
   const resetChanges = () => {
     const savedSelection = findCategorySelection(categories, draft.selectedCategoryId)
@@ -248,6 +262,10 @@ function DraftRow({
               onClick={() => void decide('Skipped')}>
               Skip
             </button>
+            <button className="danger-button" type="button" disabled={isBusy}
+              onClick={() => void onRemove(draft.id, draft.sourceRowNumber)}>
+              Remove row
+            </button>
           </div>
         )}
       </form>
@@ -261,19 +279,40 @@ export function ImportReviewPage() {
   const [selectedImportId, setSelectedImportId] = useState(selectedImportFromUrl)
   const [detail, setDetail] = useState<ImportReviewDetail | null>(null)
   const [categories, setCategories] = useState<CategoryItem[]>([])
+  const [importFilter, setImportFilter] = useState<'inProgress' | 'completed' | 'all'>(
+    'inProgress',
+  )
   const [draftPage, setDraftPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [isCompleting, setIsCompleting] = useState(false)
   const [isDiscarding, setIsDiscarding] = useState(false)
+  const [bulkDecision, setBulkDecision] = useState<
+    'Approved' | 'Rejected' | 'Skipped' | null
+  >(null)
+  const [dirtyDraftIds, setDirtyDraftIds] = useState<Set<string>>(new Set())
+  const [showBackToTop, setShowBackToTop] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+
+  const filteredImports = useMemo(() => imports.filter(item => {
+    if (importFilter === 'all') return true
+    if (importFilter === 'completed') return item.status === 'Completed'
+    return item.status === 'ReadyForReview'
+  }), [importFilter, imports])
+
+  const handleDirtyChange = useCallback((draftId: string, isDirty: boolean) => {
+    setDirtyDraftIds(current => {
+      const updated = new Set(current)
+      if (isDirty) updated.add(draftId)
+      else updated.delete(draftId)
+      return updated.size === current.size && [...updated].every(id => current.has(id))
+        ? current
+        : updated
+    })
+  }, [])
 
   const refreshList = async (householdId: string) => {
     const items = await getImports(householdId)
     setImports(items)
-    setSelectedImportId(current => {
-      if (items.some(item => item.id === current)) return current
-      return items.find(item => item.status === 'ReadyForReview')?.id ?? items[0]?.id ?? ''
-    })
   }
 
   const refreshDetail = async () => {
@@ -282,6 +321,16 @@ export function ImportReviewPage() {
     setDetail(updated)
     await refreshList(currentHousehold.id)
   }
+
+  useEffect(() => {
+    const updateBackToTopVisibility = () => {
+      setShowBackToTop(window.scrollY > 400)
+    }
+
+    updateBackToTopVisibility()
+    window.addEventListener('scroll', updateBackToTopVisibility, { passive: true })
+    return () => window.removeEventListener('scroll', updateBackToTopVisibility)
+  }, [])
 
   useEffect(() => {
     if (!currentHousehold) return
@@ -308,11 +357,26 @@ export function ImportReviewPage() {
   }, [currentHousehold])
 
   useEffect(() => {
+    if (filteredImports.some(item => item.id === selectedImportId)) return
+
+    const nextId = filteredImports[0]?.id ?? ''
+    setSelectedImportId(nextId)
+    setDetail(null)
+    setDraftPage(1)
+    window.history.replaceState(
+      null,
+      '',
+      nextId ? `/imports/review?importId=${nextId}` : '/imports/review',
+    )
+  }, [filteredImports, selectedImportId])
+
+  useEffect(() => {
     if (!currentHousehold || !selectedImportId) {
       setDetail(null)
       return
     }
     let isCurrent = true
+    setDirtyDraftIds(new Set())
     setIsLoading(true)
     setErrors([])
     void getImport(currentHousehold.id, selectedImportId)
@@ -325,6 +389,14 @@ export function ImportReviewPage() {
   const pendingRows = useMemo(() => detail
     ? detail.totalRows - detail.approvedRows - detail.rejectedRows - detail.skippedRows
     : 0, [detail])
+  const pendingDrafts = detail?.drafts.filter(
+    draft => draft.reviewDecision === 'Pending') ?? []
+  const validPendingRows = pendingDrafts.filter(
+    draft => draft.validationStatus === 'Valid').length
+  const pendingPossibleDuplicates = pendingDrafts.filter(draft =>
+    draft.validationStatus === 'Valid' &&
+    draft.duplicateStatus === 'PossibleDuplicate').length
+  const hasUnsavedRows = dirtyDraftIds.size > 0
   const hasUncheckedDuplicates = detail?.drafts.some(
     draft => draft.duplicateStatus === 'NotChecked') ?? false
   const draftPageCount = detail
@@ -359,6 +431,53 @@ export function ImportReviewPage() {
       setErrors(getErrorMessages(error))
     } finally {
       setIsCompleting(false)
+    }
+  }
+
+  const handleBulkDecision = async (
+    decision: 'Approved' | 'Rejected' | 'Skipped',
+  ) => {
+    if (!detail || hasUnsavedRows) return
+
+    const affectedRows = decision === 'Approved' ? validPendingRows : pendingRows
+    const duplicateNote = decision === 'Approved' && pendingPossibleDuplicates > 0
+      ? `, including ${pendingPossibleDuplicates} possible duplicate${
+        pendingPossibleDuplicates === 1 ? '' : 's'}`
+      : ''
+    const action = decision === 'Approved'
+      ? 'Approve'
+      : decision === 'Rejected' ? 'Reject' : 'Skip'
+    if (!window.confirm(
+      `${action} ${affectedRows} pending row${affectedRows === 1 ? '' : 's'}${duplicateNote}?`,
+    )) return
+
+    setBulkDecision(decision)
+    setErrors([])
+    try {
+      await bulkReviewImportDrafts(
+        currentHousehold.id,
+        detail.id,
+        decision,
+      )
+      await refreshDetail()
+    } catch (error) {
+      setErrors(getErrorMessages(error))
+    } finally {
+      setBulkDecision(null)
+    }
+  }
+
+  const handleRemoveDraft = async (draftId: string, sourceRowNumber: number) => {
+    if (!detail || !window.confirm(
+      `Remove CSV row ${sourceRowNumber} from this staged import? This cannot be undone.`,
+    )) return
+
+    setErrors([])
+    try {
+      await removeImportDraft(currentHousehold.id, detail.id, draftId)
+      await refreshDetail()
+    } catch (error) {
+      setErrors(getErrorMessages(error))
     }
   }
 
@@ -405,21 +524,36 @@ export function ImportReviewPage() {
         <ErrorSummary errors={errors} />
 
         {imports.length > 0 && (
-          <label className="import-selector">
-            <span>Import</span>
-            <select value={selectedImportId} onChange={event => {
-              const id = event.target.value
-              setSelectedImportId(id)
-              setDraftPage(1)
-              window.history.replaceState(null, '', `/imports/review?importId=${id}`)
-            }}>
-              {imports.map(item => (
-                <option key={item.id} value={item.id}>
-                  {item.originalFileName} — {item.accountName} ({item.status})
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="import-selector-row">
+            <label className="import-selector">
+              <span>Show imports</span>
+              <select value={importFilter} onChange={event => {
+                setImportFilter(event.target.value as 'inProgress' | 'completed' | 'all')
+              }}>
+                <option value="inProgress">In progress</option>
+                <option value="completed">Completed</option>
+                <option value="all">All</option>
+              </select>
+            </label>
+            <label className="import-selector">
+              <span>Import</span>
+              <select value={selectedImportId} disabled={filteredImports.length === 0}
+                onChange={event => {
+                  const id = event.target.value
+                  setSelectedImportId(id)
+                  setDetail(null)
+                  setDraftPage(1)
+                  window.history.replaceState(null, '', `/imports/review?importId=${id}`)
+                }}>
+                {filteredImports.length === 0 && <option value="">No matching imports</option>}
+                {filteredImports.map(item => (
+                  <option key={item.id} value={item.id}>
+                    {item.originalFileName} — {item.accountName} ({item.status})
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
         )}
 
         {isLoading && !detail ? (
@@ -429,6 +563,11 @@ export function ImportReviewPage() {
             <h2>No imports yet</h2>
             <p>Upload a CSV to create staged rows for review.</p>
             <AppLink to="/import">Import a CSV</AppLink>
+          </div>
+        ) : filteredImports.length === 0 ? (
+          <div className="empty-state">
+            <h2>No matching imports</h2>
+            <p>Choose another filter or upload a new CSV.</p>
           </div>
         ) : detail && (
           <>
@@ -451,17 +590,55 @@ export function ImportReviewPage() {
                   Check for duplicates
                 </button>
               )}
-              {detail.canEdit && detail.status !== 'Completed' && (
-                <button className="danger-button" type="button"
-                  disabled={isDiscarding}
-                  onClick={() => void handleDiscard()}>
-                  {isDiscarding ? 'Discarding...' : 'Discard staged import'}
-                </button>
+              {detail.canEdit && detail.status === 'ReadyForReview' && (
+                <div className="import-control-groups">
+                  <div>
+                    <strong>Review remaining</strong>
+                    <div className="import-control-actions">
+                      <button className="primary-button" type="button"
+                        disabled={validPendingRows === 0 || hasUnsavedRows || bulkDecision !== null}
+                        onClick={() => void handleBulkDecision('Approved')}>
+                        {bulkDecision === 'Approved' ? 'Approving...' : 'Approve all valid'}
+                      </button>
+                      <button className="secondary-button" type="button"
+                        disabled={pendingRows === 0 || hasUnsavedRows || bulkDecision !== null}
+                        onClick={() => void handleBulkDecision('Rejected')}>
+                        {bulkDecision === 'Rejected' ? 'Rejecting...' : 'Reject all'}
+                      </button>
+                      <button className="secondary-button" type="button"
+                        disabled={pendingRows === 0 || hasUnsavedRows || bulkDecision !== null}
+                        onClick={() => void handleBulkDecision('Skipped')}>
+                        {bulkDecision === 'Skipped' ? 'Skipping...' : 'Skip all'}
+                      </button>
+                    </div>
+                    {hasUnsavedRows && (
+                      <p className="field-help">Save or refresh edited rows before using bulk actions.</p>
+                    )}
+                  </div>
+                  <div>
+                    <strong>Import</strong>
+                    <div className="import-control-actions">
+                      <button className="primary-button" type="button"
+                        disabled={pendingRows !== 0 || isCompleting || hasUnsavedRows}
+                        onClick={() => void handleComplete()}>
+                        {isCompleting ? 'Creating...' : 'Create approved transactions'}
+                      </button>
+                      <button className="danger-button" type="button"
+                        disabled={isDiscarding}
+                        onClick={() => void handleDiscard()}>
+                        {isDiscarding ? 'Discarding...' : 'Discard staged import'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
               {detail.status === 'Completed' && (
-                <p className="field-help">
-                  Completed imports are retained to preserve the history of official transactions.
-                </p>
+                <div>
+                  <p className="field-help">
+                    Completed imports are retained to preserve the history of official transactions.
+                  </p>
+                  <AppLink to="/transactions">View transactions</AppLink>
+                </div>
               )}
             </section>
 
@@ -476,6 +653,8 @@ export function ImportReviewPage() {
                   canEdit={detail.canEdit}
                   isCompleted={detail.status === 'Completed'}
                   onChanged={refreshDetail}
+                  onDirtyChange={handleDirtyChange}
+                  onRemove={handleRemoveDraft}
                   onError={error => setErrors(getErrorMessages(error))}
                 />
               ))}
@@ -497,32 +676,16 @@ export function ImportReviewPage() {
               </nav>
             )}
 
-            <section className="complete-import-panel">
-              {detail.status === 'Completed' ? (
-                <>
-                  <strong>Import completed</strong>
-                  <p>Approved rows are now official transactions.</p>
-                  <AppLink to="/transactions">View transactions</AppLink>
-                </>
-              ) : (
-                <>
-                  <strong>Complete import</strong>
-                  <p>
-                    {pendingRows === 0
-                      ? `${detail.approvedRows} approved rows will become official transactions.`
-                      : `Review ${pendingRows} remaining rows before completing this import.`}
-                  </p>
-                  <button className="primary-button" type="button"
-                    disabled={!detail.canEdit || pendingRows !== 0 || isCompleting}
-                    onClick={() => void handleComplete()}>
-                    {isCompleting ? 'Completing...' : 'Create approved transactions'}
-                  </button>
-                </>
-              )}
-            </section>
           </>
         )}
       </section>
+      {showBackToTop && (
+        <button className="back-to-top-button" type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          aria-label="Back to top">
+          <span aria-hidden="true">↑</span> Back to top
+        </button>
+      )}
     </main>
   )
 }

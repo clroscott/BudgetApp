@@ -190,6 +190,57 @@ public sealed class ImportsController(
         }
     }
 
+    [HttpPost("{importFileId:guid}/decisions")]
+    public async Task<IActionResult> SetBulkDecision(
+        Guid householdId,
+        Guid importFileId,
+        BulkReviewImportRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            await importReviewService.BulkSetDecisionAsync(
+                householdId,
+                userId,
+                importFileId,
+                request.Decision,
+                cancellationToken);
+            return NoContent();
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
+    [HttpDelete("{importFileId:guid}/drafts/{draftId:guid}")]
+    public async Task<IActionResult> RemoveDraft(
+        Guid householdId,
+        Guid importFileId,
+        Guid draftId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            await importReviewService.RemoveDraftAsync(
+                householdId, userId, importFileId, draftId, cancellationToken);
+            logger.LogInformation(
+                "User {UserId} removed staged row {DraftId} from import {ImportFileId}",
+                userId,
+                draftId,
+                importFileId);
+            return NoContent();
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
     [HttpPost("{importFileId:guid}/complete")]
     public async Task<ActionResult<CompleteImportResult>> Complete(
         Guid householdId,
@@ -299,3 +350,6 @@ public sealed record UpdateImportDraftRequest(
 public sealed record ReviewImportDraftRequest(
     [param: Required] string Decision,
     bool AcknowledgePossibleDuplicate);
+
+public sealed record BulkReviewImportRequest(
+    [param: Required] string Decision);
