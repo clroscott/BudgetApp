@@ -1,5 +1,6 @@
 using BudgetApp.Application.Transactions;
 using BudgetApp.Domain.Accounts;
+using BudgetApp.Domain.Categories;
 using BudgetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,12 +9,16 @@ namespace BudgetApp.Infrastructure.Transactions;
 internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
     : ITransactionRepository
 {
-    public async Task<IReadOnlyList<TransactionRecord>> ListVisibleAsync(
+    public async Task<TransactionQueryResult> ListVisibleAsync(
         Guid householdId,
         Guid userId,
         Guid? accountId,
         DateOnly? fromDate,
         DateOnly? toDate,
+        CategoryType? categoryType,
+        Guid? categoryId,
+        string? descriptionSearch,
+        int skip,
         int take,
         CancellationToken cancellationToken)
     {
@@ -28,7 +33,14 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
                   (account.Scope == AccountScope.Household || account.OwnerUserId == userId) &&
                   (!accountId.HasValue || transaction.AccountId == accountId.Value) &&
                   (!fromDate.HasValue || transaction.TransactionDate >= fromDate.Value) &&
-                  (!toDate.HasValue || transaction.TransactionDate <= toDate.Value)
+                  (!toDate.HasValue || transaction.TransactionDate <= toDate.Value) &&
+                  (!categoryType.HasValue ||
+                      (category != null && category.Type == categoryType.Value)) &&
+                  (!categoryId.HasValue ||
+                      transaction.CategoryId == categoryId.Value ||
+                      (category != null && category.ParentCategoryId == categoryId.Value)) &&
+                  (descriptionSearch == null ||
+                      transaction.Description.ToUpper().Contains(descriptionSearch.ToUpper()))
             orderby transaction.TransactionDate descending,
                 transaction.Id descending
             select new TransactionRecord(
@@ -51,7 +63,12 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
                 account.Scope == AccountScope.Personal,
                 account.OwnerUserId);
 
-        return await query.Take(take).ToListAsync(cancellationToken);
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+        return new TransactionQueryResult(items, totalCount);
     }
 
     public async Task<TransactionAccessRecord?> GetForUpdateAsync(

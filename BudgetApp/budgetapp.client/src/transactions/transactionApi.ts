@@ -23,6 +23,20 @@ export interface TransactionItem {
 export interface TransactionListResult {
   items: TransactionItem[]
   hasMore: boolean
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
+export interface TransactionQuery {
+  accountId?: string
+  fromDate?: string
+  toDate?: string
+  categoryType?: string
+  categoryId?: string
+  description?: string
+  page: number
 }
 
 export interface UpdateTransactionRequest {
@@ -38,10 +52,17 @@ export interface UpdateTransactionRequest {
 
 export function getTransactions(
   householdId: string,
-  accountId?: string,
+  query: TransactionQuery,
 ): Promise<TransactionListResult> {
-  const query = accountId ? `?accountId=${encodeURIComponent(accountId)}` : ''
-  return apiGet(`/api/households/${householdId}/transactions${query}`)
+  const parameters = new URLSearchParams()
+  if (query.accountId) parameters.set('accountId', query.accountId)
+  if (query.fromDate) parameters.set('fromDate', query.fromDate)
+  if (query.toDate) parameters.set('toDate', query.toDate)
+  if (query.categoryType) parameters.set('categoryType', query.categoryType)
+  if (query.categoryId) parameters.set('categoryId', query.categoryId)
+  if (query.description) parameters.set('description', query.description)
+  parameters.set('page', query.page.toString())
+  return apiGet(`/api/households/${householdId}/transactions?${parameters}`)
 }
 
 export function updateTransaction(

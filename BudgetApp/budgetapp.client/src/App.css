@@ -662,6 +662,47 @@ a {
   max-width: 68rem;
 }
 
+.transaction-filter-panel {
+  margin-bottom: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.transaction-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.transaction-filter-grid label {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+}
+
+.transaction-description-filter {
+  grid-column: span 2;
+}
+
+.transaction-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.transaction-filter-actions button {
+  margin-top: 1rem;
+}
+
+.transaction-result-summary {
+  margin-bottom: 0.75rem;
+  color: var(--muted-text);
+}
+
 .transaction-account-filter {
   display: grid;
   max-width: 22rem;
@@ -729,6 +770,19 @@ a {
   border-radius: 1rem;
   background: var(--surface);
   box-shadow: var(--small-shadow);
+}
+
+.transaction-inline-edit {
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+}
+
+.transaction-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
 }
 
 .transaction-edit-grid {
@@ -960,6 +1014,10 @@ a {
     grid-template-columns: 1fr 2fr auto;
   }
 
+  .transaction-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .transaction-flags {
     grid-column: 2;
   }
@@ -1017,8 +1075,13 @@ a {
   }
 
   .transaction-row,
-  .transaction-edit-grid {
+  .transaction-edit-grid,
+  .transaction-filter-grid {
     grid-template-columns: 1fr;
+  }
+
+  .transaction-description-filter {
+    grid-column: 1;
   }
 
   .transaction-flags,

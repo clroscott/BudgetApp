@@ -41,4 +41,12 @@ public sealed record TransactionRecord(
 
 public sealed record TransactionListResult(
     IReadOnlyList<TransactionListItem> Items,
-    bool HasMore);
+    bool HasMore,
+    int Page,
+    int PageSize,
+    int TotalCount,
+    int TotalPages);
+
+public sealed record TransactionQueryResult(
+    IReadOnlyList<TransactionRecord> Items,
+    int TotalCount);

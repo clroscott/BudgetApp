@@ -74,6 +74,83 @@ public sealed class TransactionManagementTests(BudgetAppWebApplicationFactory fa
         Assert.Equal(userId, updated.LastModifiedByUserId);
     }
 
+    [Fact]
+    public async Task List_FiltersByParentCategoryDescriptionAndPagesResults()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        var userId = await Register(client);
+        var householdId = await CreateHousehold(client);
+        var (accountId, foodCategoryId) = await SeedSearchTransactions(
+            householdId,
+            userId);
+
+        var firstPage = await client.GetFromJsonAsync<TransactionListResponse>(
+            $"{TransactionPath(householdId)}?accountId={accountId}&page=1");
+        Assert.NotNull(firstPage);
+        Assert.Equal(100, firstPage.Items.Count);
+        Assert.True(firstPage.HasMore);
+        Assert.Equal(1, firstPage.Page);
+        Assert.Equal(100, firstPage.PageSize);
+        Assert.Equal(105, firstPage.TotalCount);
+        Assert.Equal(2, firstPage.TotalPages);
+
+        var secondPage = await client.GetFromJsonAsync<TransactionListResponse>(
+            $"{TransactionPath(householdId)}?accountId={accountId}&page=2");
+        Assert.NotNull(secondPage);
+        Assert.Equal(5, secondPage.Items.Count);
+        Assert.False(secondPage.HasMore);
+
+        var filtered = await client.GetFromJsonAsync<TransactionListResponse>(
+            $"{TransactionPath(householdId)}?categoryType=Expense" +
+            $"&categoryId={foodCategoryId}&description=market" +
+            "&fromDate=2026-01-01&toDate=2026-01-31&page=1");
+        Assert.NotNull(filtered);
+        var match = Assert.Single(filtered.Items);
+        Assert.Equal("Corner MARKET", match.Description);
+    }
+
+    private async Task<(Guid AccountId, Guid FoodCategoryId)> SeedSearchTransactions(
+        Guid householdId,
+        Guid userId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        var foodCategory = await dbContext.Categories.SingleAsync(category =>
+            category.HouseholdId == householdId && category.Name == "Food & Dining");
+        var groceries = await dbContext.Categories.SingleAsync(category =>
+            category.HouseholdId == householdId && category.Name == "Groceries");
+        var now = DateTimeOffset.UtcNow;
+        var account = Account.CreateHousehold(
+            householdId,
+            "Search Chequing",
+            AccountType.Chequing,
+            "CAD",
+            null,
+            null,
+            now);
+        dbContext.Accounts.Add(account);
+
+        for (var index = 0; index < 105; index++)
+        {
+            dbContext.Transactions.Add(Transaction.CreateManual(
+                householdId,
+                account.Id,
+                groceries.Id,
+                new DateOnly(2026, 1, 1).AddDays(index),
+                null,
+                -(index + 1),
+                index == 0 ? "Corner MARKET" : $"Search purchase {index:000}",
+                null,
+                null,
+                false,
+                userId,
+                now));
+        }
+
+        await dbContext.SaveChangesAsync();
+        return (account.Id, foodCategory.Id);
+    }
+
     private async Task<SeededTransactions> SeedTransactions(Guid householdId, Guid userId)
     {
         using var scope = factory.Services.CreateScope();
@@ -234,9 +311,13 @@ public sealed class TransactionManagementTests(BudgetAppWebApplicationFactory fa
 
     private sealed record TransactionListResponse(
         IReadOnlyList<TransactionResponse> Items,
-        bool HasMore);
+        bool HasMore,
+        int Page,
+        int PageSize,
+        int TotalCount,
+        int TotalPages);
 
-    private sealed record TransactionResponse(Guid Id, bool CanEdit);
+    private sealed record TransactionResponse(Guid Id, bool CanEdit, string Description);
     private sealed record AntiforgeryTokenResponse(string Token);
     private sealed record CreateHouseholdResponse(Guid Id);
     private sealed record CurrentUserResponse(Guid Id);

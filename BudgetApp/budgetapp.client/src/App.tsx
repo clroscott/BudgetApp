@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import './App.css'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
+import { BackToTopButton } from './components/BackToTopButton'
 import { HouseholdProvider } from './households/HouseholdProvider'
 import { useHouseholds } from './households/useHouseholds'
 import { AccountManagementPage } from './pages/AccountManagementPage'
@@ -204,6 +205,7 @@ function App() {
       <AuthProvider>
         <HouseholdProvider>
           <AppRoutes />
+          <BackToTopButton />
         </HouseholdProvider>
       </AuthProvider>
     </RouterProvider>

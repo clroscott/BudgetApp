@@ -290,7 +290,6 @@ export function ImportReviewPage() {
     'Approved' | 'Rejected' | 'Skipped' | null
   >(null)
   const [dirtyDraftIds, setDirtyDraftIds] = useState<Set<string>>(new Set())
-  const [showBackToTop, setShowBackToTop] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
   const filteredImports = useMemo(() => imports.filter(item => {
@@ -321,16 +320,6 @@ export function ImportReviewPage() {
     setDetail(updated)
     await refreshList(currentHousehold.id)
   }
-
-  useEffect(() => {
-    const updateBackToTopVisibility = () => {
-      setShowBackToTop(window.scrollY > 400)
-    }
-
-    updateBackToTopVisibility()
-    window.addEventListener('scroll', updateBackToTopVisibility, { passive: true })
-    return () => window.removeEventListener('scroll', updateBackToTopVisibility)
-  }, [])
 
   useEffect(() => {
     if (!currentHousehold) return
@@ -679,13 +668,6 @@ export function ImportReviewPage() {
           </>
         )}
       </section>
-      {showBackToTop && (
-        <button className="back-to-top-button" type="button"
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          aria-label="Back to top">
-          <span aria-hidden="true">↑</span> Back to top
-        </button>
-      )}
     </main>
   )
 }

@@ -1,5 +1,6 @@
 using BudgetApp.Application.Categories;
 using BudgetApp.Application.Households;
+using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
 
 namespace BudgetApp.Application.Transactions;
@@ -10,7 +11,7 @@ public sealed class TransactionManagementService(
     HouseholdAuthorizationService authorizationService,
     TimeProvider timeProvider)
 {
-    private const int PageSize = 200;
+    private const int PageSize = 100;
 
     public async Task<TransactionListResult> ListAsync(
         Guid householdId,
@@ -18,6 +19,10 @@ public sealed class TransactionManagementService(
         Guid? accountId,
         DateOnly? fromDate,
         DateOnly? toDate,
+        string? categoryType,
+        Guid? categoryId,
+        string? descriptionSearch,
+        int page,
         CancellationToken cancellationToken)
     {
         if (fromDate > toDate)
@@ -25,22 +30,60 @@ public sealed class TransactionManagementService(
             throw new ArgumentException("From date cannot be after to date.");
         }
 
+        if (page < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(page), "Page must be at least 1.");
+        }
+
+        CategoryType? parsedCategoryType = null;
+        if (!string.IsNullOrWhiteSpace(categoryType))
+        {
+            if (!Enum.TryParse<CategoryType>(categoryType.Trim(), ignoreCase: true, out var parsed) ||
+                !Enum.IsDefined(parsed))
+            {
+                throw new ArgumentException("Category type is not supported.", nameof(categoryType));
+            }
+
+            parsedCategoryType = parsed;
+        }
+
+        var normalizedDescriptionSearch = string.IsNullOrWhiteSpace(descriptionSearch)
+            ? null
+            : descriptionSearch.Trim();
+        if (normalizedDescriptionSearch?.Length > 250)
+        {
+            throw new ArgumentException(
+                "Description search cannot exceed 250 characters.",
+                nameof(descriptionSearch));
+        }
+
         var role = await authorizationService.RequireViewAsync(
             householdId,
             userId,
             cancellationToken);
-        var records = await transactionRepository.ListVisibleAsync(
+        var result = await transactionRepository.ListVisibleAsync(
             householdId,
             userId,
             accountId,
             fromDate,
             toDate,
-            PageSize + 1,
+            parsedCategoryType,
+            categoryId,
+            normalizedDescriptionSearch,
+            (page - 1) * PageSize,
+            PageSize,
             cancellationToken);
+        var totalPages = result.TotalCount == 0
+            ? 0
+            : (int)Math.Ceiling(result.TotalCount / (double)PageSize);
 
         return new TransactionListResult(
-            records.Take(PageSize).Select(record => ToListItem(record, role, userId)).ToList(),
-            records.Count > PageSize);
+            result.Items.Select(record => ToListItem(record, role, userId)).ToList(),
+            page < totalPages,
+            page,
+            PageSize,
+            result.TotalCount,
+            totalPages);
     }
 
     public async Task UpdateAsync(

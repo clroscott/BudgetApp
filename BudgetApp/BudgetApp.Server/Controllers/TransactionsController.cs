@@ -22,7 +22,11 @@ public sealed class TransactionsController(
         [FromQuery] Guid? accountId,
         [FromQuery] DateOnly? fromDate,
         [FromQuery] DateOnly? toDate,
-        CancellationToken cancellationToken)
+        [FromQuery] string? categoryType,
+        [FromQuery] Guid? categoryId,
+        [FromQuery] string? description,
+        CancellationToken cancellationToken,
+        [FromQuery] int page = 1)
     {
         if (!TryGetUserId(out var userId))
         {
@@ -37,6 +41,10 @@ public sealed class TransactionsController(
                 accountId,
                 fromDate,
                 toDate,
+                categoryType,
+                categoryId,
+                description,
+                page,
                 cancellationToken));
         }
         catch (Exception exception) when (IsExpected(exception))
