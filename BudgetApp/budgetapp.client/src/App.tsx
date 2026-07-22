@@ -4,6 +4,7 @@ import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
 import { HouseholdProvider } from './households/HouseholdProvider'
 import { useHouseholds } from './households/useHouseholds'
+import { AccountManagementPage } from './pages/AccountManagementPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { CategoryManagementPage } from './pages/CategoryManagementPage'
 import { HouseholdSetupPage } from './pages/HouseholdSetupPage'
@@ -138,6 +139,14 @@ function AppRoutes() {
         <ProtectedRoute>
           <HouseholdRequiredRoute>
             <DashboardPage />
+          </HouseholdRequiredRoute>
+        </ProtectedRoute>
+      )
+    case '/accounts':
+      return (
+        <ProtectedRoute>
+          <HouseholdRequiredRoute>
+            <AccountManagementPage />
           </HouseholdRequiredRoute>
         </ProtectedRoute>
       )

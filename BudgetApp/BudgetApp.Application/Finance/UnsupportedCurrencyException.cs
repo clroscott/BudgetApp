@@ -1,4 +1,4 @@
-namespace BudgetApp.Application.Households;
+namespace BudgetApp.Application.Finance;
 
 public sealed class UnsupportedCurrencyException(string currencyCode)
     : ArgumentException(

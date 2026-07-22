@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { currencies } from '../finance/currencies'
 import { useHouseholds } from '../households/useHouseholds'
 import { useRouter } from '../routing/useRouter'
 
@@ -9,20 +10,16 @@ function getBrowserTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Vancouver'
 }
 
-function getSupportedValues(
-  key: 'currency' | 'timeZone',
-  fallback: string[],
-): string[] {
+function getSupportedTimeZones(fallback: string[]): string[] {
   if (typeof Intl.supportedValuesOf !== 'function') {
     return fallback
   }
 
-  return Intl.supportedValuesOf(key)
+  return Intl.supportedValuesOf('timeZone')
 }
 
-const currencies = getSupportedValues('currency', ['CAD', 'USD'])
 const browserTimeZone = getBrowserTimeZone()
-const supportedTimeZones = getSupportedValues('timeZone', [browserTimeZone])
+const supportedTimeZones = getSupportedTimeZones([browserTimeZone])
 const timeZones = supportedTimeZones.includes(browserTimeZone)
   ? supportedTimeZones
   : [browserTimeZone, ...supportedTimeZones]

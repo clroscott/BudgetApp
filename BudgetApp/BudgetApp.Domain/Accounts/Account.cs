@@ -26,9 +26,7 @@ public sealed class Account
         Id = id;
         HouseholdId = ValidateHouseholdId(householdId);
         SetDetails(name, type, institutionName, lastFourDigits);
-        Scope = scope;
-        OwnerUserId = ownerUserId;
-        Currency = ValidateCurrency(currency);
+        SetFinancialSettings(scope, ownerUserId, currency);
         IsActive = true;
         CreatedAtUtc = createdAtUtc;
         UpdatedAtUtc = createdAtUtc;
@@ -119,6 +117,16 @@ public sealed class Account
         UpdatedAtUtc = updatedAtUtc;
     }
 
+    public void UpdateFinancialSettings(
+        AccountScope scope,
+        Guid? ownerUserId,
+        string currency,
+        DateTimeOffset updatedAtUtc)
+    {
+        SetFinancialSettings(scope, ownerUserId, currency);
+        UpdatedAtUtc = updatedAtUtc;
+    }
+
     public void Archive(DateTimeOffset updatedAtUtc)
     {
         IsActive = false;
@@ -149,6 +157,39 @@ public sealed class Account
             nameof(institutionName),
             "Institution name");
         LastFourDigits = ValidateLastFourDigits(lastFourDigits);
+    }
+
+    private void SetFinancialSettings(
+        AccountScope scope,
+        Guid? ownerUserId,
+        string currency)
+    {
+        if (!Enum.IsDefined(scope))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(scope),
+                "Account scope is not supported.");
+        }
+
+        if (scope == AccountScope.Personal &&
+            (!ownerUserId.HasValue || ownerUserId.Value == Guid.Empty))
+        {
+            throw new ArgumentException(
+                "Owner user ID is required for a personal account.",
+                nameof(ownerUserId));
+        }
+
+        if (scope == AccountScope.Household && ownerUserId.HasValue)
+        {
+            throw new ArgumentException(
+                "A household account cannot have a personal owner.",
+                nameof(ownerUserId));
+        }
+
+        var normalizedCurrency = ValidateCurrency(currency);
+        Scope = scope;
+        OwnerUserId = ownerUserId;
+        Currency = normalizedCurrency;
     }
 
     private static Guid ValidateHouseholdId(Guid householdId)

@@ -99,7 +99,8 @@ Key data:
 Rules:
 
 - Household-owned records cannot be moved between households through ordinary editing.
-- Currency conversion is outside the initial scope; a household has one default currency for version 1.
+- The household currency is the default for budgets, reports, and new accounts; it does not prevent an account from using another currency.
+- Currency conversion is outside the initial scope. Reports must keep currencies separate until an explicit exchange-rate policy exists.
 
 ### HouseholdMember
 
@@ -140,6 +141,9 @@ Key data:
 Rules:
 
 - A personal account owner must be an active member of the household.
+- Account currency defaults to the household currency but may differ.
+- Changing to Personal scope assigns the current user as owner; changing to Household scope clears the personal owner and requires shared-account edit permission.
+- Scope and currency can be corrected during initial account setup. Once transactions or imports exist, changes require an explicit history-preserving policy.
 - Archived accounts retain their transactions and history.
 - Credentials, full bank account numbers, and banking passwords are never stored.
 - Current balance should not be treated as authoritative until balance snapshots or reconciliation are implemented.
