@@ -42,6 +42,8 @@ public interface IImportRepository
 
     void Remove(ImportFile importFile);
 
+    void RemoveDraft(ImportTransactionDraft draft);
+
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 

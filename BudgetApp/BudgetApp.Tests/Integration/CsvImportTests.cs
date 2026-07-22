@@ -158,6 +158,77 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
     }
 
     [Fact]
+    public async Task Review_BulkDecisionsAndRowRemoval_UpdateStagedImport()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        var userId = await Register(client);
+        var householdId = await CreateHousehold(client);
+        var accountId = await CreateAccount(client, householdId);
+        await AddExistingTransaction(householdId, accountId, userId);
+        const string csv =
+            "Date,Description,Amount\n" +
+            "2026-07-20,Existing purchase,-25.00\n" +
+            "2026-07-21,New purchase,-15.00\n" +
+            "bad-date,Needs rejection,-30.00\n" +
+            "2026-07-22,Remove me,-5.00\n";
+
+        var upload = await Upload(
+            client,
+            householdId,
+            accountId,
+            csv,
+            await GetAntiforgeryToken(client));
+        var uploaded = await upload.Content.ReadFromJsonAsync<CsvImportResponse>();
+        Assert.Equal(HttpStatusCode.Created, upload.StatusCode);
+        Assert.NotNull(uploaded);
+
+        var review = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}");
+        Assert.NotNull(review);
+        var removed = review.Drafts.Single(row => row.SourceRowNumber == 5);
+        var removeResponse = await DeleteWithAntiforgery(
+            client,
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}/drafts/{removed.Id}",
+            await GetAntiforgeryToken(client));
+        Assert.Equal(HttpStatusCode.NoContent, removeResponse.StatusCode);
+
+        var bulkApprove = await PostJson(
+            client,
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}/decisions",
+            new { decision = "Approved" },
+            await GetAntiforgeryToken(client));
+        Assert.Equal(HttpStatusCode.NoContent, bulkApprove.StatusCode);
+
+        review = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}");
+        Assert.NotNull(review);
+        Assert.Equal(3, review.TotalRows);
+        Assert.Equal(2, review.ApprovedRows);
+        Assert.Equal(ImportDraftReviewDecision.Pending.ToString(),
+            review.Drafts.Single(row => row.SourceRowNumber == 4).ReviewDecision);
+        var duplicate = review.Drafts.Single(row => row.SourceRowNumber == 2);
+        Assert.Equal(ImportDraftReviewDecision.Approved.ToString(), duplicate.ReviewDecision);
+        Assert.True(duplicate.IsDuplicateAcknowledged);
+
+        var bulkReject = await PostJson(
+            client,
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}/decisions",
+            new { decision = "Rejected" },
+            await GetAntiforgeryToken(client));
+        Assert.Equal(HttpStatusCode.NoContent, bulkReject.StatusCode);
+
+        var completed = await PostJson(
+            client,
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}/complete",
+            new { },
+            await GetAntiforgeryToken(client));
+        var completion = await completed.Content.ReadFromJsonAsync<CompleteImportResponse>();
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+        Assert.NotNull(completion);
+        Assert.Equal(2, completion.CreatedTransactionCount);
+    }
+
+    [Fact]
     public async Task Review_CorrectsDecidesAndCompletesRowsIdempotently()
     {
         using var client = factory.CreateAuthenticatedTestClient();
@@ -441,7 +512,10 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         int ValidRows,
         int InvalidRows,
         int DuplicateRows);
-    private sealed record ImportReviewResponse(IReadOnlyList<ImportDraftResponse> Drafts);
+    private sealed record ImportReviewResponse(
+        int TotalRows,
+        int ApprovedRows,
+        IReadOnlyList<ImportDraftResponse> Drafts);
     private sealed record ImportListResponse(Guid Id);
     private sealed record ImportDraftResponse(
         Guid Id,
@@ -450,7 +524,9 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         string DuplicateStatus,
         string? ImportedCategoryName,
         string? ImportedSubcategoryName,
-        Guid? SelectedCategoryId);
+        Guid? SelectedCategoryId,
+        string ReviewDecision,
+        bool IsDuplicateAcknowledged);
     private sealed record CompleteImportResponse(
         int CreatedTransactionCount,
         string Status);

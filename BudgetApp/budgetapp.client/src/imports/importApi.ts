@@ -127,6 +127,27 @@ export function reviewImportDraft(
   )
 }
 
+export function bulkReviewImportDrafts(
+  householdId: string,
+  importFileId: string,
+  decision: 'Approved' | 'Rejected' | 'Skipped',
+): Promise<void> {
+  return apiPost(
+    `/api/households/${householdId}/imports/${importFileId}/decisions`,
+    { decision },
+  )
+}
+
+export function removeImportDraft(
+  householdId: string,
+  importFileId: string,
+  draftId: string,
+): Promise<void> {
+  return apiDelete(
+    `/api/households/${householdId}/imports/${importFileId}/drafts/${draftId}`,
+  )
+}
+
 export function completeImport(
   householdId: string,
   importFileId: string,

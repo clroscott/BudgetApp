@@ -151,6 +151,27 @@ public sealed class ImportFile
         UpdatedAtUtc = updatedAtUtc;
     }
 
+    public void RefreshStatisticsAfterRowRemoval(
+        ImportStatistics statistics,
+        DateTimeOffset updatedAtUtc)
+    {
+        if (Status != ImportFileStatus.ReadyForReview)
+        {
+            throw new InvalidOperationException(
+                "Rows can only be removed while an import is under review.");
+        }
+
+        if (statistics.TotalRows <= 0 || statistics.TotalRows >= TotalRowCount)
+        {
+            throw new ArgumentException(
+                "Removing a row must reduce the import while leaving at least one row.",
+                nameof(statistics));
+        }
+
+        SetStatistics(statistics);
+        UpdatedAtUtc = updatedAtUtc;
+    }
+
     public void Complete(
         ImportStatistics statistics,
         DateTimeOffset updatedAtUtc)

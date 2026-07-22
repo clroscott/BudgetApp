@@ -148,6 +148,89 @@ public sealed class ImportReviewService(
         await importRepository.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task BulkSetDecisionAsync(
+        Guid householdId,
+        Guid userId,
+        Guid importFileId,
+        string decision,
+        CancellationToken cancellationToken)
+    {
+        var (access, role) = await GetAuthorized(
+            householdId, userId, importFileId, forUpdate: true, cancellationToken);
+        RequireEdit(access, role, userId);
+        RequireReviewable(access.ImportFile);
+        var drafts = await importRepository.ListDraftsAsync(
+            importFileId, forUpdate: true, cancellationToken);
+        var pendingDrafts = drafts.Where(draft =>
+            draft.ReviewDecision == ImportDraftReviewDecision.Pending).ToList();
+        var normalizedDecision = decision.Trim().ToLowerInvariant();
+        var now = timeProvider.GetUtcNow();
+
+        switch (normalizedDecision)
+        {
+            case "approved":
+                var validDrafts = pendingDrafts.Where(draft =>
+                    draft.ValidationStatus == ImportDraftValidationStatus.Valid).ToList();
+                await ApplyDuplicateResults(
+                    access.ImportFile.AccountId,
+                    validDrafts,
+                    cancellationToken);
+                foreach (var draft in validDrafts)
+                {
+                    draft.Approve(userId, acknowledgePossibleDuplicate: true, now);
+                }
+                break;
+            case "rejected":
+                foreach (var draft in pendingDrafts)
+                {
+                    draft.Reject(userId, now);
+                }
+                break;
+            case "skipped":
+                foreach (var draft in pendingDrafts)
+                {
+                    draft.Skip(userId, now);
+                }
+                break;
+            default:
+                throw new ArgumentException(
+                    "Review decision is not supported.",
+                    nameof(decision));
+        }
+
+        access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), now);
+        await importRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task RemoveDraftAsync(
+        Guid householdId,
+        Guid userId,
+        Guid importFileId,
+        Guid draftId,
+        CancellationToken cancellationToken)
+    {
+        var (access, role) = await GetAuthorized(
+            householdId, userId, importFileId, forUpdate: true, cancellationToken);
+        RequireEdit(access, role, userId);
+        RequireReviewable(access.ImportFile);
+        var drafts = await importRepository.ListDraftsAsync(
+            importFileId, forUpdate: true, cancellationToken);
+        var draft = drafts.SingleOrDefault(candidate => candidate.Id == draftId)
+            ?? throw new ImportDraftNotFoundException();
+        if (drafts.Count == 1)
+        {
+            throw new InvalidOperationException(
+                "The final staged row cannot be removed. Discard the staged import instead.");
+        }
+
+        var remainingDrafts = drafts.Where(candidate => candidate.Id != draftId).ToList();
+        importRepository.RemoveDraft(draft);
+        access.ImportFile.RefreshStatisticsAfterRowRemoval(
+            CalculateStatistics(remainingDrafts),
+            timeProvider.GetUtcNow());
+        await importRepository.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<CompleteImportResult> CompleteAsync(
         Guid householdId,
         Guid userId,

@@ -134,6 +134,9 @@ internal sealed class ImportRepository(BudgetAppDbContext dbContext)
     public void Remove(ImportFile importFile) =>
         dbContext.ImportFiles.Remove(importFile);
 
+    public void RemoveDraft(ImportTransactionDraft draft) =>
+        dbContext.ImportTransactionDrafts.Remove(draft);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>
         dbContext.SaveChangesAsync(cancellationToken);
 }
