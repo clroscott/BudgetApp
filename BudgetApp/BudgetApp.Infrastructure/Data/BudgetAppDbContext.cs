@@ -1,4 +1,5 @@
 using BudgetApp.Domain.Accounts;
+using BudgetApp.Domain.Budgeting;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
 using BudgetApp.Domain.Imports;
@@ -13,6 +14,10 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
     : IdentityUserContext<ApplicationUser, Guid>(options)
 {
     public DbSet<Account> Accounts => Set<Account>();
+
+    public DbSet<BudgetLine> BudgetLines => Set<BudgetLine>();
+
+    public DbSet<BudgetMonth> BudgetMonths => Set<BudgetMonth>();
 
     public DbSet<Category> Categories => Set<Category>();
 
