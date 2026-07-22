@@ -122,7 +122,7 @@ Categories, categorization rules, merchant aliases, and import profiles are seco
 ### Main steps
 
 1. The user opens Accounts and selects Add account.
-2. The user enters a name, type, optional institution, and non-sensitive identifier.
+2. The user enters a name, type, currency, optional institution, and non-sensitive identifier. Currency defaults to the household currency but may differ.
 3. The user selects Personal or Household scope.
 4. For Personal scope, the owner defaults to the current user.
 5. The application creates the account and returns to the account list or detail view.

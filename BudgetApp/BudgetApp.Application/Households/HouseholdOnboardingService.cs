@@ -1,5 +1,5 @@
-using System.Globalization;
 using BudgetApp.Application.Categories;
+using BudgetApp.Application.Finance;
 using BudgetApp.Domain.Households;
 
 namespace BudgetApp.Application.Households;
@@ -8,12 +8,6 @@ public sealed class HouseholdOnboardingService(
     IHouseholdRepository householdRepository,
     TimeProvider timeProvider)
 {
-    private static readonly HashSet<string> SupportedCurrencyCodes =
-        CultureInfo.GetCultures(CultureTypes.SpecificCultures)
-            .Select(culture => new RegionInfo(culture.Name).ISOCurrencySymbol)
-            .Where(code => code.Length == Household.CurrencyCodeLength)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
     public Task<IReadOnlyList<HouseholdMembership>> GetActiveMembershipsAsync(
         Guid userId,
         CancellationToken cancellationToken = default)
@@ -47,11 +41,7 @@ public sealed class HouseholdOnboardingService(
             throw new HouseholdMembershipExistsException();
         }
 
-        var normalizedCurrency = defaultCurrency.Trim().ToUpperInvariant();
-        if (!SupportedCurrencyCodes.Contains(normalizedCurrency))
-        {
-            throw new UnsupportedCurrencyException(normalizedCurrency);
-        }
+        var normalizedCurrency = CurrencyCatalog.NormalizeSupported(defaultCurrency);
 
         var normalizedTimeZoneId = timeZoneId.Trim();
         try

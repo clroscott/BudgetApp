@@ -51,16 +51,22 @@ export function DashboardPage() {
         <p className="eyebrow">Dashboard</p>
         <h1>Hello, {user.displayName}</h1>
         <p className="dashboard-intro">
-          Your household is ready. Accounts and budgeting tools are coming next.
+          Your household foundation is ready. Manage accounts and categories before importing transactions.
         </p>
 
         <ErrorSummary errors={errors} />
 
         <div className="dashboard-grid">
           <article className="summary-card">
-            <span>Account</span>
+            <span>Profile</span>
             <strong>{user.email}</strong>
             <small>User ID: {user.id}</small>
+          </article>
+          <article className="summary-card">
+            <span>Accounts</span>
+            <strong>Financial accounts</strong>
+            <small>Set up shared and personal transaction sources.</small>
+            <AppLink to="/accounts">Manage accounts</AppLink>
           </article>
           <article className="summary-card">
             <span>Categories</span>

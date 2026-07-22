@@ -361,6 +361,156 @@ a {
   color: var(--muted-text);
 }
 
+.add-account-form,
+.account-section {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.account-form-heading,
+.account-section-heading,
+.account-card,
+.account-card-main,
+.account-name-line,
+.account-actions {
+  display: flex;
+  align-items: center;
+}
+
+.account-form-heading,
+.account-section-heading,
+.account-card {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.account-form-heading h2,
+.account-section-heading h2,
+.account-name-line h3 {
+  margin: 0;
+}
+
+.account-form-heading p,
+.account-section-heading p,
+.account-card-main p {
+  margin: 0.3rem 0 0;
+  color: var(--muted-text);
+}
+
+.currency-pill,
+.account-section-heading > span {
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.account-form-grid,
+.account-edit-grid {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.account-form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.account-edit-grid {
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+.account-form-grid label,
+.account-edit-grid label {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.account-form-grid label span,
+.account-edit-grid label span {
+  color: var(--heading);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.account-submit {
+  justify-self: start;
+}
+
+.account-sections {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.account-section {
+  margin-bottom: 0;
+}
+
+.account-list {
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.account-card {
+  min-height: 4.5rem;
+  padding: 1rem 0;
+}
+
+.account-card + .account-card {
+  border-top: 1px solid var(--border);
+}
+
+.account-card-main {
+  gap: 0.9rem;
+}
+
+.account-type-mark {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.75rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.account-name-line,
+.account-actions {
+  gap: 0.5rem;
+}
+
+.account-card-main small {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--muted-text);
+}
+
+.archived-account .account-card-main {
+  opacity: 0.65;
+}
+
+.account-edit-form {
+  width: 100%;
+}
+
+.account-edit-form .field-help {
+  margin: 0.75rem 0;
+}
+
+.account-edit-form .account-actions {
+  justify-content: flex-start;
+}
+
 .app-header {
   min-height: 4.5rem;
   display: flex;
@@ -426,6 +576,12 @@ a {
   border-style: dashed;
 }
 
+@media (max-width: 55rem) {
+  .account-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 40rem) {
   .auth-card,
   .status-card {
@@ -445,12 +601,19 @@ a {
   }
 
   .page-title-row,
-  .category-row {
+  .category-row,
+  .account-card,
+  .account-form-heading,
+  .account-section-heading {
     align-items: stretch;
     flex-direction: column;
   }
 
   .add-category-form {
+    grid-template-columns: 1fr;
+  }
+
+  .account-form-grid {
     grid-template-columns: 1fr;
   }
 

@@ -89,6 +89,52 @@ public sealed class AccountTests
     }
 
     [Fact]
+    public void UpdateFinancialSettings_ChangesScopeOwnerAndCurrencyTogether()
+    {
+        var account = CreateHouseholdAccount();
+        var ownerUserId = Guid.NewGuid();
+        var updatedAtUtc = DateTimeOffset.UtcNow.AddMinutes(1);
+
+        account.UpdateFinancialSettings(
+            AccountScope.Personal,
+            ownerUserId,
+            "usd",
+            updatedAtUtc);
+
+        Assert.Equal(AccountScope.Personal, account.Scope);
+        Assert.Equal(ownerUserId, account.OwnerUserId);
+        Assert.Equal("USD", account.Currency);
+        Assert.Equal(updatedAtUtc, account.UpdatedAtUtc);
+
+        account.UpdateFinancialSettings(
+            AccountScope.Household,
+            null,
+            "CAD",
+            updatedAtUtc.AddMinutes(1));
+
+        Assert.Equal(AccountScope.Household, account.Scope);
+        Assert.Null(account.OwnerUserId);
+        Assert.Equal("CAD", account.Currency);
+    }
+
+    [Fact]
+    public void UpdateFinancialSettings_RejectsScopeOwnerMismatch()
+    {
+        var account = CreateHouseholdAccount();
+
+        Assert.Throws<ArgumentException>(() => account.UpdateFinancialSettings(
+            AccountScope.Personal,
+            null,
+            "CAD",
+            DateTimeOffset.UtcNow));
+        Assert.Throws<ArgumentException>(() => account.UpdateFinancialSettings(
+            AccountScope.Household,
+            Guid.NewGuid(),
+            "CAD",
+            DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
     public void ArchiveAndReactivate_PreserveAccountHistory()
     {
         var account = CreateHouseholdAccount();

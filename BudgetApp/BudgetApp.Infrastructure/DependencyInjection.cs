@@ -1,5 +1,7 @@
+using BudgetApp.Application.Accounts;
 using BudgetApp.Application.Categories;
 using BudgetApp.Application.Households;
+using BudgetApp.Infrastructure.Accounts;
 using BudgetApp.Infrastructure.Categories;
 using BudgetApp.Infrastructure.Data;
 using BudgetApp.Infrastructure.Households;
@@ -20,6 +22,8 @@ public static class DependencyInjection
 
         services.AddDbContext<BudgetAppDbContext>(options =>
             options.UseSqlServer(connectionString));
+        services.AddScoped<IAccountRepository, AccountRepository>();
+        services.AddScoped<AccountManagementService>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<CategoryManagementService>();
         services.AddScoped<IHouseholdRepository, HouseholdRepository>();
