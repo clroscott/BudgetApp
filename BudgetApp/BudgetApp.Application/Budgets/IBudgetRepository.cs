@@ -31,5 +31,7 @@ public interface IBudgetRepository
 
     Task AddLineAsync(BudgetLine budgetLine, CancellationToken cancellationToken);
 
+    void Remove(BudgetMonth budgetMonth);
+
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }

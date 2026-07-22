@@ -71,6 +71,9 @@ internal sealed class BudgetRepository(BudgetAppDbContext dbContext) : IBudgetRe
     public async Task AddLineAsync(BudgetLine budgetLine, CancellationToken cancellationToken) =>
         await dbContext.BudgetLines.AddAsync(budgetLine, cancellationToken);
 
+    public void Remove(BudgetMonth budgetMonth) =>
+        dbContext.BudgetMonths.Remove(budgetMonth);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>
         dbContext.SaveChangesAsync(cancellationToken);
 }

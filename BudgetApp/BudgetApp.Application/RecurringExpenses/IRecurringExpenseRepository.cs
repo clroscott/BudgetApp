@@ -14,6 +14,14 @@ public interface IRecurringExpenseRepository
         Guid recurringExpenseId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<RecurringExpense>> ListApplicableAsync(
+        Guid householdId,
+        Guid userId,
+        RecurringExpenseScope scope,
+        DateOnly firstDay,
+        DateOnly lastDay,
+        CancellationToken cancellationToken);
+
     Task<string?> GetHouseholdCurrencyAsync(
         Guid householdId,
         CancellationToken cancellationToken);

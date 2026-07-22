@@ -1,10 +1,13 @@
 using BudgetApp.Application.Households;
+using BudgetApp.Application.RecurringExpenses;
 using BudgetApp.Domain.Budgeting;
+using BudgetApp.Domain.RecurringExpenses;
 
 namespace BudgetApp.Application.Budgets;
 
 public sealed class BudgetManagementService(
     IBudgetRepository budgetRepository,
+    IRecurringExpenseRepository recurringExpenseRepository,
     HouseholdAuthorizationService authorizationService,
     TimeProvider timeProvider)
 {
@@ -62,6 +65,122 @@ public sealed class BudgetManagementService(
         var categories = await budgetRepository.ListExpenseCategoriesAsync(
             householdId, cancellationToken);
         return BuildModel(budget, year, month, budgetScope, currency, categories);
+    }
+
+    public async Task<BudgetPageModel> CopyPreviousAsync(
+        Guid householdId,
+        Guid userId,
+        int year,
+        int month,
+        string scope,
+        CancellationToken cancellationToken)
+    {
+        await authorizationService.RequireEditAsync(householdId, userId, cancellationToken);
+        var budgetScope = ParseScope(scope);
+        ValidatePeriod(year, month);
+        Guid? ownerUserId = budgetScope == BudgetScope.Personal ? userId : null;
+        await EnsureBudgetDoesNotExist(
+            householdId, year, month, budgetScope, ownerUserId, cancellationToken);
+        if (year == BudgetMonth.MinimumYear && month == 1)
+            throw new InvalidOperationException("There is no previous calendar month to copy.");
+
+        var previousPeriod = new DateOnly(year, month, 1).AddMonths(-1);
+        var previous = await budgetRepository.GetAsync(
+            householdId, previousPeriod.Year, previousPeriod.Month,
+            budgetScope, ownerUserId, forUpdate: false, cancellationToken)
+            ?? throw new InvalidOperationException(
+                "No budget exists for the previous month in this scope.");
+        var currency = await GetHouseholdCurrency(householdId, cancellationToken);
+        var categories = await budgetRepository.ListExpenseCategoriesAsync(
+            householdId, cancellationToken);
+        var activeCategoryIds = categories
+            .Where(category => category.IsActive)
+            .Select(category => category.Id)
+            .ToHashSet();
+        var budget = CreateBudget(
+            householdId, userId, year, month, budgetScope, currency);
+        var now = timeProvider.GetUtcNow();
+        foreach (var line in previous.Lines.Where(line => activeCategoryIds.Contains(line.CategoryId)))
+            budget.AddLine(line.CategoryId, line.BudgetedAmount, now);
+        await budgetRepository.AddAsync(budget, cancellationToken);
+        await budgetRepository.SaveChangesAsync(cancellationToken);
+        return BuildModel(budget, year, month, budgetScope, currency, categories);
+    }
+
+    public async Task<BudgetPageModel> CreateFromRecurringAsync(
+        Guid householdId,
+        Guid userId,
+        int year,
+        int month,
+        string scope,
+        CancellationToken cancellationToken)
+    {
+        await authorizationService.RequireEditAsync(householdId, userId, cancellationToken);
+        var budgetScope = ParseScope(scope);
+        ValidatePeriod(year, month);
+        Guid? ownerUserId = budgetScope == BudgetScope.Personal ? userId : null;
+        await EnsureBudgetDoesNotExist(
+            householdId, year, month, budgetScope, ownerUserId, cancellationToken);
+        var currency = await GetHouseholdCurrency(householdId, cancellationToken);
+        var firstDay = new DateOnly(year, month, 1);
+        var lastDay = new DateOnly(year, month, DateTime.DaysInMonth(year, month));
+        var recurringScope = budgetScope == BudgetScope.Household
+            ? RecurringExpenseScope.Household
+            : RecurringExpenseScope.Personal;
+        var recurring = await recurringExpenseRepository.ListApplicableAsync(
+            householdId, userId, recurringScope, firstDay, lastDay, cancellationToken);
+        if (recurring.Count == 0)
+            throw new InvalidOperationException(
+                "No active recurring expenses apply to this month and scope.");
+        if (recurring.Any(expense => !string.Equals(
+                expense.Currency, currency, StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException(
+                "All recurring expenses must use the household budget currency.");
+
+        var categories = await budgetRepository.ListExpenseCategoriesAsync(
+            householdId, cancellationToken);
+        var activeRootIds = categories
+            .Where(category => category.IsActive && !category.ParentCategoryId.HasValue)
+            .Select(category => category.Id)
+            .ToHashSet();
+        var activeSubcategoryIds = categories
+            .Where(category =>
+                category.IsActive &&
+                category.ParentCategoryId.HasValue &&
+                activeRootIds.Contains(category.ParentCategoryId.Value))
+            .Select(category => category.Id)
+            .ToHashSet();
+        var applicable = recurring
+            .Where(expense => activeSubcategoryIds.Contains(expense.CategoryId))
+            .GroupBy(expense => expense.CategoryId)
+            .Select(group => new { CategoryId = group.Key, Amount = group.Sum(item => item.Amount) })
+            .ToList();
+        if (applicable.Count == 0)
+            throw new InvalidOperationException(
+                "No recurring expenses use an active expense subcategory.");
+
+        var budget = CreateBudget(
+            householdId, userId, year, month, budgetScope, currency);
+        var now = timeProvider.GetUtcNow();
+        foreach (var item in applicable)
+            budget.AddLine(item.CategoryId, item.Amount, now);
+        await budgetRepository.AddAsync(budget, cancellationToken);
+        await budgetRepository.SaveChangesAsync(cancellationToken);
+        return BuildModel(budget, year, month, budgetScope, currency, categories);
+    }
+
+    public async Task DeleteDraftAsync(
+        Guid householdId,
+        Guid userId,
+        Guid budgetId,
+        CancellationToken cancellationToken)
+    {
+        await authorizationService.RequireEditAsync(householdId, userId, cancellationToken);
+        var budget = await GetOwnedBudget(householdId, userId, budgetId, cancellationToken);
+        if (budget.Status != BudgetStatus.Draft)
+            throw new InvalidOperationException("Only a draft budget can be deleted.");
+        budgetRepository.Remove(budget);
+        await budgetRepository.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<BudgetPageModel> SaveAsync(
@@ -173,6 +292,41 @@ public sealed class BudgetManagementService(
         return await budgetRepository.GetByIdForUpdateAsync(
             householdId, budgetId, userId, cancellationToken)
             ?? throw new BudgetNotFoundException();
+    }
+
+    private async Task EnsureBudgetDoesNotExist(
+        Guid householdId,
+        int year,
+        int month,
+        BudgetScope scope,
+        Guid? ownerUserId,
+        CancellationToken cancellationToken)
+    {
+        if (await budgetRepository.GetAsync(
+                householdId, year, month, scope, ownerUserId,
+                forUpdate: false, cancellationToken) is not null)
+            throw new InvalidOperationException(
+                "A budget already exists for this month and scope.");
+    }
+
+    private async Task<string> GetHouseholdCurrency(
+        Guid householdId,
+        CancellationToken cancellationToken) =>
+        await budgetRepository.GetHouseholdCurrencyAsync(householdId, cancellationToken)
+        ?? throw new HouseholdAccessDeniedException();
+
+    private BudgetMonth CreateBudget(
+        Guid householdId,
+        Guid userId,
+        int year,
+        int month,
+        BudgetScope scope,
+        string currency)
+    {
+        var now = timeProvider.GetUtcNow();
+        return scope == BudgetScope.Household
+            ? BudgetMonth.CreateHousehold(householdId, year, month, currency, now)
+            : BudgetMonth.CreatePersonal(householdId, userId, year, month, currency, now);
     }
 
     private static void ValidateSectionModes(

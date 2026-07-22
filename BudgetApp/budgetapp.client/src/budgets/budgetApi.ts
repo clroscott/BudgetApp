@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from '../api/apiClient'
+import { apiDelete, apiGet, apiPost, apiPut } from '../api/apiClient'
 
 export type BudgetScope = 'Household' | 'Personal'
 export type BudgetStatus = 'Draft' | 'Active' | 'Closed'
@@ -41,6 +41,23 @@ export function createBudget(
   scope: BudgetScope,
 ): Promise<BudgetPageData> {
   return apiPost(periodPath(householdId, year, month), { scope })
+}
+
+export function initializeBudget(
+  householdId: string,
+  year: number,
+  month: number,
+  scope: BudgetScope,
+  method: 'copy-previous' | 'from-recurring',
+): Promise<BudgetPageData> {
+  return apiPost(`${periodPath(householdId, year, month)}/${method}`, { scope })
+}
+
+export function deleteDraftBudget(
+  householdId: string,
+  budgetId: string,
+): Promise<void> {
+  return apiDelete(`/api/households/${householdId}/budgets/${budgetId}`)
 }
 
 export function saveBudget(

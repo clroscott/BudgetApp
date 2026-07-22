@@ -35,6 +35,20 @@ public sealed class BudgetsController(
             return CreatedAtAction(nameof(Get), new { householdId, year, month, scope = request.Scope }, model);
         });
 
+    [HttpPost("{year:int}/{month:int}/copy-previous")]
+    public Task<ActionResult<BudgetPageModel>> CopyPrevious(
+        Guid householdId, int year, int month, CreateBudgetRequest request,
+        CancellationToken cancellationToken) =>
+        ExecuteWrite(async userId => Ok(await budgetManagementService.CopyPreviousAsync(
+            householdId, userId, year, month, request.Scope, cancellationToken)));
+
+    [HttpPost("{year:int}/{month:int}/from-recurring")]
+    public Task<ActionResult<BudgetPageModel>> CreateFromRecurring(
+        Guid householdId, int year, int month, CreateBudgetRequest request,
+        CancellationToken cancellationToken) =>
+        ExecuteWrite(async userId => Ok(await budgetManagementService.CreateFromRecurringAsync(
+            householdId, userId, year, month, request.Scope, cancellationToken)));
+
     [HttpPut("{budgetId:guid}")]
     public Task<ActionResult<BudgetPageModel>> Save(
         Guid householdId, Guid budgetId, SaveBudgetRequest request,
@@ -43,6 +57,25 @@ public sealed class BudgetsController(
             householdId, userId, budgetId,
             request.Lines.Select(line => new BudgetLineInput(line.CategoryId, line.BudgetedAmount)).ToList(),
             cancellationToken)));
+
+    [HttpDelete("{budgetId:guid}")]
+    public async Task<IActionResult> DeleteDraft(
+        Guid householdId,
+        Guid budgetId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        try
+        {
+            await budgetManagementService.DeleteDraftAsync(
+                householdId, userId, budgetId, cancellationToken);
+            return NoContent();
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
 
     [HttpPost("{budgetId:guid}/activate")]
     public Task<ActionResult<BudgetPageModel>> Activate(

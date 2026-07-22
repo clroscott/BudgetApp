@@ -3,7 +3,9 @@ import { getErrorMessages } from '../auth/errorMessages'
 import {
   changeBudgetStatus,
   createBudget,
+  deleteDraftBudget,
   getBudget,
+  initializeBudget,
   saveBudget,
   type BudgetPageData,
   type BudgetScope,
@@ -106,11 +108,31 @@ export function BudgetManagementPage() {
     if (confirmDiscard()) setScope(nextScope)
   }
 
-  const handleCreate = async () => {
+  const handleCreate = async (
+    method: 'blank' | 'copy-previous' | 'from-recurring',
+  ) => {
     setIsSaving(true)
     setErrors([])
     try {
-      applyBudget(await createBudget(currentHousehold.id, year, month, scope))
+      applyBudget(method === 'blank'
+        ? await createBudget(currentHousehold.id, year, month, scope)
+        : await initializeBudget(currentHousehold.id, year, month, scope, method))
+    } catch (error) {
+      setErrors(getErrorMessages(error))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleDeleteDraft = async () => {
+    if (!budget?.id || budget.status !== 'Draft' || !window.confirm(
+      'Delete this draft budget and all of its amounts? This cannot be undone.',
+    )) return
+    setIsSaving(true)
+    setErrors([])
+    try {
+      await deleteDraftBudget(currentHousehold.id, budget.id)
+      await loadBudget()
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {
@@ -218,9 +240,7 @@ export function BudgetManagementPage() {
         <ErrorSummary errors={errors} />
 
         {isLoading ? <p className="empty-state">Loading budget...</p> : !budget?.id ? (
-          <div className="empty-state"><h2>No budget for {monthNames[month - 1]} {year}</h2><p>Create a {scope.toLowerCase()} budget when you are ready to start planning.</p>
-            {canManage && <button className="primary-button" type="button" disabled={isSaving} onClick={() => void handleCreate()}>Create budget</button>}
-          </div>
+          <div className="budget-empty-state"><div className="empty-state"><h2>No budget for {monthNames[month - 1]} {year}</h2><p>Choose how to start this {scope.toLowerCase()} budget.</p></div>{canManage && <div className="budget-initialization-grid"><article><h3>Copy previous month</h3><p>Copy the budget amounts and category detail from the previous calendar month.</p><button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('copy-previous')}>Copy previous month</button></article><article><h3>Use recurring expenses</h3><p>Build category amounts from active recurring expenses that apply this month.</p><button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('from-recurring')}>Build from recurring expenses</button></article><article><h3>Start from scratch</h3><p>Create an empty draft and enter every amount yourself.</p><button className="primary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('blank')}>Create blank budget</button></article></div>}</div>
         ) : budget.categories.length === 0 ? (
           <div className="empty-state"><h2>No expense categories</h2><p>Add expense categories before entering budget amounts.</p><AppLink to="/settings/categories">Manage categories</AppLink></div>
         ) : (
@@ -256,6 +276,7 @@ export function BudgetManagementPage() {
           </div>
           <div className="budget-save-actions">
             <span className="budget-back-to-top-host" data-back-to-top-host />
+            {budget?.status === 'Draft' && canManage && <button className="danger-button" type="button" disabled={isSaving} onClick={() => void handleDeleteDraft()}>Delete draft</button>}
             {budget?.status === 'Draft' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before activating.' : undefined} onClick={() => void handleStatus('activate')}>Activate</button>}
             {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before closing.' : undefined} onClick={() => void handleStatus('close')}>Close budget</button>}
             {budget?.status === 'Closed' && canManage && <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleStatus('reopen')}>Reopen budget</button>}

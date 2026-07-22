@@ -52,6 +52,24 @@ internal sealed class RecurringExpenseRepository(BudgetAppDbContext dbContext)
             expense => expense.HouseholdId == householdId && expense.Id == recurringExpenseId,
             cancellationToken);
 
+    public async Task<IReadOnlyList<RecurringExpense>> ListApplicableAsync(
+        Guid householdId,
+        Guid userId,
+        RecurringExpenseScope scope,
+        DateOnly firstDay,
+        DateOnly lastDay,
+        CancellationToken cancellationToken) =>
+        await dbContext.RecurringExpenses
+            .AsNoTracking()
+            .Where(expense =>
+                expense.HouseholdId == householdId &&
+                expense.Scope == scope &&
+                (scope == RecurringExpenseScope.Household || expense.OwnerUserId == userId) &&
+                expense.IsActive &&
+                expense.StartsOn <= lastDay &&
+                (!expense.EndsOn.HasValue || expense.EndsOn.Value >= firstDay))
+            .ToListAsync(cancellationToken);
+
     public Task<string?> GetHouseholdCurrencyAsync(
         Guid householdId,
         CancellationToken cancellationToken) =>
