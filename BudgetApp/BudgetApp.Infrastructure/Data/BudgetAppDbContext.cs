@@ -1,6 +1,7 @@
 using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
+using BudgetApp.Domain.Transactions;
 using BudgetApp.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,8 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
     public DbSet<Household> Households => Set<Household>();
 
     public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
+
+    public DbSet<Transaction> Transactions => Set<Transaction>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
