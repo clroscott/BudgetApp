@@ -2,7 +2,10 @@ import { useEffect, type ReactNode } from 'react'
 import './App.css'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
+import { HouseholdProvider } from './households/HouseholdProvider'
+import { useHouseholds } from './households/useHouseholds'
 import { DashboardPage } from './pages/DashboardPage'
+import { HouseholdSetupPage } from './pages/HouseholdSetupPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { RouterProvider } from './routing/RouterProvider'
@@ -30,12 +33,73 @@ function AnonymousOnlyRoute({ children }: { children: ReactNode }) {
   return user ? <Redirect to="/dashboard" /> : children
 }
 
+function HouseholdRequiredRoute({ children }: { children: ReactNode }) {
+  const {
+    currentHousehold,
+    initializationError,
+    isLoading,
+    refresh,
+  } = useHouseholds()
+
+  if (isLoading) {
+    return <LoadingScreen message="Loading your household..." />
+  }
+
+  if (initializationError) {
+    return (
+      <StatusError
+        message={initializationError}
+        onRetry={() => void refresh()}
+      />
+    )
+  }
+
+  return currentHousehold ? children : <Redirect to="/household/setup" />
+}
+
+function HouseholdSetupRoute({ children }: { children: ReactNode }) {
+  const {
+    currentHousehold,
+    initializationError,
+    isLoading,
+    refresh,
+  } = useHouseholds()
+
+  if (isLoading) {
+    return <LoadingScreen message="Checking household setup..." />
+  }
+
+  if (initializationError) {
+    return (
+      <StatusError
+        message={initializationError}
+        onRetry={() => void refresh()}
+      />
+    )
+  }
+
+  return currentHousehold ? <Redirect to="/dashboard" /> : children
+}
+
 function LoadingScreen({ message }: { message: string }) {
   return (
     <main className="centered-page" aria-busy="true">
       <section className="status-card">
         <span className="brand-mark" aria-hidden="true">B</span>
         <p>{message}</p>
+      </section>
+    </main>
+  )
+}
+
+function StatusError({ message, onRetry }: { message: string, onRetry: () => void }) {
+  return (
+    <main className="centered-page">
+      <section className="status-card" role="alert">
+        <span className="brand-mark" aria-hidden="true">B</span>
+        <h1>BudgetApp is unavailable</h1>
+        <p>{message}</p>
+        <button type="button" onClick={onRetry}>Try again</button>
       </section>
     </main>
   )
@@ -50,18 +114,7 @@ function AppRoutes() {
   }
 
   if (initializationError) {
-    return (
-      <main className="centered-page">
-        <section className="status-card" role="alert">
-          <span className="brand-mark" aria-hidden="true">B</span>
-          <h1>BudgetApp is unavailable</h1>
-          <p>{initializationError}</p>
-          <button type="button" onClick={() => void refresh()}>
-            Try again
-          </button>
-        </section>
-      </main>
-    )
+    return <StatusError message={initializationError} onRetry={() => void refresh()} />
   }
 
   switch (path) {
@@ -82,7 +135,17 @@ function AppRoutes() {
     case '/dashboard':
       return (
         <ProtectedRoute>
-          <DashboardPage />
+          <HouseholdRequiredRoute>
+            <DashboardPage />
+          </HouseholdRequiredRoute>
+        </ProtectedRoute>
+      )
+    case '/household/setup':
+      return (
+        <ProtectedRoute>
+          <HouseholdSetupRoute>
+            <HouseholdSetupPage />
+          </HouseholdSetupRoute>
         </ProtectedRoute>
       )
     default:
@@ -94,7 +157,9 @@ function App() {
   return (
     <RouterProvider>
       <AuthProvider>
-        <AppRoutes />
+        <HouseholdProvider>
+          <AppRoutes />
+        </HouseholdProvider>
       </AuthProvider>
     </RouterProvider>
   )

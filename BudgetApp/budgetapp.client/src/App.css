@@ -55,6 +55,18 @@
   margin-bottom: 1rem;
 }
 
+.setup-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.setup-header-row .brand-mark {
+  margin-bottom: 0;
+}
+
 .eyebrow {
   color: var(--accent);
   font-size: 0.78rem;
@@ -85,7 +97,8 @@ form label:not(.checkbox-row) {
   font-weight: 700;
 }
 
-input {
+input,
+select {
   min-width: 0;
   padding: 0.78rem 0.9rem;
   border: 1px solid var(--border-strong);
@@ -95,7 +108,8 @@ input {
   font: inherit;
 }
 
-input:focus {
+input:focus,
+select:focus {
   border-color: var(--accent);
   outline: 3px solid var(--accent-soft);
 }
@@ -153,6 +167,16 @@ button:disabled {
   border: 1px solid var(--border-strong);
   background: var(--surface);
   color: var(--heading);
+}
+
+.text-button {
+  padding: 0.45rem;
+  background: transparent;
+  color: var(--accent);
+}
+
+.text-button:hover:not(:disabled) {
+  text-decoration: underline;
 }
 
 .auth-switch {

@@ -1,4 +1,6 @@
+using BudgetApp.Application.Households;
 using BudgetApp.Infrastructure.Data;
+using BudgetApp.Infrastructure.Households;
 using BudgetApp.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +18,9 @@ public static class DependencyInjection
 
         services.AddDbContext<BudgetAppDbContext>(options =>
             options.UseSqlServer(connectionString));
+        services.AddScoped<IHouseholdRepository, HouseholdRepository>();
+        services.AddScoped<HouseholdOnboardingService>();
+        services.AddSingleton(TimeProvider.System);
 
         return services
             .AddIdentityCore<ApplicationUser>(options =>

@@ -32,7 +32,7 @@ export function RegisterPage() {
         email: String(form.get('email') ?? ''),
         password,
       })
-      navigate('/dashboard', { replace: true })
+      navigate('/household/setup', { replace: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {
