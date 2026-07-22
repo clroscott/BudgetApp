@@ -152,6 +152,21 @@ public sealed class BudgetMonthTests
             budget.RemoveLine(categoryId, DateTimeOffset.UtcNow));
     }
 
+    [Fact]
+    public void Reopen_ChangesClosedBudgetBackToActive()
+    {
+        var budget = CreateBudget();
+        budget.Activate(DateTimeOffset.UtcNow);
+        budget.Close(DateTimeOffset.UtcNow.AddMinutes(1));
+
+        budget.Reopen(DateTimeOffset.UtcNow.AddMinutes(2));
+
+        Assert.Equal(BudgetStatus.Active, budget.Status);
+        budget.AddLine(Guid.NewGuid(), 50m, DateTimeOffset.UtcNow.AddMinutes(3));
+        Assert.Throws<InvalidOperationException>(() =>
+            budget.Reopen(DateTimeOffset.UtcNow.AddMinutes(4)));
+    }
+
     private static BudgetMonth CreateBudget() =>
         BudgetMonth.CreateHousehold(
             Guid.NewGuid(),

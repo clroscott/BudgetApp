@@ -6,6 +6,7 @@ import { BackToTopButton } from './components/BackToTopButton'
 import { HouseholdProvider } from './households/HouseholdProvider'
 import { useHouseholds } from './households/useHouseholds'
 import { AccountManagementPage } from './pages/AccountManagementPage'
+import { BudgetManagementPage } from './pages/BudgetManagementPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { CategoryManagementPage } from './pages/CategoryManagementPage'
 import { CsvImportPage } from './pages/CsvImportPage'
@@ -151,6 +152,14 @@ function AppRoutes() {
         <ProtectedRoute>
           <HouseholdRequiredRoute>
             <AccountManagementPage />
+          </HouseholdRequiredRoute>
+        </ProtectedRoute>
+      )
+    case '/budgeting':
+      return (
+        <ProtectedRoute>
+          <HouseholdRequiredRoute>
+            <BudgetManagementPage />
           </HouseholdRequiredRoute>
         </ProtectedRoute>
       )

@@ -150,6 +150,17 @@ public sealed class BudgetMonth
         UpdatedAtUtc = updatedAtUtc;
     }
 
+    public void Reopen(DateTimeOffset updatedAtUtc)
+    {
+        if (Status != BudgetStatus.Closed)
+        {
+            throw new InvalidOperationException("Only a closed budget can be reopened.");
+        }
+
+        Status = BudgetStatus.Active;
+        UpdatedAtUtc = updatedAtUtc;
+    }
+
     private BudgetLine FindLine(Guid categoryId) =>
         _lines.SingleOrDefault(line => line.CategoryId == categoryId)
         ?? throw new InvalidOperationException(

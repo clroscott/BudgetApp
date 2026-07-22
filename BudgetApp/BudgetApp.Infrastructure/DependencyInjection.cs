@@ -1,10 +1,12 @@
 using BudgetApp.Application.Accounts;
 using BudgetApp.Application.Categories;
+using BudgetApp.Application.Budgets;
 using BudgetApp.Application.Households;
 using BudgetApp.Application.Imports;
 using BudgetApp.Application.Transactions;
 using BudgetApp.Infrastructure.Accounts;
 using BudgetApp.Infrastructure.Categories;
+using BudgetApp.Infrastructure.Budgets;
 using BudgetApp.Infrastructure.Data;
 using BudgetApp.Infrastructure.Households;
 using BudgetApp.Infrastructure.Identity;
@@ -30,6 +32,8 @@ public static class DependencyInjection
         services.AddScoped<AccountManagementService>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<CategoryManagementService>();
+        services.AddScoped<IBudgetRepository, BudgetRepository>();
+        services.AddScoped<BudgetManagementService>();
         services.AddScoped<IHouseholdRepository, HouseholdRepository>();
         services.AddScoped<IHouseholdAuthorizationRepository, HouseholdAuthorizationRepository>();
         services.AddScoped<HouseholdAuthorizationService>();

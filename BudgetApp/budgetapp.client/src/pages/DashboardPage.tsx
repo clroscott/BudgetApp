@@ -75,6 +75,12 @@ export function DashboardPage() {
             <AppLink to="/settings/categories">Manage categories</AppLink>
           </article>
           <article className="summary-card">
+            <span>Budgeting</span>
+            <strong>Monthly budget</strong>
+            <small>Plan household or personal spending by category.</small>
+            <AppLink to="/budgeting">Manage budget</AppLink>
+          </article>
+          <article className="summary-card">
             <span>Transactions</span>
             <strong>Official activity</strong>
             <small>Review and correct approved household and personal transactions.</small>

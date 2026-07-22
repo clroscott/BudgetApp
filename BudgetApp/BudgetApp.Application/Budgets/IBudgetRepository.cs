@@ -1,0 +1,35 @@
+using BudgetApp.Domain.Budgeting;
+
+namespace BudgetApp.Application.Budgets;
+
+public interface IBudgetRepository
+{
+    Task<BudgetMonth?> GetAsync(
+        Guid householdId,
+        int year,
+        int month,
+        BudgetScope scope,
+        Guid? ownerUserId,
+        bool forUpdate,
+        CancellationToken cancellationToken);
+
+    Task<BudgetMonth?> GetByIdForUpdateAsync(
+        Guid householdId,
+        Guid budgetId,
+        Guid userId,
+        CancellationToken cancellationToken);
+
+    Task<string?> GetHouseholdCurrencyAsync(
+        Guid householdId,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<BudgetCategoryRecord>> ListExpenseCategoriesAsync(
+        Guid householdId,
+        CancellationToken cancellationToken);
+
+    Task AddAsync(BudgetMonth budgetMonth, CancellationToken cancellationToken);
+
+    Task AddLineAsync(BudgetLine budgetLine, CancellationToken cancellationToken);
+
+    Task SaveChangesAsync(CancellationToken cancellationToken);
+}
