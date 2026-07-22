@@ -7,6 +7,7 @@ import { useHouseholds } from './households/useHouseholds'
 import { AccountManagementPage } from './pages/AccountManagementPage'
 import { DashboardPage } from './pages/DashboardPage'
 import { CategoryManagementPage } from './pages/CategoryManagementPage'
+import { CsvImportPage } from './pages/CsvImportPage'
 import { HouseholdSetupPage } from './pages/HouseholdSetupPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
@@ -147,6 +148,14 @@ function AppRoutes() {
         <ProtectedRoute>
           <HouseholdRequiredRoute>
             <AccountManagementPage />
+          </HouseholdRequiredRoute>
+        </ProtectedRoute>
+      )
+    case '/import':
+      return (
+        <ProtectedRoute>
+          <HouseholdRequiredRoute>
+            <CsvImportPage />
           </HouseholdRequiredRoute>
         </ProtectedRoute>
       )

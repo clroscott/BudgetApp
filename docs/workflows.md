@@ -199,16 +199,16 @@ Categories, categorization rules, merchant aliases, and import profiles are seco
 1. The user opens Import and selects an account.
 2. The user selects a CSV file.
 3. The backend validates and hashes the file.
-4. The application reads headers and shows a mapping step.
-5. The user maps date, description, and amount fields, or debit and credit fields.
-6. The backend parses rows into staged draft records.
-7. The user is directed to Import Review.
+4. Version 1 recognizes common date, description, amount, debit, and credit headers.
+5. The backend parses rows into staged draft records and preserves a safe serialized representation of each source row.
+6. The application shows the staged row summary.
+7. Interactive mapping for unrecognized layouts is deferred to a later import-mapping feature.
 
 ### Validation
 
-- File type and size are allowed.
+- The file has a `.csv` extension, is no larger than 10 MB, and contains no more than 10,000 transaction rows.
 - File content is parseable as CSV using the selected encoding and delimiter.
-- Required columns are mapped exactly once.
+- Required columns are recognized exactly once. Unknown layouts are rejected with the headers that were found rather than guessed.
 - Dates and amounts can be parsed or are marked invalid for review.
 - The selected account belongs to the current household and is accessible to the user.
 - File hash and account are checked for likely repeat uploads.
@@ -225,6 +225,7 @@ Categories, categorization rules, merchant aliases, and import profiles are seco
 - A partially parsed upload remains resumable only if its status and drafts are internally consistent; otherwise it is marked Failed and can be retried.
 - Duplicate-file warnings require confirmation rather than silently blocking legitimate reimports.
 - No official Transaction is created during upload or parsing.
+- The original uploaded file is not retained in version 1; its hash, metadata, and staged source-row values are retained.
 
 ### Permissions
 

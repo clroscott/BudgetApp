@@ -1,11 +1,13 @@
 using BudgetApp.Application.Accounts;
 using BudgetApp.Application.Categories;
 using BudgetApp.Application.Households;
+using BudgetApp.Application.Imports;
 using BudgetApp.Infrastructure.Accounts;
 using BudgetApp.Infrastructure.Categories;
 using BudgetApp.Infrastructure.Data;
 using BudgetApp.Infrastructure.Households;
 using BudgetApp.Infrastructure.Identity;
+using BudgetApp.Infrastructure.Imports;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +32,9 @@ public static class DependencyInjection
         services.AddScoped<IHouseholdAuthorizationRepository, HouseholdAuthorizationRepository>();
         services.AddScoped<HouseholdAuthorizationService>();
         services.AddScoped<HouseholdOnboardingService>();
+        services.AddScoped<IImportRepository, ImportRepository>();
+        services.AddScoped<ICsvImportReader, CsvImportReader>();
+        services.AddScoped<CsvImportService>();
         services.AddSingleton(TimeProvider.System);
 
         return services

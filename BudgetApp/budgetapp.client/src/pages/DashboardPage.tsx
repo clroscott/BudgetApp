@@ -75,6 +75,12 @@ export function DashboardPage() {
             <AppLink to="/settings/categories">Manage categories</AppLink>
           </article>
           <article className="summary-card">
+            <span>Import</span>
+            <strong>CSV transactions</strong>
+            <small>Stage bank transactions for validation and review.</small>
+            <AppLink to="/import">Import a CSV</AppLink>
+          </article>
+          <article className="summary-card">
             <span>Household</span>
             <strong>{currentHousehold?.name}</strong>
             <small>

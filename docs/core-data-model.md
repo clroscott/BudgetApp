@@ -226,7 +226,8 @@ Rules:
 - Household ID must match the selected account's household.
 - The uploader must have permission to import into the selected account.
 - A stable file hash helps identify accidental repeat uploads.
-- File retention and deletion policy must be decided before production use. Parsed source values must remain traceable even if the original file is deleted.
+- Version 1 does not retain the uploaded bank file. It stores the hash, file metadata, and a safe serialized representation of each staged row so imported values remain traceable without keeping another copy of the file.
+- Version 1 limits each upload to 10 MB and 10,000 transaction rows.
 
 ### ImportTransactionDraft
 
@@ -377,7 +378,6 @@ AI suggestions will be introduced behind backend interfaces only. They may propo
 ## Decisions Required Before Implementation
 
 - Initial personal-data visibility policy between household members
-- File size limits and uploaded-file retention policy
 - Whether version 1 permits manual transaction entry
 - Whether regular income uses `RecurringExpense` initially or a more general UI label such as “Recurring Items”
 - Minimum role permissions for accounts, imports, categories, budgets, and household administration
