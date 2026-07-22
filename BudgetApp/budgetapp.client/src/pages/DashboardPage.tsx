@@ -4,6 +4,7 @@ import { useAuth } from '../auth/useAuth'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { useRouter } from '../routing/useRouter'
+import { AppLink } from '../routing/AppLink'
 
 export function DashboardPage() {
   const { user, logout } = useAuth()
@@ -60,6 +61,12 @@ export function DashboardPage() {
             <span>Account</span>
             <strong>{user.email}</strong>
             <small>User ID: {user.id}</small>
+          </article>
+          <article className="summary-card">
+            <span>Categories</span>
+            <strong>Household categories</strong>
+            <small>Organize transactions and future budget lines.</small>
+            <AppLink to="/settings/categories">Manage categories</AppLink>
           </article>
           <article className="summary-card">
             <span>Household</span>

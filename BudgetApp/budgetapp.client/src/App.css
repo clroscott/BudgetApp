@@ -208,6 +208,159 @@ a {
   background: var(--page-bg);
 }
 
+.management-page {
+  min-height: 100svh;
+  background: var(--page-bg);
+}
+
+.management-content {
+  width: min(100% - 2rem, 70rem);
+  margin: 0 auto;
+  padding: 3rem 0;
+}
+
+.page-title-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.page-title-row h1 {
+  margin: 0.35rem 0 0.5rem;
+}
+
+.page-title-row p:last-child {
+  color: var(--muted-text);
+}
+
+.header-link {
+  text-decoration: none;
+}
+
+.add-category-form {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) minmax(9rem, 12rem) auto;
+  align-items: end;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+}
+
+.add-category-form > div {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.add-category-form label {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.add-category-form .primary-button {
+  margin-top: 0;
+}
+
+.category-sections {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.category-section {
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.category-section h2 {
+  margin-bottom: 1rem;
+  font-size: 1.05rem;
+}
+
+.category-group + .category-group {
+  border-top: 1px solid var(--border);
+}
+
+.category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.3rem;
+  padding: 0.65rem 0;
+}
+
+.subcategory-row {
+  margin-left: 2rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--border);
+}
+
+.inactive-row {
+  color: var(--muted-text);
+}
+
+.category-name-block,
+.category-actions,
+.inline-edit,
+.inline-add-subcategory {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.category-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.category-actions button,
+.inline-edit button,
+.inline-add-subcategory button {
+  padding: 0.4rem 0.55rem;
+  font-size: 0.82rem;
+}
+
+.icon-button {
+  min-width: 2rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--heading);
+}
+
+.status-pill {
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--muted-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.inline-add-subcategory {
+  margin: 0 0 0.75rem 2rem;
+  padding-left: 1rem;
+}
+
+.inline-edit input,
+.inline-add-subcategory input {
+  width: min(18rem, 100%);
+}
+
+.empty-state {
+  padding: 2rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 1rem;
+  text-align: center;
+  color: var(--muted-text);
+}
+
 .app-header {
   min-height: 4.5rem;
   display: flex;
@@ -285,5 +438,23 @@ a {
 
   .dashboard-content {
     padding: 2.5rem 0;
+  }
+
+  .management-content {
+    padding: 2rem 0;
+  }
+
+  .page-title-row,
+  .category-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .add-category-form {
+    grid-template-columns: 1fr;
+  }
+
+  .category-actions {
+    justify-content: flex-start;
   }
 }

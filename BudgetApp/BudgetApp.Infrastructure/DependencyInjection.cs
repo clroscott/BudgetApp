@@ -1,4 +1,6 @@
+using BudgetApp.Application.Categories;
 using BudgetApp.Application.Households;
+using BudgetApp.Infrastructure.Categories;
 using BudgetApp.Infrastructure.Data;
 using BudgetApp.Infrastructure.Households;
 using BudgetApp.Infrastructure.Identity;
@@ -18,7 +20,11 @@ public static class DependencyInjection
 
         services.AddDbContext<BudgetAppDbContext>(options =>
             options.UseSqlServer(connectionString));
+        services.AddScoped<ICategoryRepository, CategoryRepository>();
+        services.AddScoped<CategoryManagementService>();
         services.AddScoped<IHouseholdRepository, HouseholdRepository>();
+        services.AddScoped<IHouseholdAuthorizationRepository, HouseholdAuthorizationRepository>();
+        services.AddScoped<HouseholdAuthorizationService>();
         services.AddScoped<HouseholdOnboardingService>();
         services.AddSingleton(TimeProvider.System);
 
