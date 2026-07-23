@@ -2,10 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import {
   changeBudgetStatus,
+  copyBudget,
   createBudget,
+  deleteDraftBudget,
   getBudget,
+  getBudgetMonthOptions,
+  initializeBudget,
   saveBudget,
   type BudgetPageData,
+  type BudgetMonthOption,
   type BudgetScope,
 } from '../budgets/budgetApi'
 import { ErrorSummary } from '../components/ErrorSummary'
@@ -45,6 +50,8 @@ export function BudgetManagementPage() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [scope, setScope] = useState<BudgetScope>('Household')
   const [budget, setBudget] = useState<BudgetPageData | null>(null)
+  const [budgetOptions, setBudgetOptions] = useState<BudgetMonthOption[]>([])
+  const [copySource, setCopySource] = useState('')
   const [amounts, setAmounts] = useState<Amounts>({})
   const [modes, setModes] = useState<Modes>({})
   const [savedSnapshot, setSavedSnapshot] = useState('')
@@ -71,7 +78,18 @@ export function BudgetManagementPage() {
     setIsLoading(true)
     setErrors([])
     try {
-      applyBudget(await getBudget(currentHousehold.id, year, month, scope))
+      const [loadedBudget, options] = await Promise.all([
+        getBudget(currentHousehold.id, year, month, scope),
+        getBudgetMonthOptions(currentHousehold.id, scope),
+      ])
+      applyBudget(loadedBudget)
+      setBudgetOptions(options)
+      const previous = new Date(year, month - 2, 1)
+      const preferred = options.find(option =>
+        option.year === previous.getFullYear() &&
+        option.month === previous.getMonth() + 1)
+      const selected = preferred ?? options[0]
+      setCopySource(selected ? `${selected.year}-${selected.month}` : '')
     } catch (error) {
       setErrors(getErrorMessages(error))
       setBudget(null)
@@ -106,11 +124,44 @@ export function BudgetManagementPage() {
     if (confirmDiscard()) setScope(nextScope)
   }
 
-  const handleCreate = async () => {
+  const handleCreate = async (
+    method: 'blank' | 'copy' | 'from-recurring',
+  ) => {
     setIsSaving(true)
     setErrors([])
     try {
-      applyBudget(await createBudget(currentHousehold.id, year, month, scope))
+      if (method === 'blank') {
+        applyBudget(await createBudget(currentHousehold.id, year, month, scope))
+      } else if (method === 'from-recurring') {
+        applyBudget(await initializeBudget(
+          currentHousehold.id, year, month, scope, method,
+        ))
+      } else {
+        const [sourceYear, sourceMonth] = copySource.split('-').map(Number)
+        if (!sourceYear || !sourceMonth) {
+          setErrors(['Select an existing budget to copy.'])
+          return
+        }
+        applyBudget(await copyBudget(
+          currentHousehold.id, year, month, scope, sourceYear, sourceMonth,
+        ))
+      }
+    } catch (error) {
+      setErrors(getErrorMessages(error))
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleDeleteDraft = async () => {
+    if (!budget?.id || budget.status !== 'Draft' || !window.confirm(
+      'Delete this draft budget and all of its amounts? This cannot be undone.',
+    )) return
+    setIsSaving(true)
+    setErrors([])
+    try {
+      await deleteDraftBudget(currentHousehold.id, budget.id)
+      await loadBudget()
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {
@@ -198,7 +249,7 @@ export function BudgetManagementPage() {
         data-back-to-top-scroll-region
       >
         <div className="page-title-row">
-          <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time.</p></div>
+          <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time. <AppLink to="/budgeting/recurring-expenses">Manage recurring expenses</AppLink></p></div>
           {budget?.status && <span className={`budget-status budget-status-${budget.status.toLowerCase()}`}>{budget.status}</span>}
         </div>
 
@@ -218,9 +269,7 @@ export function BudgetManagementPage() {
         <ErrorSummary errors={errors} />
 
         {isLoading ? <p className="empty-state">Loading budget...</p> : !budget?.id ? (
-          <div className="empty-state"><h2>No budget for {monthNames[month - 1]} {year}</h2><p>Create a {scope.toLowerCase()} budget when you are ready to start planning.</p>
-            {canManage && <button className="primary-button" type="button" disabled={isSaving} onClick={() => void handleCreate()}>Create budget</button>}
-          </div>
+          <div className="budget-empty-state"><div className="empty-state"><h2>No budget for {monthNames[month - 1]} {year}</h2><p>Choose how to start this {scope.toLowerCase()} budget.</p></div>{canManage && <div className="budget-initialization-grid"><article><h3>Copy an existing month</h3><p>Copy budget amounts and category detail from any existing {scope.toLowerCase()} budget.</p><label className="budget-copy-source"><span>Budget to copy</span><select value={copySource} disabled={budgetOptions.length === 0 || isSaving} onChange={event => setCopySource(event.target.value)}>{budgetOptions.length === 0 ? <option value="">No existing budgets</option> : budgetOptions.map(option => <option key={option.id} value={`${option.year}-${option.month}`}>{monthNames[option.month - 1]} {option.year} ({option.status})</option>)}</select></label><button className="secondary-button" type="button" disabled={isSaving || !copySource} onClick={() => void handleCreate('copy')}>Copy selected month</button></article><article><h3>Use recurring expenses</h3><p>Build category amounts from active recurring expenses that apply this month.</p><button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('from-recurring')}>Build from recurring expenses</button></article><article><h3>Start from scratch</h3><p>Create an empty draft and enter every amount yourself.</p><button className="primary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('blank')}>Create blank budget</button></article></div>}</div>
         ) : budget.categories.length === 0 ? (
           <div className="empty-state"><h2>No expense categories</h2><p>Add expense categories before entering budget amounts.</p><AppLink to="/settings/categories">Manage categories</AppLink></div>
         ) : (
@@ -256,6 +305,7 @@ export function BudgetManagementPage() {
           </div>
           <div className="budget-save-actions">
             <span className="budget-back-to-top-host" data-back-to-top-host />
+            {budget?.status === 'Draft' && canManage && <button className="danger-button" type="button" disabled={isSaving} onClick={() => void handleDeleteDraft()}>Delete draft</button>}
             {budget?.status === 'Draft' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before activating.' : undefined} onClick={() => void handleStatus('activate')}>Activate</button>}
             {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before closing.' : undefined} onClick={() => void handleStatus('close')}>Close budget</button>}
             {budget?.status === 'Closed' && canManage && <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleStatus('reopen')}>Reopen budget</button>}

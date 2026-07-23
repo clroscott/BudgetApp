@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut } from '../api/apiClient'
+import { apiDelete, apiGet, apiPost, apiPut } from '../api/apiClient'
 
 export type BudgetScope = 'Household' | 'Personal'
 export type BudgetStatus = 'Draft' | 'Active' | 'Closed'
@@ -22,6 +22,13 @@ export interface BudgetPageData {
   categories: BudgetCategory[]
 }
 
+export interface BudgetMonthOption {
+  id: string
+  year: number
+  month: number
+  status: BudgetStatus
+}
+
 const periodPath = (householdId: string, year: number, month: number) =>
   `/api/households/${householdId}/budgets/${year}/${month}`
 
@@ -41,6 +48,45 @@ export function createBudget(
   scope: BudgetScope,
 ): Promise<BudgetPageData> {
   return apiPost(periodPath(householdId, year, month), { scope })
+}
+
+export function getBudgetMonthOptions(
+  householdId: string,
+  scope: BudgetScope,
+): Promise<BudgetMonthOption[]> {
+  return apiGet(`/api/households/${householdId}/budgets?scope=${scope}`)
+}
+
+export function copyBudget(
+  householdId: string,
+  year: number,
+  month: number,
+  scope: BudgetScope,
+  sourceYear: number,
+  sourceMonth: number,
+): Promise<BudgetPageData> {
+  return apiPost(`${periodPath(householdId, year, month)}/copy`, {
+    scope,
+    sourceYear,
+    sourceMonth,
+  })
+}
+
+export function initializeBudget(
+  householdId: string,
+  year: number,
+  month: number,
+  scope: BudgetScope,
+  method: 'from-recurring',
+): Promise<BudgetPageData> {
+  return apiPost(`${periodPath(householdId, year, month)}/${method}`, { scope })
+}
+
+export function deleteDraftBudget(
+  householdId: string,
+  budgetId: string,
+): Promise<void> {
+  return apiDelete(`/api/households/${householdId}/budgets/${budgetId}`)
 }
 
 export function saveBudget(

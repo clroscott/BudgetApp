@@ -14,6 +14,24 @@ public sealed class BudgetsController(
     BudgetManagementService budgetManagementService,
     ILogger<BudgetsController> logger) : ControllerBase
 {
+    [HttpGet]
+    public async Task<ActionResult<IReadOnlyList<BudgetMonthOption>>> ListAvailable(
+        Guid householdId,
+        [FromQuery] string? scope,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        try
+        {
+            return Ok(await budgetManagementService.ListAvailableAsync(
+                householdId, userId, scope ?? "Household", cancellationToken));
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
     [HttpGet("{year:int}/{month:int}")]
     public Task<ActionResult<BudgetPageModel>> Get(
         Guid householdId, int year, int month, [FromQuery] string? scope,
@@ -35,6 +53,21 @@ public sealed class BudgetsController(
             return CreatedAtAction(nameof(Get), new { householdId, year, month, scope = request.Scope }, model);
         });
 
+    [HttpPost("{year:int}/{month:int}/copy")]
+    public Task<ActionResult<BudgetPageModel>> Copy(
+        Guid householdId, int year, int month, CopyBudgetRequest request,
+        CancellationToken cancellationToken) =>
+        ExecuteWrite(async userId => Ok(await budgetManagementService.CopyFromAsync(
+            householdId, userId, year, month, request.Scope,
+            request.SourceYear, request.SourceMonth, cancellationToken)));
+
+    [HttpPost("{year:int}/{month:int}/from-recurring")]
+    public Task<ActionResult<BudgetPageModel>> CreateFromRecurring(
+        Guid householdId, int year, int month, CreateBudgetRequest request,
+        CancellationToken cancellationToken) =>
+        ExecuteWrite(async userId => Ok(await budgetManagementService.CreateFromRecurringAsync(
+            householdId, userId, year, month, request.Scope, cancellationToken)));
+
     [HttpPut("{budgetId:guid}")]
     public Task<ActionResult<BudgetPageModel>> Save(
         Guid householdId, Guid budgetId, SaveBudgetRequest request,
@@ -43,6 +76,25 @@ public sealed class BudgetsController(
             householdId, userId, budgetId,
             request.Lines.Select(line => new BudgetLineInput(line.CategoryId, line.BudgetedAmount)).ToList(),
             cancellationToken)));
+
+    [HttpDelete("{budgetId:guid}")]
+    public async Task<IActionResult> DeleteDraft(
+        Guid householdId,
+        Guid budgetId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        try
+        {
+            await budgetManagementService.DeleteDraftAsync(
+                householdId, userId, budgetId, cancellationToken);
+            return NoContent();
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
 
     [HttpPost("{budgetId:guid}/activate")]
     public Task<ActionResult<BudgetPageModel>> Activate(
@@ -108,5 +160,6 @@ public sealed class BudgetsController(
 }
 
 public sealed record CreateBudgetRequest(string Scope);
+public sealed record CopyBudgetRequest(string Scope, int SourceYear, int SourceMonth);
 public sealed record SaveBudgetRequest(IReadOnlyList<SaveBudgetLineRequest> Lines);
 public sealed record SaveBudgetLineRequest(Guid CategoryId, decimal BudgetedAmount);

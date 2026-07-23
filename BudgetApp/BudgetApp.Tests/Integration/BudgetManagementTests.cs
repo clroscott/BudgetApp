@@ -43,6 +43,9 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
         Assert.Equal(HttpStatusCode.OK, (await SendWithAntiforgery(
             client, HttpMethod.Post,
             $"/api/households/{householdId}/budgets/{created.Id}/activate", new { }, token)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SendWithAntiforgery(
+            client, HttpMethod.Delete,
+            $"/api/households/{householdId}/budgets/{created.Id}", new { }, token)).StatusCode);
         Assert.Equal(HttpStatusCode.OK, (await SendWithAntiforgery(
             client, HttpMethod.Post,
             $"/api/households/{householdId}/budgets/{created.Id}/close", new { }, token)).StatusCode);
@@ -94,6 +97,111 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
         Assert.Equal(HttpStatusCode.BadRequest, save.StatusCode);
     }
 
+    [Fact]
+    public async Task CopySelectedMonth_CopiesLinesIntoNewDraft()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        await Register(client);
+        var householdId = await CreateHousehold(client);
+        var token = await GetAntiforgeryToken(client);
+        var sourcePath = $"/api/households/{householdId}/budgets/2026/5";
+        var create = await SendWithAntiforgery(
+            client, HttpMethod.Post, sourcePath, new { scope = "Household" }, token);
+        var source = await create.Content.ReadFromJsonAsync<BudgetResponse>();
+        var food = Assert.Single(source!.Categories, category => category.Name == "Food & Dining");
+        var save = await SendWithAntiforgery(
+            client, HttpMethod.Put,
+            $"/api/households/{householdId}/budgets/{source.Id}",
+            new { lines = new[] { new { categoryId = food.Id, budgetedAmount = 600m } } },
+            token);
+        Assert.Equal(HttpStatusCode.OK, save.StatusCode);
+        var options = await client.GetFromJsonAsync<BudgetOptionResponse[]>(
+            $"/api/households/{householdId}/budgets?scope=Household") ?? [];
+        var sourceOption = Assert.Single(options, option => option.Id == source.Id);
+        Assert.Equal(2026, sourceOption.Year);
+        Assert.Equal(5, sourceOption.Month);
+
+        var copy = await SendWithAntiforgery(
+            client, HttpMethod.Post,
+            $"/api/households/{householdId}/budgets/2026/7/copy",
+            new { scope = "Household", sourceYear = 2026, sourceMonth = 5 }, token);
+
+        Assert.Equal(HttpStatusCode.OK, copy.StatusCode);
+        var july = await copy.Content.ReadFromJsonAsync<BudgetResponse>();
+        Assert.Equal("Draft", july!.Status);
+        Assert.Equal(
+            600m,
+            Assert.Single(july.Categories, category => category.Id == food.Id).BudgetedAmount);
+    }
+
+    [Fact]
+    public async Task CreateFromRecurring_AggregatesSubcategoryAmounts()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        await Register(client);
+        var householdId = await CreateHousehold(client);
+        var token = await GetAntiforgeryToken(client);
+        var budgetPath = $"/api/households/{householdId}/budgets/2026/9";
+        var empty = await client.GetFromJsonAsync<BudgetResponse>(
+            $"{budgetPath}?scope=Personal");
+        var subscriptions = Assert.Single(
+            empty!.Categories, category => category.Name == "Subscriptions");
+        var streaming = Assert.Single(
+            subscriptions.Children, category => category.Name == "Streaming");
+        foreach (var item in new[] { ("Netflix", 22.99m), ("Disney+", 15.99m) })
+        {
+            var response = await SendWithAntiforgery(
+                client, HttpMethod.Post,
+                $"/api/households/{householdId}/recurring-expenses",
+                new
+                {
+                    name = item.Item1,
+                    amount = item.Item2,
+                    scope = "Personal",
+                    subcategoryId = streaming.Id,
+                    accountId = (Guid?)null,
+                    expectedDayOfMonth = 15,
+                    startsOn = "2026-01-01",
+                    endsOn = (string?)null
+                }, token);
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        }
+
+        var build = await SendWithAntiforgery(
+            client, HttpMethod.Post,
+            $"{budgetPath}/from-recurring",
+            new { scope = "Personal" }, token);
+
+        Assert.Equal(HttpStatusCode.OK, build.StatusCode);
+        var budget = await build.Content.ReadFromJsonAsync<BudgetResponse>();
+        var savedStreaming = Assert.Single(
+            Assert.Single(budget!.Categories, category => category.Id == subscriptions.Id).Children,
+            category => category.Id == streaming.Id);
+        Assert.Equal(38.98m, savedStreaming.BudgetedAmount);
+    }
+
+    [Fact]
+    public async Task DeleteDraft_RemovesBudgetAndReturnsPeriodToEmptyState()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        await Register(client);
+        var householdId = await CreateHousehold(client);
+        var token = await GetAntiforgeryToken(client);
+        var periodPath = $"/api/households/{householdId}/budgets/2026/10";
+        var create = await SendWithAntiforgery(
+            client, HttpMethod.Post, periodPath, new { scope = "Household" }, token);
+        var budget = await create.Content.ReadFromJsonAsync<BudgetResponse>();
+
+        var delete = await SendWithAntiforgery(
+            client, HttpMethod.Delete,
+            $"/api/households/{householdId}/budgets/{budget!.Id}", new { }, token);
+
+        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+        var empty = await client.GetFromJsonAsync<BudgetResponse>(
+            $"{periodPath}?scope=Household");
+        Assert.Null(empty!.Id);
+    }
+
     private static async Task Register(HttpClient client)
     {
         var response = await SendWithAntiforgery(
@@ -137,6 +245,7 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
         string Currency,
         string? Status,
         IReadOnlyList<BudgetCategoryResponse> Categories);
+    private sealed record BudgetOptionResponse(Guid Id, int Year, int Month, string Status);
     private sealed record BudgetCategoryResponse(
         Guid Id,
         string Name,

@@ -1274,7 +1274,170 @@ a {
   box-shadow: none;
 }
 
+.budget-empty-state {
+  display: grid;
+  gap: 1rem;
+}
+
+.budget-initialization-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.budget-initialization-grid article {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.budget-initialization-grid h3 {
+  margin: 0;
+}
+
+.budget-initialization-grid p {
+  flex: 1;
+  color: var(--muted-text);
+}
+
+.budget-initialization-grid .primary-button {
+  margin-top: 0;
+}
+
+.budget-copy-source {
+  width: 100%;
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.budget-copy-source span {
+  color: var(--heading);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.recurring-content {
+  max-width: 64rem;
+}
+
+.recurring-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.recurring-summary > div {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.recurring-summary span,
+.recurring-card small {
+  color: var(--muted-text);
+}
+
+.recurring-summary strong {
+  font-size: 1.35rem;
+}
+
+.recurring-form,
+.recurring-card {
+  margin-bottom: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.recurring-form-heading,
+.recurring-card,
+.recurring-card-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.recurring-form-heading h2,
+.recurring-card h3,
+.recurring-card p {
+  margin: 0;
+}
+
+.recurring-form-heading p,
+.recurring-card p {
+  margin-top: 0.3rem;
+  color: var(--muted-text);
+}
+
+.recurring-form-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.recurring-form-grid label {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+}
+
+.recurring-form-grid label > span:first-child {
+  color: var(--heading);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.recurring-list {
+  margin-top: 1.5rem;
+}
+
+.recurring-card-main {
+  flex: 1;
+}
+
+.recurring-card-main > div,
+.recurring-card-main > strong {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.recurring-card-main > strong {
+  justify-items: end;
+  white-space: nowrap;
+  font-size: 1.15rem;
+}
+
+.recurring-card-main > strong small {
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.recurring-edit-form {
+  width: 100%;
+}
+
 @media (max-width: 55rem) {
+  .budget-initialization-grid {
+    grid-template-columns: 1fr;
+  }
+  .recurring-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .budget-period-panel {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -1409,5 +1572,21 @@ a {
 
   .budget-save-actions {
     flex-wrap: wrap;
+  }
+
+  .recurring-summary,
+  .recurring-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .recurring-form-heading,
+  .recurring-card,
+  .recurring-card-main {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recurring-card-main > strong {
+    justify-items: start;
   }
 }

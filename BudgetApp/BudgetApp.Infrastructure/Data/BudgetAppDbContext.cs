@@ -3,6 +3,7 @@ using BudgetApp.Domain.Budgeting;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
 using BudgetApp.Domain.Imports;
+using BudgetApp.Domain.RecurringExpenses;
 using BudgetApp.Domain.Transactions;
 using BudgetApp.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -29,6 +30,8 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
 
     public DbSet<ImportTransactionDraft> ImportTransactionDrafts =>
         Set<ImportTransactionDraft>();
+
+    public DbSet<RecurringExpense> RecurringExpenses => Set<RecurringExpense>();
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
 

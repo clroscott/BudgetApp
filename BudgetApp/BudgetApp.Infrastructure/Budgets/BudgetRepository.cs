@@ -41,6 +41,31 @@ internal sealed class BudgetRepository(BudgetAppDbContext dbContext) : IBudgetRe
                 (budget.Scope == BudgetScope.Household || budget.OwnerUserId == userId),
                 cancellationToken);
 
+    public async Task<IReadOnlyList<BudgetMonthOption>> ListAvailableAsync(
+        Guid householdId,
+        BudgetScope scope,
+        Guid? ownerUserId,
+        CancellationToken cancellationToken) =>
+        (await dbContext.BudgetMonths
+            .AsNoTracking()
+            .Where(budget =>
+                budget.HouseholdId == householdId &&
+                budget.Scope == scope &&
+                budget.OwnerUserId == ownerUserId)
+            .OrderByDescending(budget => budget.Year)
+            .ThenByDescending(budget => budget.Month)
+            .Select(budget => new
+            {
+                budget.Id,
+                budget.Year,
+                budget.Month,
+                budget.Status
+            })
+            .ToListAsync(cancellationToken))
+        .Select(budget => new BudgetMonthOption(
+            budget.Id, budget.Year, budget.Month, budget.Status.ToString()))
+        .ToList();
+
     public Task<string?> GetHouseholdCurrencyAsync(
         Guid householdId,
         CancellationToken cancellationToken) =>
@@ -70,6 +95,9 @@ internal sealed class BudgetRepository(BudgetAppDbContext dbContext) : IBudgetRe
 
     public async Task AddLineAsync(BudgetLine budgetLine, CancellationToken cancellationToken) =>
         await dbContext.BudgetLines.AddAsync(budgetLine, cancellationToken);
+
+    public void Remove(BudgetMonth budgetMonth) =>
+        dbContext.BudgetMonths.Remove(budgetMonth);
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) =>
         dbContext.SaveChangesAsync(cancellationToken);

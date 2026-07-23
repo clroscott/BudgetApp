@@ -14,6 +14,7 @@ import { HouseholdSetupPage } from './pages/HouseholdSetupPage'
 import { ImportReviewPage } from './pages/ImportReviewPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { RecurringExpenseManagementPage } from './pages/RecurringExpenseManagementPage'
 import { TransactionManagementPage } from './pages/TransactionManagementPage'
 import { RouterProvider } from './routing/RouterProvider'
 import { useRouter } from './routing/useRouter'
@@ -160,6 +161,14 @@ function AppRoutes() {
         <ProtectedRoute>
           <HouseholdRequiredRoute>
             <BudgetManagementPage />
+          </HouseholdRequiredRoute>
+        </ProtectedRoute>
+      )
+    case '/budgeting/recurring-expenses':
+      return (
+        <ProtectedRoute>
+          <HouseholdRequiredRoute>
+            <RecurringExpenseManagementPage />
           </HouseholdRequiredRoute>
         </ProtectedRoute>
       )

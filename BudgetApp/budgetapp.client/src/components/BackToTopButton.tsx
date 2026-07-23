@@ -10,7 +10,11 @@ export function BackToTopButton() {
 
   useEffect(() => {
     const region = document.querySelector<HTMLElement>('[data-back-to-top-scroll-region]')
-    const host = document.querySelector<HTMLElement>('[data-back-to-top-host]')
+    const findVisibleHost = () => {
+      const candidate = document.querySelector<HTMLElement>('[data-back-to-top-host]')
+      return candidate?.closest('[hidden]') ? null : candidate
+    }
+    const host = findVisibleHost()
     setScrollRegion(region)
     setButtonHost(host)
 
@@ -20,7 +24,16 @@ export function BackToTopButton() {
     updateVisibility()
     const target: Window | HTMLElement = region ?? window
     target.addEventListener('scroll', updateVisibility, { passive: true })
-    return () => target.removeEventListener('scroll', updateVisibility)
+    const observer = new MutationObserver(() => setButtonHost(findVisibleHost()))
+    observer.observe(document.body, {
+      attributes: true,
+      subtree: true,
+      attributeFilter: ['hidden'],
+    })
+    return () => {
+      target.removeEventListener('scroll', updateVisibility)
+      observer.disconnect()
+    }
   }, [path])
 
   if (!isVisible) return null
