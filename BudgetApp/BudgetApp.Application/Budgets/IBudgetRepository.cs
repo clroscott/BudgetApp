@@ -33,6 +33,15 @@ public interface IBudgetRepository
         Guid householdId,
         CancellationToken cancellationToken);
 
+    Task<BudgetActualsRecord> GetActualsAsync(
+        Guid householdId,
+        Guid userId,
+        int year,
+        int month,
+        BudgetScope scope,
+        string currency,
+        CancellationToken cancellationToken);
+
     Task AddAsync(BudgetMonth budgetMonth, CancellationToken cancellationToken);
 
     Task AddLineAsync(BudgetLine budgetLine, CancellationToken cancellationToken);

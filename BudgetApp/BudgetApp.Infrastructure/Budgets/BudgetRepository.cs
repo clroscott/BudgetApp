@@ -1,5 +1,6 @@
 using BudgetApp.Application.Budgets;
 using BudgetApp.Domain.Budgeting;
+using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -89,6 +90,58 @@ internal sealed class BudgetRepository(BudgetAppDbContext dbContext) : IBudgetRe
                 category.DisplayOrder,
                 category.IsActive))
             .ToListAsync(cancellationToken);
+
+    public async Task<BudgetActualsRecord> GetActualsAsync(
+        Guid householdId,
+        Guid userId,
+        int year,
+        int month,
+        BudgetScope scope,
+        string currency,
+        CancellationToken cancellationToken)
+    {
+        var firstDay = new DateOnly(year, month, 1);
+        var lastDay = new DateOnly(year, month, DateTime.DaysInMonth(year, month));
+        var transactions = await (
+            from transaction in dbContext.Transactions.AsNoTracking()
+            join account in dbContext.Accounts.AsNoTracking()
+                on transaction.AccountId equals account.Id
+            join category in dbContext.Categories.AsNoTracking()
+                on transaction.CategoryId equals category.Id into categories
+            from category in categories.DefaultIfEmpty()
+            where transaction.HouseholdId == householdId &&
+                  transaction.TransactionDate >= firstDay &&
+                  transaction.TransactionDate <= lastDay &&
+                  !transaction.IsVoided &&
+                  !transaction.IsExcludedFromBudget &&
+                  (scope == BudgetScope.Household
+                      ? account.Scope == AccountScope.Household
+                      : account.Scope == AccountScope.Personal && account.OwnerUserId == userId) &&
+                  (category == null || category.Type == CategoryType.Expense)
+            select new
+            {
+                transaction.CategoryId,
+                transaction.Amount,
+                account.Currency
+            })
+            .ToListAsync(cancellationToken);
+
+        var matchingCurrency = transactions
+            .Where(transaction => string.Equals(
+                transaction.Currency, currency, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var amounts = matchingCurrency
+            .Where(transaction => transaction.CategoryId.HasValue)
+            .GroupBy(transaction => transaction.CategoryId!.Value)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.Amount));
+        var uncategorized = matchingCurrency
+            .Where(transaction => !transaction.CategoryId.HasValue)
+            .Sum(transaction => transaction.Amount);
+        var mismatchCount = transactions.Count(transaction => !string.Equals(
+            transaction.Currency, currency, StringComparison.OrdinalIgnoreCase));
+
+        return new BudgetActualsRecord(amounts, uncategorized, mismatchCount);
+    }
 
     public async Task AddAsync(BudgetMonth budgetMonth, CancellationToken cancellationToken) =>
         await dbContext.BudgetMonths.AddAsync(budgetMonth, cancellationToken);

@@ -32,7 +32,9 @@ public sealed class BudgetManagementService(
         var categories = await budgetRepository.ListExpenseCategoriesAsync(
             householdId, cancellationToken);
 
-        return BuildModel(budget, year, month, budgetScope, currency, categories);
+        return await BuildModelAsync(
+            budget, year, month, budgetScope, currency, categories,
+            householdId, userId, cancellationToken);
     }
 
     public async Task<BudgetPageModel> CreateAsync(
@@ -64,7 +66,9 @@ public sealed class BudgetManagementService(
         await budgetRepository.SaveChangesAsync(cancellationToken);
         var categories = await budgetRepository.ListExpenseCategoriesAsync(
             householdId, cancellationToken);
-        return BuildModel(budget, year, month, budgetScope, currency, categories);
+        return await BuildModelAsync(
+            budget, year, month, budgetScope, currency, categories,
+            householdId, userId, cancellationToken);
     }
 
     public async Task<IReadOnlyList<BudgetMonthOption>> ListAvailableAsync(
@@ -120,7 +124,9 @@ public sealed class BudgetManagementService(
             budget.AddLine(line.CategoryId, line.BudgetedAmount, now);
         await budgetRepository.AddAsync(budget, cancellationToken);
         await budgetRepository.SaveChangesAsync(cancellationToken);
-        return BuildModel(budget, year, month, budgetScope, currency, categories);
+        return await BuildModelAsync(
+            budget, year, month, budgetScope, currency, categories,
+            householdId, userId, cancellationToken);
     }
 
     public async Task<BudgetPageModel> CreateFromRecurringAsync(
@@ -182,7 +188,9 @@ public sealed class BudgetManagementService(
             budget.AddLine(item.CategoryId, item.Amount, now);
         await budgetRepository.AddAsync(budget, cancellationToken);
         await budgetRepository.SaveChangesAsync(cancellationToken);
-        return BuildModel(budget, year, month, budgetScope, currency, categories);
+        return await BuildModelAsync(
+            budget, year, month, budgetScope, currency, categories,
+            householdId, userId, cancellationToken);
     }
 
     public async Task DeleteDraftAsync(
@@ -252,8 +260,9 @@ public sealed class BudgetManagementService(
         }
 
         await budgetRepository.SaveChangesAsync(cancellationToken);
-        return BuildModel(
-            budget, budget.Year, budget.Month, budget.Scope, budget.Currency, categories);
+        return await BuildModelAsync(
+            budget, budget.Year, budget.Month, budget.Scope, budget.Currency, categories,
+            householdId, userId, cancellationToken);
     }
 
     public Task<BudgetPageModel> ActivateAsync(
@@ -295,8 +304,9 @@ public sealed class BudgetManagementService(
         await budgetRepository.SaveChangesAsync(cancellationToken);
         var categories = await budgetRepository.ListExpenseCategoriesAsync(
             householdId, cancellationToken);
-        return BuildModel(
-            budget, budget.Year, budget.Month, budget.Scope, budget.Currency, categories);
+        return await BuildModelAsync(
+            budget, budget.Year, budget.Month, budget.Scope, budget.Currency, categories,
+            householdId, userId, cancellationToken);
     }
 
     private async Task<BudgetMonth> GetOwnedBudget(
@@ -361,13 +371,30 @@ public sealed class BudgetManagementService(
         }
     }
 
+    private async Task<BudgetPageModel> BuildModelAsync(
+        BudgetMonth? budget,
+        int year,
+        int month,
+        BudgetScope scope,
+        string currency,
+        IReadOnlyList<BudgetCategoryRecord> categories,
+        Guid householdId,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var actuals = await budgetRepository.GetActualsAsync(
+            householdId, userId, year, month, scope, currency, cancellationToken);
+        return BuildModel(budget, year, month, scope, currency, categories, actuals);
+    }
+
     private static BudgetPageModel BuildModel(
         BudgetMonth? budget,
         int year,
         int month,
         BudgetScope scope,
         string currency,
-        IReadOnlyList<BudgetCategoryRecord> categories)
+        IReadOnlyList<BudgetCategoryRecord> categories,
+        BudgetActualsRecord actuals)
     {
         var amounts = budget?.Lines.ToDictionary(line => line.CategoryId, line => (decimal?)line.BudgetedAmount)
             ?? new Dictionary<Guid, decimal?>();
@@ -378,26 +405,48 @@ public sealed class BudgetManagementService(
         var roots = categories
             .Where(category => !category.ParentCategoryId.HasValue)
             .OrderBy(category => category.DisplayOrder)
-            .Select(root => ToModel(root, amounts, children.GetValueOrDefault(root.Id, [])))
-            .Where(root => root.IsActive || root.BudgetedAmount.HasValue ||
-                root.Children.Any(child => child.IsActive || child.BudgetedAmount.HasValue))
+            .Select(root => ToModel(
+                root, amounts, actuals.AmountsByCategoryId,
+                children.GetValueOrDefault(root.Id, [])))
+            .Where(root => root.IsActive || root.BudgetedAmount.HasValue || root.ActualAmount != 0 ||
+                root.Children.Any(child =>
+                    child.IsActive || child.BudgetedAmount.HasValue || child.ActualAmount != 0))
             .ToList();
         return new BudgetPageModel(
             budget?.Id, year, month, scope.ToString(), currency,
-            budget?.Status.ToString(), budget?.UpdatedAtUtc, roots);
+            budget?.Status.ToString(), budget?.UpdatedAtUtc, roots,
+            actuals.UncategorizedAmount, actuals.CurrencyMismatchTransactionCount);
     }
 
     private static BudgetCategoryModel ToModel(
         BudgetCategoryRecord category,
         IReadOnlyDictionary<Guid, decimal?> amounts,
+        IReadOnlyDictionary<Guid, decimal> actuals,
         IReadOnlyList<BudgetCategoryRecord> children) =>
-        new(category.Id, category.Name, category.IsActive,
+        CreateCategoryModel(category, amounts, actuals, children);
+
+    private static BudgetCategoryModel CreateCategoryModel(
+        BudgetCategoryRecord category,
+        IReadOnlyDictionary<Guid, decimal?> amounts,
+        IReadOnlyDictionary<Guid, decimal> actuals,
+        IReadOnlyList<BudgetCategoryRecord> children)
+    {
+        var childModels = children
+            .Select(child => new BudgetCategoryModel(
+                child.Id, child.Name, child.IsActive,
+                amounts.GetValueOrDefault(child.Id),
+                actuals.GetValueOrDefault(child.Id),
+                actuals.GetValueOrDefault(child.Id), []))
+            .Where(child => child.IsActive || child.BudgetedAmount.HasValue || child.ActualAmount != 0)
+            .ToList();
+        var directActual = actuals.GetValueOrDefault(category.Id);
+        return new BudgetCategoryModel(
+            category.Id, category.Name, category.IsActive,
             amounts.GetValueOrDefault(category.Id),
-            children.Select(child => new BudgetCategoryModel(
-                    child.Id, child.Name, child.IsActive,
-                    amounts.GetValueOrDefault(child.Id), []))
-                .Where(child => child.IsActive || child.BudgetedAmount.HasValue)
-                .ToList());
+            directActual + childModels.Sum(child => child.ActualAmount),
+            directActual,
+            childModels);
+    }
 
     private static BudgetScope ParseScope(string scope) =>
         Enum.TryParse<BudgetScope>(scope, true, out var parsed) && Enum.IsDefined(parsed)

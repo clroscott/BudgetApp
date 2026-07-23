@@ -354,8 +354,8 @@ public sealed class CsvImportReader : ICsvImportReader
         }
 
         return hasCredit && credit != 0
-            ? decimal.Abs(credit)
-            : -decimal.Abs(debit);
+            ? -decimal.Abs(credit)
+            : decimal.Abs(debit);
     }
 
     private static bool TryParseDecimal(string value, out decimal amount)

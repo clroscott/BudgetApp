@@ -535,7 +535,7 @@ export function TransactionManagementPage() {
                             ...editRequest,
                             amount: event.target.valueAsNumber,
                           })} />
-                        <small>Negative is money out; positive is money in.</small>
+                        <small>Positive is spending; negative is income, a refund, or a credit.</small>
                       </label>
                       <label>
                         <span>Category</span>
