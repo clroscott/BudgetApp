@@ -19,6 +19,9 @@ public sealed record BudgetCategoryModel(
     decimal? BudgetedAmount,
     decimal ActualAmount,
     decimal DirectActualAmount,
+    decimal AverageMonthlyActualAmount,
+    decimal? LastMonthBudgetedAmount,
+    decimal LastMonthActualAmount,
     IReadOnlyList<BudgetCategoryModel> Children);
 
 public sealed record BudgetLineInput(Guid CategoryId, decimal BudgetedAmount);
@@ -40,3 +43,9 @@ public sealed record BudgetActualsRecord(
     IReadOnlyDictionary<Guid, decimal> AmountsByCategoryId,
     decimal UncategorizedAmount,
     int CurrencyMismatchTransactionCount);
+
+public sealed record BudgetHistoricalActualRecord(
+    Guid CategoryId,
+    int Year,
+    int Month,
+    decimal Amount);

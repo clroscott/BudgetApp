@@ -1077,7 +1077,7 @@ a {
 }
 
 .budget-content {
-  max-width: 64rem;
+  max-width: 80rem;
   min-height: 0;
   flex: 1;
   overflow-y: auto;
@@ -1250,6 +1250,38 @@ a {
   gap: 1rem;
 }
 
+.budget-row-name {
+  flex: 0 0 9rem;
+  color: var(--heading);
+  font-weight: 700;
+}
+
+.budget-planning-metrics {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(4, minmax(5.5rem, 1fr));
+  gap: 0.75rem;
+  padding: 0 0.75rem;
+}
+
+.budget-planning-metrics > span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.budget-planning-metrics small {
+  color: var(--muted-text);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.035em;
+}
+
+.budget-planning-metrics strong {
+  color: var(--heading);
+  font-size: 0.88rem;
+}
+
 .budget-direct-actual {
   color: var(--muted-text);
   font-style: italic;
@@ -1292,7 +1324,7 @@ a {
 }
 
 .budget-save-bar {
-  width: min(100% - 2rem, 64rem);
+  width: min(100% - 2rem, 80rem);
   flex: 0 0 auto;
   margin: 0 auto 1rem;
   padding: 1rem 1.25rem;
@@ -1497,6 +1529,15 @@ a {
   .budget-period-panel {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .budget-amount-row {
+    flex-wrap: wrap;
+  }
+  .budget-row-name {
+    flex-basis: 100%;
+  }
+  .budget-planning-metrics {
+    padding-left: 0;
+  }
   .account-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1619,6 +1660,12 @@ a {
   .budget-metrics {
     width: 100%;
     text-align: left;
+  }
+
+  .budget-planning-metrics {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0;
   }
 
   .currency-input input {

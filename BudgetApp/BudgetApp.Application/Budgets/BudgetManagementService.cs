@@ -384,7 +384,50 @@ public sealed class BudgetManagementService(
     {
         var actuals = await budgetRepository.GetActualsAsync(
             householdId, userId, year, month, scope, currency, cancellationToken);
-        return BuildModel(budget, year, month, scope, currency, categories, actuals);
+        var currentMonth = new DateOnly(year, month, 1);
+        var availableHistoryMonths = Math.Min(
+            12, ((year - 1) * 12) + month - 1);
+        IReadOnlyList<BudgetHistoricalActualRecord> historicalActuals = [];
+        BudgetMonth? previousBudget = null;
+        DateOnly? previousMonth = null;
+        if (availableHistoryMonths > 0)
+        {
+            previousMonth = currentMonth.AddMonths(-1);
+            historicalActuals = await budgetRepository.GetHistoricalActualsAsync(
+                householdId,
+                userId,
+                currentMonth.AddMonths(-availableHistoryMonths),
+                currentMonth.AddDays(-1),
+                scope,
+                currency,
+                cancellationToken);
+            previousBudget = await budgetRepository.GetAsync(
+                householdId,
+                previousMonth.Value.Year,
+                previousMonth.Value.Month,
+                scope,
+                scope == BudgetScope.Personal ? userId : null,
+                forUpdate: false,
+                cancellationToken);
+        }
+
+        var historicalTotals = historicalActuals
+            .GroupBy(item => item.CategoryId)
+            .ToDictionary(group => group.Key, group => group.Sum(item => item.Amount) / 12m);
+        var lastMonthActuals = previousMonth.HasValue
+            ? historicalActuals
+                .Where(item =>
+                    item.Year == previousMonth.Value.Year &&
+                    item.Month == previousMonth.Value.Month)
+                .ToDictionary(item => item.CategoryId, item => item.Amount)
+            : new Dictionary<Guid, decimal>();
+        var lastMonthBudgeted = previousBudget?.Lines.ToDictionary(
+            line => line.CategoryId, line => (decimal?)line.BudgetedAmount)
+            ?? new Dictionary<Guid, decimal?>();
+
+        return BuildModel(
+            budget, year, month, scope, currency, categories, actuals,
+            historicalTotals, lastMonthBudgeted, lastMonthActuals);
     }
 
     private static BudgetPageModel BuildModel(
@@ -394,7 +437,10 @@ public sealed class BudgetManagementService(
         BudgetScope scope,
         string currency,
         IReadOnlyList<BudgetCategoryRecord> categories,
-        BudgetActualsRecord actuals)
+        BudgetActualsRecord actuals,
+        IReadOnlyDictionary<Guid, decimal> averageActuals,
+        IReadOnlyDictionary<Guid, decimal?> lastMonthBudgeted,
+        IReadOnlyDictionary<Guid, decimal> lastMonthActuals)
     {
         var amounts = budget?.Lines.ToDictionary(line => line.CategoryId, line => (decimal?)line.BudgetedAmount)
             ?? new Dictionary<Guid, decimal?>();
@@ -407,6 +453,7 @@ public sealed class BudgetManagementService(
             .OrderBy(category => category.DisplayOrder)
             .Select(root => ToModel(
                 root, amounts, actuals.AmountsByCategoryId,
+                averageActuals, lastMonthBudgeted, lastMonthActuals,
                 children.GetValueOrDefault(root.Id, [])))
             .Where(root => root.IsActive || root.BudgetedAmount.HasValue || root.ActualAmount != 0 ||
                 root.Children.Any(child =>
@@ -422,13 +469,21 @@ public sealed class BudgetManagementService(
         BudgetCategoryRecord category,
         IReadOnlyDictionary<Guid, decimal?> amounts,
         IReadOnlyDictionary<Guid, decimal> actuals,
+        IReadOnlyDictionary<Guid, decimal> averageActuals,
+        IReadOnlyDictionary<Guid, decimal?> lastMonthBudgeted,
+        IReadOnlyDictionary<Guid, decimal> lastMonthActuals,
         IReadOnlyList<BudgetCategoryRecord> children) =>
-        CreateCategoryModel(category, amounts, actuals, children);
+        CreateCategoryModel(
+            category, amounts, actuals, averageActuals,
+            lastMonthBudgeted, lastMonthActuals, children);
 
     private static BudgetCategoryModel CreateCategoryModel(
         BudgetCategoryRecord category,
         IReadOnlyDictionary<Guid, decimal?> amounts,
         IReadOnlyDictionary<Guid, decimal> actuals,
+        IReadOnlyDictionary<Guid, decimal> averageActuals,
+        IReadOnlyDictionary<Guid, decimal?> lastMonthBudgeted,
+        IReadOnlyDictionary<Guid, decimal> lastMonthActuals,
         IReadOnlyList<BudgetCategoryRecord> children)
     {
         var childModels = children
@@ -436,15 +491,32 @@ public sealed class BudgetManagementService(
                 child.Id, child.Name, child.IsActive,
                 amounts.GetValueOrDefault(child.Id),
                 actuals.GetValueOrDefault(child.Id),
-                actuals.GetValueOrDefault(child.Id), []))
+                actuals.GetValueOrDefault(child.Id),
+                averageActuals.GetValueOrDefault(child.Id),
+                lastMonthBudgeted.GetValueOrDefault(child.Id),
+                lastMonthActuals.GetValueOrDefault(child.Id), []))
             .Where(child => child.IsActive || child.BudgetedAmount.HasValue || child.ActualAmount != 0)
             .ToList();
         var directActual = actuals.GetValueOrDefault(category.Id);
+        var directAverageActual = averageActuals.GetValueOrDefault(category.Id);
+        var directLastMonthActual = lastMonthActuals.GetValueOrDefault(category.Id);
+        var rootLastMonthBudgeted = lastMonthBudgeted.GetValueOrDefault(category.Id);
+        if (!rootLastMonthBudgeted.HasValue)
+        {
+            var childBudgets = childModels
+                .Where(child => child.LastMonthBudgetedAmount.HasValue)
+                .Select(child => child.LastMonthBudgetedAmount!.Value)
+                .ToList();
+            if (childBudgets.Count > 0) rootLastMonthBudgeted = childBudgets.Sum();
+        }
         return new BudgetCategoryModel(
             category.Id, category.Name, category.IsActive,
             amounts.GetValueOrDefault(category.Id),
             directActual + childModels.Sum(child => child.ActualAmount),
             directActual,
+            directAverageActual + childModels.Sum(child => child.AverageMonthlyActualAmount),
+            rootLastMonthBudgeted,
+            directLastMonthActual + childModels.Sum(child => child.LastMonthActualAmount),
             childModels);
     }
 

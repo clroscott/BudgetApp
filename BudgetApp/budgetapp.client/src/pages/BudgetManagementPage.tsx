@@ -266,6 +266,15 @@ export function BudgetManagementPage() {
     </span>
   }
 
+  const planningMetrics = (category: BudgetPageData['categories'][number]) => (
+    <span className="budget-planning-metrics" aria-label={`${category.name} planning history`}>
+      <span><small>Yearly target</small><strong>XX</strong></span>
+      <span><small>Avg / month</small><strong>{formatAmount(category.averageMonthlyActualAmount)}</strong></span>
+      <span><small>Last budget</small><strong>{category.lastMonthBudgetedAmount === null ? '—' : formatAmount(category.lastMonthBudgetedAmount)}</strong></span>
+      <span><small>Last actual</small><strong>{formatAmount(category.lastMonthActualAmount)}</strong></span>
+    </span>
+  )
+
   return (
     <main className="management-page budget-page">
       <header className="app-header">
@@ -321,10 +330,10 @@ export function BudgetManagementPage() {
                     </div>}
                   </div>
                   <div className="budget-section-summary"><span><small>Budgeted</small><strong>{rootBudget === null ? 'No budget' : formatAmount(rootBudget)}</strong></span>{metrics(rootBudget, root.actualAmount)}</div>
-                  {mode === 'overall' ? <label className="budget-amount-row"><span>{root.name} total</span><span className="budget-row-values"><span className="currency-input"><span>{budget.currency}</span><input aria-label={`${root.name} budget`} type="number" min="0" step="0.01" placeholder="No budget" disabled={!canEdit || isSaving || !root.isActive} value={amounts[root.id] ?? ''} onChange={event => setAmounts(current => ({ ...current, [root.id]: event.target.value }))} /></span>{metrics(amountOrNull(root.id), root.actualAmount)}</span></label> :
+                  {mode === 'overall' ? <label className="budget-amount-row"><span className="budget-row-name">{root.name} total</span>{planningMetrics(root)}<span className="budget-row-values"><span className="currency-input"><span>{budget.currency}</span><input aria-label={`${root.name} budget`} type="number" min="0" step="0.01" placeholder="No budget" disabled={!canEdit || isSaving || !root.isActive} value={amounts[root.id] ?? ''} onChange={event => setAmounts(current => ({ ...current, [root.id]: event.target.value }))} /></span>{metrics(amountOrNull(root.id), root.actualAmount)}</span></label> :
                     <div className="budget-detail-list">
                       {root.directActualAmount !== 0 && <div className="budget-amount-row budget-direct-actual"><span>Directly categorized to {root.name}</span>{metrics(null, root.directActualAmount)}</div>}
-                      {root.children.map(child => <label className="budget-amount-row" key={child.id}><span>{child.name}{!child.isActive && <small> Deactivated</small>}</span><span className="budget-row-values"><span className="currency-input"><span>{budget.currency}</span><input aria-label={`${child.name} budget`} type="number" min="0" step="0.01" placeholder="No budget" disabled={!canEdit || isSaving || !child.isActive} value={amounts[child.id] ?? ''} onChange={event => setAmounts(current => ({ ...current, [child.id]: event.target.value }))} /></span>{metrics(amountOrNull(child.id), child.actualAmount)}</span></label>)}
+                      {root.children.map(child => <label className="budget-amount-row" key={child.id}><span className="budget-row-name">{child.name}{!child.isActive && <small> Deactivated</small>}</span>{planningMetrics(child)}<span className="budget-row-values"><span className="currency-input"><span>{budget.currency}</span><input aria-label={`${child.name} budget`} type="number" min="0" step="0.01" placeholder="No budget" disabled={!canEdit || isSaving || !child.isActive} value={amounts[child.id] ?? ''} onChange={event => setAmounts(current => ({ ...current, [child.id]: event.target.value }))} /></span>{metrics(amountOrNull(child.id), child.actualAmount)}</span></label>)}
                     </div>}
                 </section>
               })}

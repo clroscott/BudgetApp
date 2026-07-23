@@ -253,8 +253,26 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
             voided.Void(userId, now);
             Add(usdAccount.Id, groceriesId, 75m, "Different currency");
             Add(personalAccount.Id, groceriesId, 500m, "Personal expense");
+            var previousMonthExpense = Transaction.CreateManual(
+                householdId, householdAccount.Id, groceriesId,
+                new DateOnly(2026, 6, 15), null, 120m, "Previous month groceries",
+                null, null, false, userId, now);
+            dbContext.Transactions.Add(previousMonthExpense);
             await dbContext.SaveChangesAsync();
         }
+
+        var token = await GetAntiforgeryToken(client);
+        var createPrevious = await SendWithAntiforgery(
+            client, HttpMethod.Post,
+            $"/api/households/{householdId}/budgets/2026/6",
+            new { scope = "Household" }, token);
+        var previousBudget = await createPrevious.Content.ReadFromJsonAsync<BudgetResponse>();
+        var savePrevious = await SendWithAntiforgery(
+            client, HttpMethod.Put,
+            $"/api/households/{householdId}/budgets/{previousBudget!.Id}",
+            new { lines = new[] { new { categoryId = groceriesId, budgetedAmount = 240m } } },
+            token);
+        Assert.Equal(HttpStatusCode.OK, savePrevious.StatusCode);
 
         var budget = await client.GetFromJsonAsync<BudgetResponse>(
             $"/api/households/{householdId}/budgets/2026/7?scope=Household");
@@ -266,6 +284,11 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
         Assert.Equal(90m, groceriesResult.ActualAmount);
         Assert.Equal(25m, foodResult.DirectActualAmount);
         Assert.Equal(115m, foodResult.ActualAmount);
+        Assert.Equal(10m, groceriesResult.AverageMonthlyActualAmount);
+        Assert.Equal(240m, groceriesResult.LastMonthBudgetedAmount);
+        Assert.Equal(120m, groceriesResult.LastMonthActualAmount);
+        Assert.Equal(240m, foodResult.LastMonthBudgetedAmount);
+        Assert.Equal(120m, foodResult.LastMonthActualAmount);
         Assert.Equal(40m, budget.UncategorizedActualAmount);
         Assert.Equal(1, budget.CurrencyMismatchTransactionCount);
     }
@@ -324,5 +347,8 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
         decimal? BudgetedAmount,
         decimal ActualAmount,
         decimal DirectActualAmount,
+        decimal AverageMonthlyActualAmount,
+        decimal? LastMonthBudgetedAmount,
+        decimal LastMonthActualAmount,
         IReadOnlyList<BudgetCategoryResponse> Children);
 }
