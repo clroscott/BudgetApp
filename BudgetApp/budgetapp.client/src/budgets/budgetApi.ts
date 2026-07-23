@@ -8,6 +8,8 @@ export interface BudgetCategory {
   name: string
   isActive: boolean
   budgetedAmount: number | null
+  actualAmount: number
+  directActualAmount: number
   children: BudgetCategory[]
 }
 
@@ -20,6 +22,8 @@ export interface BudgetPageData {
   status: BudgetStatus | null
   updatedAtUtc: string | null
   categories: BudgetCategory[]
+  uncategorizedActualAmount: number
+  currencyMismatchTransactionCount: number
 }
 
 export interface BudgetMonthOption {

@@ -1127,6 +1127,14 @@ a {
   color: var(--heading);
 }
 
+.budget-actual-warning {
+  padding: 0.85rem 1rem;
+  border: 1px solid #dfca93;
+  border-radius: 0.65rem;
+  background: #fff9e8;
+  color: var(--heading);
+}
+
 .budget-sections {
   display: grid;
   gap: 1rem;
@@ -1164,6 +1172,43 @@ a {
   margin-bottom: 1rem;
 }
 
+.budget-section-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.budget-section-summary > span:first-child,
+.budget-metrics > span {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.budget-section-summary small,
+.budget-metrics small {
+  color: var(--muted-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.budget-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(7.5rem, 1fr));
+  gap: 1rem;
+  text-align: right;
+}
+
+.budget-over strong {
+  color: var(--danger);
+}
+
 .budget-section-heading > div,
 .budget-save-actions {
   gap: 0.55rem;
@@ -1197,6 +1242,17 @@ a {
 
 .budget-amount-row {
   min-height: 3.25rem;
+}
+
+.budget-row-values {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.budget-direct-actual {
+  color: var(--muted-text);
+  font-style: italic;
 }
 
 .budget-detail-list .budget-amount-row {
@@ -1551,6 +1607,22 @@ a {
 
   .budget-period-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .budget-section-summary,
+  .budget-amount-row,
+  .budget-row-values {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .budget-metrics {
+    width: 100%;
+    text-align: left;
+  }
+
+  .currency-input input {
+    width: 100%;
   }
 
   .budget-section-heading,

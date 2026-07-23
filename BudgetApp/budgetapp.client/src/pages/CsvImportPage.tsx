@@ -162,7 +162,7 @@ export function CsvImportPage() {
                 columns. Category and Subcategory columns are optional. Dates may use YYYY-MM-DD
                 or MM/DD/YYYY.
               </p>
-              <p>Negative amounts are money out; positive amounts are money in.</p>
+              <p>Positive amounts are spending; negative amounts are income, refunds, or credits.</p>
               <a
                 className="download-template-link"
                 href="/budgetapp-import-template.csv"

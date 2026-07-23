@@ -8,13 +8,17 @@ public sealed record BudgetPageModel(
     string Currency,
     string? Status,
     DateTimeOffset? UpdatedAtUtc,
-    IReadOnlyList<BudgetCategoryModel> Categories);
+    IReadOnlyList<BudgetCategoryModel> Categories,
+    decimal UncategorizedActualAmount,
+    int CurrencyMismatchTransactionCount);
 
 public sealed record BudgetCategoryModel(
     Guid Id,
     string Name,
     bool IsActive,
     decimal? BudgetedAmount,
+    decimal ActualAmount,
+    decimal DirectActualAmount,
     IReadOnlyList<BudgetCategoryModel> Children);
 
 public sealed record BudgetLineInput(Guid CategoryId, decimal BudgetedAmount);
@@ -31,3 +35,8 @@ public sealed record BudgetCategoryRecord(
     Guid? ParentCategoryId,
     int DisplayOrder,
     bool IsActive);
+
+public sealed record BudgetActualsRecord(
+    IReadOnlyDictionary<Guid, decimal> AmountsByCategoryId,
+    decimal UncategorizedAmount,
+    int CurrencyMismatchTransactionCount);

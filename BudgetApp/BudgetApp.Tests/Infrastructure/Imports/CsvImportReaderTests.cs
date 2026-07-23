@@ -13,9 +13,9 @@ public sealed class CsvImportReaderTests
     {
         const string csv =
             "Date,Description,Amount\n" +
-            "2026-07-20,\"Market, Main Street\",-47.25\n" +
+            "2026-07-20,\"Market, Main Street\",47.25\n" +
             "not-a-date,Unclear purchase,12.34567\n" +
-            "07/21/2026,Payroll,1250.00\n";
+            "07/21/2026,Payroll,-1250.00\n";
 
         var result = await Read(csv);
 
@@ -26,7 +26,7 @@ public sealed class CsvImportReaderTests
         var expense = result.Rows[0];
         Assert.Equal(2, expense.SourceRowNumber);
         Assert.Equal(new DateOnly(2026, 7, 20), expense.TransactionDate);
-        Assert.Equal(-47.25m, expense.Amount);
+        Assert.Equal(47.25m, expense.Amount);
         Assert.Equal("Market, Main Street", expense.Description);
         Assert.Null(expense.ValidationMessage);
         Assert.Contains("Market, Main Street", expense.RawData);
@@ -38,7 +38,7 @@ public sealed class CsvImportReaderTests
 
         var income = result.Rows[2];
         Assert.Equal(new DateOnly(2026, 7, 21), income.TransactionDate);
-        Assert.Equal(1250m, income.Amount);
+        Assert.Equal(-1250m, income.Amount);
     }
 
     [Fact]
@@ -51,8 +51,8 @@ public sealed class CsvImportReaderTests
 
         var result = await Read(csv);
 
-        Assert.Equal(-55.10m, result.Rows[0].Amount);
-        Assert.Equal(12.25m, result.Rows[1].Amount);
+        Assert.Equal(55.10m, result.Rows[0].Amount);
+        Assert.Equal(-12.25m, result.Rows[1].Amount);
         Assert.All(result.Rows, row => Assert.Null(row.ValidationMessage));
     }
 
@@ -61,8 +61,8 @@ public sealed class CsvImportReaderTests
     {
         const string csv =
             "Date,Description,Amount,Category,Sub Category\n" +
-            "2026-07-20,Groceries,-55.10,Food & Dining,Groceries\n" +
-            "2026-07-21,Uncategorized,-12.25,,\n";
+            "2026-07-20,Groceries,55.10,Food & Dining,Groceries\n" +
+            "2026-07-21,Uncategorized,12.25,,\n";
 
         var result = await Read(csv);
 

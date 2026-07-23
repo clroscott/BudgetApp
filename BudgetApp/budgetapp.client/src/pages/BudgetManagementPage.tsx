@@ -233,6 +233,38 @@ export function BudgetManagementPage() {
   const formattedTotal = new Intl.NumberFormat(undefined, {
     style: 'currency', currency: budget?.currency ?? currentHousehold.defaultCurrency,
   }).format(total)
+  const currencyFormatter = new Intl.NumberFormat(undefined, {
+    style: 'currency', currency: budget?.currency ?? currentHousehold.defaultCurrency,
+  })
+  const actualTotal = budget?.categories.reduce(
+    (sum, category) => sum + category.actualAmount, 0,
+  ) ?? 0
+  const formatAmount = (amount: number) => currencyFormatter.format(amount)
+
+  const amountOrNull = (categoryId: string) => {
+    const value = amounts[categoryId]
+    return value === undefined || value.trim() === '' ? null : Number(value)
+  }
+
+  const sectionBudget = (root: BudgetPageData['categories'][number]) => {
+    if (modes[root.id] !== 'detailed') return amountOrNull(root.id)
+    const childAmounts = root.children
+      .map(child => amountOrNull(child.id))
+      .filter((amount): amount is number => amount !== null)
+    return childAmounts.length === 0
+      ? null
+      : childAmounts.reduce((sum, amount) => sum + amount, 0)
+  }
+
+  const metrics = (budgeted: number | null, actual: number) => {
+    const remaining = budgeted === null ? null : budgeted - actual
+    return <span className="budget-metrics">
+      <span><small>Actual</small><strong>{formatAmount(actual)}</strong></span>
+      <span className={remaining !== null && remaining < 0 ? 'budget-over' : ''}>
+        <small>Remaining</small><strong>{remaining === null ? '—' : formatAmount(remaining)}</strong>
+      </span>
+    </span>
+  }
 
   return (
     <main className="management-page budget-page">
@@ -275,9 +307,12 @@ export function BudgetManagementPage() {
         ) : (
           <>
             {isClosed && <p className="budget-readonly-note">This historical budget is closed and read-only.</p>}
+            {budget.uncategorizedActualAmount !== 0 && <p className="budget-actual-warning"><strong>{formatAmount(budget.uncategorizedActualAmount)} uncategorized</strong> is not included in the category totals. Categorize those transactions to see the complete budget picture.</p>}
+            {budget.currencyMismatchTransactionCount > 0 && <p className="budget-actual-warning"><strong>{budget.currencyMismatchTransactionCount} transaction{budget.currencyMismatchTransactionCount === 1 ? '' : 's'}</strong> in another currency {budget.currencyMismatchTransactionCount === 1 ? 'is' : 'are'} excluded because currency conversion is not available yet.</p>}
             <div className="budget-sections">
               {budget.categories.map(root => {
                 const mode = modes[root.id] ?? 'overall'
+                const rootBudget = sectionBudget(root)
                 return <section className="budget-section" key={root.id}>
                   <div className="budget-section-heading"><div><h2>{root.name}</h2>{!root.isActive && <span className="status-pill">Deactivated</span>}</div>
                     {root.children.length > 0 && <div className="budget-mode" aria-label={`${root.name} budgeting mode`}>
@@ -285,8 +320,12 @@ export function BudgetManagementPage() {
                       <button type="button" className={mode === 'detailed' ? 'selected' : ''} disabled={!canEdit || isSaving} onClick={() => setMode(root.id, 'detailed')}>Detailed</button>
                     </div>}
                   </div>
-                  {mode === 'overall' ? <label className="budget-amount-row"><span>{root.name} total</span><span className="currency-input"><span>{budget.currency}</span><input aria-label={`${root.name} budget`} type="number" min="0" step="0.01" placeholder="No budget" disabled={!canEdit || isSaving || !root.isActive} value={amounts[root.id] ?? ''} onChange={event => setAmounts(current => ({ ...current, [root.id]: event.target.value }))} /></span></label> :
-                    <div className="budget-detail-list">{root.children.map(child => <label className="budget-amount-row" key={child.id}><span>{child.name}{!child.isActive && <small> Deactivated</small>}</span><span className="currency-input"><span>{budget.currency}</span><input aria-label={`${child.name} budget`} type="number" min="0" step="0.01" placeholder="No budget" disabled={!canEdit || isSaving || !child.isActive} value={amounts[child.id] ?? ''} onChange={event => setAmounts(current => ({ ...current, [child.id]: event.target.value }))} /></span></label>)}</div>}
+                  <div className="budget-section-summary"><span><small>Budgeted</small><strong>{rootBudget === null ? 'No budget' : formatAmount(rootBudget)}</strong></span>{metrics(rootBudget, root.actualAmount)}</div>
+                  {mode === 'overall' ? <label className="budget-amount-row"><span>{root.name} total</span><span className="budget-row-values"><span className="currency-input"><span>{budget.currency}</span><input aria-label={`${root.name} budget`} type="number" min="0" step="0.01" placeholder="No budget" disabled={!canEdit || isSaving || !root.isActive} value={amounts[root.id] ?? ''} onChange={event => setAmounts(current => ({ ...current, [root.id]: event.target.value }))} /></span>{metrics(amountOrNull(root.id), root.actualAmount)}</span></label> :
+                    <div className="budget-detail-list">
+                      {root.directActualAmount !== 0 && <div className="budget-amount-row budget-direct-actual"><span>Directly categorized to {root.name}</span>{metrics(null, root.directActualAmount)}</div>}
+                      {root.children.map(child => <label className="budget-amount-row" key={child.id}><span>{child.name}{!child.isActive && <small> Deactivated</small>}</span><span className="budget-row-values"><span className="currency-input"><span>{budget.currency}</span><input aria-label={`${child.name} budget`} type="number" min="0" step="0.01" placeholder="No budget" disabled={!canEdit || isSaving || !child.isActive} value={amounts[child.id] ?? ''} onChange={event => setAmounts(current => ({ ...current, [child.id]: event.target.value }))} /></span>{metrics(amountOrNull(child.id), child.actualAmount)}</span></label>)}
+                    </div>}
                 </section>
               })}
             </div>
@@ -301,6 +340,7 @@ export function BudgetManagementPage() {
           <div>
             <span>Monthly budget</span>
             <strong>{formattedTotal}</strong>
+            <small>Actual {formatAmount(actualTotal)} · Remaining {formatAmount(total - actualTotal)}</small>
             {isDirty && <small>Unsaved changes</small>}
           </div>
           <div className="budget-save-actions">

@@ -201,7 +201,7 @@ Rules:
 - A discrepancy should normally be represented by an explicit adjustment transaction rather than an unexplained edit to another transaction.
 - Transfers, reimbursements, and transaction splits may need richer models later. Version 1 may begin with category type and exclusion flags.
 
-Amount uses a signed cash-flow convention in the account's currency: positive means money entering the account and negative means money leaving the account. CSV adapters must normalize bank-specific debit and credit formats into this convention before approval.
+Amount uses a signed budgeting convention in the account's currency: positive means money leaving the account (spending), while negative means money entering the account (income, refund, or credit). CSV adapters must normalize bank-specific debit and credit formats into this convention before approval. Reports should display income as a positive magnitude even though its stored transaction amount is negative.
 
 ### ImportFile
 

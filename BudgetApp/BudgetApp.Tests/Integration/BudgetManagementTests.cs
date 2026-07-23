@@ -1,5 +1,10 @@
 using System.Net;
 using System.Net.Http.Json;
+using BudgetApp.Domain.Accounts;
+using BudgetApp.Domain.Transactions;
+using BudgetApp.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BudgetApp.Tests.Integration;
 
@@ -202,7 +207,70 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
         Assert.Null(empty!.Id);
     }
 
-    private static async Task Register(HttpClient client)
+    [Fact]
+    public async Task BudgetActuals_RollUpExpensesAndRespectScopeAndExclusions()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        var userId = await Register(client);
+        var householdId = await CreateHousehold(client);
+        Guid foodId;
+        Guid groceriesId;
+        var now = DateTimeOffset.UtcNow;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+            var food = await dbContext.Categories.SingleAsync(category =>
+                category.HouseholdId == householdId && category.Name == "Food & Dining");
+            var groceries = await dbContext.Categories.SingleAsync(category =>
+                category.HouseholdId == householdId && category.Name == "Groceries");
+            foodId = food.Id;
+            groceriesId = groceries.Id;
+            var householdAccount = Account.CreateHousehold(
+                householdId, "Joint", AccountType.Chequing, "CAD", null, null, now);
+            var usdAccount = Account.CreateHousehold(
+                householdId, "US Card", AccountType.CreditCard, "USD", null, null, now);
+            var personalAccount = Account.CreatePersonal(
+                householdId, userId, "Personal", AccountType.CreditCard, "CAD", null, null, now);
+            dbContext.Accounts.AddRange(householdAccount, usdAccount, personalAccount);
+
+            Transaction Add(Guid accountId, Guid? categoryId, decimal amount,
+                string description, bool excluded = false)
+            {
+                var transaction = Transaction.CreateManual(
+                    householdId, accountId, categoryId, new DateOnly(2026, 7, 15), null,
+                    amount, description, null, null, excluded, userId, now);
+                dbContext.Transactions.Add(transaction);
+                return transaction;
+            }
+
+            Add(householdAccount.Id, groceriesId, 100m, "Groceries");
+            Add(householdAccount.Id, groceriesId, -10m, "Grocery refund");
+            Add(householdAccount.Id, foodId, 25m, "Direct food expense");
+            Add(householdAccount.Id, null, 40m, "Uncategorized expense");
+            Add(householdAccount.Id, groceriesId, 1000m, "Excluded", excluded: true);
+            var voided = Add(householdAccount.Id, groceriesId, 1000m, "Voided");
+            voided.Void(userId, now);
+            Add(usdAccount.Id, groceriesId, 75m, "Different currency");
+            Add(personalAccount.Id, groceriesId, 500m, "Personal expense");
+            await dbContext.SaveChangesAsync();
+        }
+
+        var budget = await client.GetFromJsonAsync<BudgetResponse>(
+            $"/api/households/{householdId}/budgets/2026/7?scope=Household");
+
+        Assert.NotNull(budget);
+        var foodResult = Assert.Single(budget.Categories, category => category.Id == foodId);
+        var groceriesResult = Assert.Single(
+            foodResult.Children, category => category.Id == groceriesId);
+        Assert.Equal(90m, groceriesResult.ActualAmount);
+        Assert.Equal(25m, foodResult.DirectActualAmount);
+        Assert.Equal(115m, foodResult.ActualAmount);
+        Assert.Equal(40m, budget.UncategorizedActualAmount);
+        Assert.Equal(1, budget.CurrencyMismatchTransactionCount);
+    }
+
+    private static async Task<Guid> Register(HttpClient client)
     {
         var response = await SendWithAntiforgery(
             client, HttpMethod.Post, "/api/auth/register",
@@ -214,6 +282,7 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
             },
             await GetAntiforgeryToken(client));
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return (await client.GetFromJsonAsync<CurrentUserResponse>("/api/auth/me"))!.Id;
     }
 
     private static async Task<Guid> CreateHousehold(HttpClient client)
@@ -240,15 +309,20 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
 
     private sealed record AntiforgeryResponse(string Token);
     private sealed record CreateResponse(Guid Id);
+    private sealed record CurrentUserResponse(Guid Id);
     private sealed record BudgetResponse(
         Guid? Id,
         string Currency,
         string? Status,
-        IReadOnlyList<BudgetCategoryResponse> Categories);
+        IReadOnlyList<BudgetCategoryResponse> Categories,
+        decimal UncategorizedActualAmount,
+        int CurrencyMismatchTransactionCount);
     private sealed record BudgetOptionResponse(Guid Id, int Year, int Month, string Status);
     private sealed record BudgetCategoryResponse(
         Guid Id,
         string Name,
         decimal? BudgetedAmount,
+        decimal ActualAmount,
+        decimal DirectActualAmount,
         IReadOnlyList<BudgetCategoryResponse> Children);
 }
