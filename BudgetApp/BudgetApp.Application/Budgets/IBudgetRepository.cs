@@ -42,6 +42,15 @@ public interface IBudgetRepository
         string currency,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<BudgetHistoricalActualRecord>> GetHistoricalActualsAsync(
+        Guid householdId,
+        Guid userId,
+        DateOnly fromDate,
+        DateOnly toDate,
+        BudgetScope scope,
+        string currency,
+        CancellationToken cancellationToken);
+
     Task AddAsync(BudgetMonth budgetMonth, CancellationToken cancellationToken);
 
     Task AddLineAsync(BudgetLine budgetLine, CancellationToken cancellationToken);

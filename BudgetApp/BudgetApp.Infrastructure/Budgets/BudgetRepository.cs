@@ -143,6 +143,54 @@ internal sealed class BudgetRepository(BudgetAppDbContext dbContext) : IBudgetRe
         return new BudgetActualsRecord(amounts, uncategorized, mismatchCount);
     }
 
+    public async Task<IReadOnlyList<BudgetHistoricalActualRecord>> GetHistoricalActualsAsync(
+        Guid householdId,
+        Guid userId,
+        DateOnly fromDate,
+        DateOnly toDate,
+        BudgetScope scope,
+        string currency,
+        CancellationToken cancellationToken)
+    {
+        var transactions = await (
+            from transaction in dbContext.Transactions.AsNoTracking()
+            join account in dbContext.Accounts.AsNoTracking()
+                on transaction.AccountId equals account.Id
+            join category in dbContext.Categories.AsNoTracking()
+                on transaction.CategoryId equals category.Id
+            where transaction.HouseholdId == householdId &&
+                  transaction.TransactionDate >= fromDate &&
+                  transaction.TransactionDate <= toDate &&
+                  !transaction.IsVoided &&
+                  !transaction.IsExcludedFromBudget &&
+                  category.Type == CategoryType.Expense &&
+                  account.Currency == currency &&
+                  (scope == BudgetScope.Household
+                      ? account.Scope == AccountScope.Household
+                      : account.Scope == AccountScope.Personal && account.OwnerUserId == userId)
+            select new
+            {
+                transaction.CategoryId,
+                transaction.TransactionDate,
+                transaction.Amount
+            })
+            .ToListAsync(cancellationToken);
+
+        return transactions
+            .GroupBy(transaction => new
+            {
+                CategoryId = transaction.CategoryId!.Value,
+                transaction.TransactionDate.Year,
+                transaction.TransactionDate.Month
+            })
+            .Select(group => new BudgetHistoricalActualRecord(
+                group.Key.CategoryId,
+                group.Key.Year,
+                group.Key.Month,
+                group.Sum(transaction => transaction.Amount)))
+            .ToList();
+    }
+
     public async Task AddAsync(BudgetMonth budgetMonth, CancellationToken cancellationToken) =>
         await dbContext.BudgetMonths.AddAsync(budgetMonth, cancellationToken);
 

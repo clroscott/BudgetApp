@@ -10,6 +10,9 @@ export interface BudgetCategory {
   budgetedAmount: number | null
   actualAmount: number
   directActualAmount: number
+  averageMonthlyActualAmount: number
+  lastMonthBudgetedAmount: number | null
+  lastMonthActualAmount: number
   children: BudgetCategory[]
 }
 
