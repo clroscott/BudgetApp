@@ -1,6 +1,7 @@
 import { apiGet, apiPost, apiPut } from '../api/apiClient'
 
 export type RecurringExpenseScope = 'Household' | 'Personal'
+export type RecurringExpenseBudgetMode = 'Overall' | 'Detailed'
 
 export interface RecurringExpenseItem {
   id: string
@@ -9,6 +10,7 @@ export interface RecurringExpenseItem {
   currency: string
   scope: RecurringExpenseScope
   ownerUserId: string | null
+  budgetMode: RecurringExpenseBudgetMode
   subcategoryId: string
   categoryName: string
   subcategoryName: string
@@ -24,6 +26,7 @@ export interface RecurringExpenseRequest {
   name: string
   amount: number
   scope: RecurringExpenseScope
+  budgetMode: RecurringExpenseBudgetMode
   subcategoryId: string
   accountId?: string | null
   expectedDayOfMonth?: number | null

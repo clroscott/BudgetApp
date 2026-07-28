@@ -163,6 +163,7 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
                     name = item.Item1,
                     amount = item.Item2,
                     scope = "Personal",
+                    budgetMode = "Detailed",
                     subcategoryId = streaming.Id,
                     accountId = (Guid?)null,
                     expectedDayOfMonth = 15,
@@ -183,6 +184,53 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
             Assert.Single(budget!.Categories, category => category.Id == subscriptions.Id).Children,
             category => category.Id == streaming.Id);
         Assert.Equal(38.98m, savedStreaming.BudgetedAmount);
+    }
+
+    [Fact]
+    public async Task CreateFromRecurring_OverallRollsAmountsIntoParentCategory()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        await Register(client);
+        var householdId = await CreateHousehold(client);
+        var token = await GetAntiforgeryToken(client);
+        var budgetPath = $"/api/households/{householdId}/budgets/2026/10";
+        var empty = await client.GetFromJsonAsync<BudgetResponse>(
+            $"{budgetPath}?scope=Personal");
+        var subscriptions = Assert.Single(
+            empty!.Categories, category => category.Name == "Subscriptions");
+        var streaming = Assert.Single(
+            subscriptions.Children, category => category.Name == "Streaming");
+
+        var create = await SendWithAntiforgery(
+            client, HttpMethod.Post,
+            $"/api/households/{householdId}/recurring-expenses",
+            new
+            {
+                name = "Netflix",
+                amount = 22.99m,
+                scope = "Personal",
+                budgetMode = "Overall",
+                subcategoryId = streaming.Id,
+                accountId = (Guid?)null,
+                expectedDayOfMonth = 15,
+                startsOn = "2026-01-01",
+                endsOn = (string?)null
+            }, token);
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+
+        var build = await SendWithAntiforgery(
+            client, HttpMethod.Post,
+            $"{budgetPath}/from-recurring",
+            new { scope = "Personal" }, token);
+
+        Assert.Equal(HttpStatusCode.OK, build.StatusCode);
+        var budget = await build.Content.ReadFromJsonAsync<BudgetResponse>();
+        var savedSubscriptions = Assert.Single(
+            budget!.Categories, category => category.Id == subscriptions.Id);
+        Assert.Equal(22.99m, savedSubscriptions.BudgetedAmount);
+        Assert.Null(Assert.Single(
+            savedSubscriptions.Children,
+            category => category.Id == streaming.Id).BudgetedAmount);
     }
 
     [Fact]

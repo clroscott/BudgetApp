@@ -30,7 +30,8 @@ public sealed class RecurringExpenseManagementService(
             .ThenBy(item => item.Name)
             .Select(item => new RecurringExpenseListItem(
                 item.Id, item.Name, item.Amount, item.Currency, item.Scope.ToString(),
-                item.OwnerUserId, item.SubcategoryId, item.CategoryName,
+                item.OwnerUserId, item.BudgetMode.ToString(),
+                item.SubcategoryId, item.CategoryName,
                 item.SubcategoryName, item.AccountId, item.AccountName,
                 item.ExpectedDayOfMonth, item.StartsOn, item.EndsOn, item.IsActive))
             .ToList();
@@ -42,6 +43,7 @@ public sealed class RecurringExpenseManagementService(
         string name,
         decimal amount,
         string scope,
+        string budgetMode,
         Guid subcategoryId,
         Guid? accountId,
         int? expectedDayOfMonth,
@@ -52,6 +54,7 @@ public sealed class RecurringExpenseManagementService(
         var role = await authorizationService.RequireViewAsync(
             householdId, userId, cancellationToken);
         var parsedScope = ParseScope(scope);
+        var parsedBudgetMode = ParseBudgetMode(budgetMode);
         EnsureScopePermission(parsedScope, role);
         var currency = await GetCurrency(householdId, cancellationToken);
         await ValidateReferences(
@@ -62,10 +65,10 @@ public sealed class RecurringExpenseManagementService(
         var expense = parsedScope == RecurringExpenseScope.Personal
             ? RecurringExpense.CreatePersonal(
                 householdId, userId, name, amount, currency, subcategoryId,
-                accountId, expectedDayOfMonth, startsOn, endsOn, now)
+                accountId, expectedDayOfMonth, startsOn, endsOn, now, parsedBudgetMode)
             : RecurringExpense.CreateHousehold(
                 householdId, name, amount, currency, subcategoryId,
-                accountId, expectedDayOfMonth, startsOn, endsOn, now);
+                accountId, expectedDayOfMonth, startsOn, endsOn, now, parsedBudgetMode);
         await recurringExpenseRepository.AddAsync(expense, cancellationToken);
         await recurringExpenseRepository.SaveChangesAsync(cancellationToken);
         return expense.Id;
@@ -78,6 +81,7 @@ public sealed class RecurringExpenseManagementService(
         string name,
         decimal amount,
         string scope,
+        string budgetMode,
         Guid subcategoryId,
         Guid? accountId,
         int? expectedDayOfMonth,
@@ -88,6 +92,7 @@ public sealed class RecurringExpenseManagementService(
         var (expense, role) = await GetAuthorizedForChange(
             householdId, userId, recurringExpenseId, cancellationToken);
         var parsedScope = ParseScope(scope);
+        var parsedBudgetMode = ParseBudgetMode(budgetMode);
         EnsureScopePermission(parsedScope, role);
         var currency = await GetCurrency(householdId, cancellationToken);
         await ValidateReferences(
@@ -101,6 +106,7 @@ public sealed class RecurringExpenseManagementService(
             amount,
             currency,
             subcategoryId,
+            parsedBudgetMode,
             accountId,
             expectedDayOfMonth,
             startsOn,
@@ -184,6 +190,13 @@ public sealed class RecurringExpenseManagementService(
         Enum.TryParse<RecurringExpenseScope>(scope, true, out var parsed) && Enum.IsDefined(parsed)
             ? parsed
             : throw new ArgumentException("Recurring expense scope is not supported.", nameof(scope));
+
+    private static RecurringExpenseBudgetMode ParseBudgetMode(string budgetMode) =>
+        Enum.TryParse<RecurringExpenseBudgetMode>(budgetMode, true, out var parsed) &&
+        Enum.IsDefined(parsed)
+            ? parsed
+            : throw new ArgumentException(
+                "Budget placement must be Overall or Detailed.", nameof(budgetMode));
 
     private static void EnsureScopePermission(
         RecurringExpenseScope scope,

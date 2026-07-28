@@ -32,6 +32,7 @@ internal sealed class RecurringExpenseRepository(BudgetAppDbContext dbContext)
                 expense.Currency,
                 expense.Scope,
                 expense.OwnerUserId,
+                expense.BudgetMode,
                 expense.CategoryId,
                 category.Name,
                 subcategory.Name,

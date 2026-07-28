@@ -49,6 +49,12 @@ internal sealed class RecurringExpenseConfiguration : IEntityTypeConfiguration<R
             .IsUnicode(false)
             .IsRequired();
 
+        builder.Property(expense => expense.BudgetMode)
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .IsUnicode(false)
+            .IsRequired();
+
         builder.Property(expense => expense.Name)
             .HasMaxLength(RecurringExpense.NameMaxLength)
             .IsRequired();

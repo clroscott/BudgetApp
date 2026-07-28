@@ -23,10 +23,30 @@ public sealed class RecurringExpenseTests
         Assert.Equal(22.99m, expense.Amount);
         Assert.Equal("CAD", expense.Currency);
         Assert.Equal(RecurringExpenseScope.Household, expense.Scope);
+        Assert.Equal(RecurringExpenseBudgetMode.Detailed, expense.BudgetMode);
         Assert.Null(expense.OwnerUserId);
         Assert.True(expense.IsActive);
         Assert.True(expense.AppliesTo(2026, 7));
         Assert.Equal(new DateOnly(2026, 7, 15), expense.GetExpectedDate(2026, 7));
+    }
+
+    [Fact]
+    public void CreateHousehold_CanTargetOverallBudget()
+    {
+        var expense = RecurringExpense.CreateHousehold(
+            Guid.NewGuid(),
+            "Netflix",
+            22.99m,
+            "CAD",
+            Guid.NewGuid(),
+            accountId: null,
+            expectedDayOfMonth: 15,
+            startsOn: new DateOnly(2026, 1, 1),
+            endsOn: null,
+            createdAtUtc: DateTimeOffset.UtcNow,
+            budgetMode: RecurringExpenseBudgetMode.Overall);
+
+        Assert.Equal(RecurringExpenseBudgetMode.Overall, expense.BudgetMode);
     }
 
     [Fact]

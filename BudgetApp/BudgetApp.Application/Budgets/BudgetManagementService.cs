@@ -165,15 +165,37 @@ public sealed class BudgetManagementService(
             .Where(category => category.IsActive && !category.ParentCategoryId.HasValue)
             .Select(category => category.Id)
             .ToHashSet();
-        var activeSubcategoryIds = categories
+        var activeSubcategories = categories
             .Where(category =>
                 category.IsActive &&
                 category.ParentCategoryId.HasValue &&
                 activeRootIds.Contains(category.ParentCategoryId.Value))
-            .Select(category => category.Id)
-            .ToHashSet();
-        var applicable = recurring
-            .Where(expense => activeSubcategoryIds.Contains(expense.CategoryId))
+            .ToDictionary(
+                category => category.Id,
+                category => category.ParentCategoryId!.Value);
+        var applicableExpenses = recurring
+            .Where(expense => activeSubcategories.ContainsKey(expense.CategoryId))
+            .ToList();
+        var mixedModeSection = applicableExpenses
+            .GroupBy(expense => activeSubcategories[expense.CategoryId])
+            .FirstOrDefault(group =>
+                group.Select(expense => expense.BudgetMode).Distinct().Count() > 1);
+        if (mixedModeSection is not null)
+        {
+            var rootName = categories.Single(category =>
+                category.Id == mixedModeSection.Key).Name;
+            throw new InvalidOperationException(
+                $"{rootName} recurring expenses use both Overall and Detailed budget placement. " +
+                "Choose one placement for that category before creating the budget.");
+        }
+        var applicable = applicableExpenses
+            .Select(expense => new
+            {
+                CategoryId = expense.BudgetMode == RecurringExpenseBudgetMode.Overall
+                    ? activeSubcategories[expense.CategoryId]
+                    : expense.CategoryId,
+                expense.Amount
+            })
             .GroupBy(expense => expense.CategoryId)
             .Select(group => new { CategoryId = group.Key, Amount = group.Sum(item => item.Amount) })
             .ToList();
