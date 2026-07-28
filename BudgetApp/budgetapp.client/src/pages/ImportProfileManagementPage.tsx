@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
 import { BrandLockup } from '../components/Brand'
@@ -138,8 +138,7 @@ export function ImportProfileManagementPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
+  const submit = async () => {
     setIsBusy(true)
     setErrors([])
     try {
@@ -300,7 +299,8 @@ export function ImportProfileManagementPage() {
           <p>Save a bank or custom CSV structure once, then reuse it automatically.</p>
         </div></div>
         <ErrorSummary errors={errors} />
-        {canEdit && <form className="management-form import-profile-form" onSubmit={event => void submit(event)}>
+        {canEdit && <form className="management-form import-profile-form"
+          onSubmit={event => event.preventDefault()}>
           <div className="account-form-heading"><div>
             <h2>{editingId ? 'Edit profile' : 'Create profile'}</h2>
             <p>Name each CSV column and choose what BudgetApp should do with it.</p>
@@ -398,7 +398,9 @@ export function ImportProfileManagementPage() {
             or at least one debit/credit column.
             {hasDuplicateHeaders && ' Header names must be unique.'}
           </p>
-          <button className="primary-button" type="submit" disabled={isBusy || !canSubmit}>
+          <button className="primary-button" type="button"
+            disabled={isBusy || !canSubmit}
+            onClick={() => void submit()}>
             {isBusy ? 'Saving...' : editingId ? 'Save profile' : 'Create profile'}
           </button>
         </form>}

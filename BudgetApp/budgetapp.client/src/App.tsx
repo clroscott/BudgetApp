@@ -110,7 +110,7 @@ function StatusError({ message, onRetry }: { message: string, onRetry: () => voi
     <main className="centered-page">
       <section className="status-card" role="alert">
         <BrandMark />
-        <h1>BudgetApp is unavailable</h1>
+        <h1>MC Budget is unavailable</h1>
         <p>{message}</p>
         <button type="button" onClick={onRetry}>Try again</button>
       </section>

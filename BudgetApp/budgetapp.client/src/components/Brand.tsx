@@ -31,7 +31,7 @@ export function BrandMark() {
       className="brand-mark-image"
       src={markLogoPath}
       alt=""
-      fallback={<span className="brand-mark" aria-hidden="true">B</span>}
+      fallback={<span className="brand-mark" aria-hidden="true">MC</span>}
     />
   )
 }
@@ -40,7 +40,7 @@ export function BrandLockup() {
   return (
     <div className="brand-lockup">
       <BrandMark />
-      <span>BudgetApp</span>
+      <span>MC Budget</span>
     </div>
   )
 }
@@ -50,7 +50,7 @@ export function BrandLogo() {
     <BrandImage
       className="brand-primary-image"
       src={primaryLogoPath}
-      alt="BudgetApp"
+      alt="MC Budget"
       fallback={<BrandLockup />}
     />
   )
