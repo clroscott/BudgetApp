@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "brand:icons": "node scripts/generate-brand-icons.mjs",
+    "predev": "npm run brand:icons",
     "dev": "vite",
+    "prebuild": "npm run brand:icons",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"
@@ -19,6 +22,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "oxlint": "^1.69.0",
+    "sharp": "^0.35.3",
     "typescript": "~6.0.2",
     "vite": "^8.1.0"
   }
