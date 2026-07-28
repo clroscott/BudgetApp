@@ -28,6 +28,8 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
 
     public DbSet<ImportFile> ImportFiles => Set<ImportFile>();
 
+    public DbSet<ImportProfile> ImportProfiles => Set<ImportProfile>();
+
     public DbSet<ImportTransactionDraft> ImportTransactionDrafts =>
         Set<ImportTransactionDraft>();
 

@@ -64,11 +64,13 @@ export function uploadCsvImport(
   accountId: string,
   file: File,
   allowDuplicateFile: boolean,
+  profileId?: string,
 ): Promise<CsvImportResult> {
   const form = new FormData()
   form.append('accountId', accountId)
   form.append('file', file)
   form.append('allowDuplicateFile', String(allowDuplicateFile))
+  if (profileId) form.append('profileId', profileId)
 
   return apiPostForm<CsvImportResult>(
     `/api/households/${householdId}/imports`,

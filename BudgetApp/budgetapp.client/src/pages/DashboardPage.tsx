@@ -93,6 +93,7 @@ export function DashboardPage() {
             <small>Stage bank transactions for validation and review.</small>
             <AppLink to="/import">Import a CSV</AppLink>
             <AppLink to="/imports/review">Review imports</AppLink>
+            <AppLink to="/settings/import-profiles">Manage CSV profiles</AppLink>
           </article>
           <article className="summary-card">
             <span>Household</span>

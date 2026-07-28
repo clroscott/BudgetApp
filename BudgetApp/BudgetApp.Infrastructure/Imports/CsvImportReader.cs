@@ -12,35 +12,70 @@ public sealed class CsvImportReader : ICsvImportReader
 {
     private static readonly string[] DateFormats =
     [
-        "yyyy-MM-dd",
-        "yyyyMMdd",
-        "MM/dd/yyyy",
-        "M/d/yyyy",
-        "MM-dd-yyyy",
-        "M-d-yyyy"
+        "yyyy-MM-dd", "yyyyMMdd", "MM/dd/yyyy", "M/d/yyyy",
+        "MM-dd-yyyy", "M-d-yyyy"
     ];
 
-    public async Task<CsvImportReadResult> ReadAsync(
+    public Task<CsvImportReadResult> ReadAsync(
+        Stream content,
+        CancellationToken cancellationToken) =>
+        ReadCoreAsync(content, profile: null, cancellationToken);
+
+    public Task<CsvImportReadResult> ReadAsync(
+        Stream content,
+        CsvProfileDefinition profile,
+        CancellationToken cancellationToken) =>
+        ReadCoreAsync(content, profile, cancellationToken);
+
+    public async Task<CsvStructureInspection> InspectAsync(
         Stream content,
         CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(content);
-
         var bytes = await ReadWithinLimit(content, cancellationToken);
         if (bytes.Length == 0)
-        {
             throw new CsvImportRejectedException("The selected CSV file is empty.");
-        }
+        var document = ReadDocument(bytes, maximumRows: 5, cancellationToken);
+        var columns = ResolveColumns(document.Headers, requireRecognized: false);
+        return new CsvStructureInspection(
+            bytes.Length,
+            Convert.ToHexString(SHA256.HashData(bytes)),
+            document.Headers,
+            document.Rows,
+            CreateSuggestedProfile(document.Headers, columns));
+    }
 
-        var sha256Hash = Convert.ToHexString(SHA256.HashData(bytes));
-        var rows = Parse(bytes, cancellationToken);
-        if (rows.Count == 0)
-        {
+    private static async Task<CsvImportReadResult> ReadCoreAsync(
+        Stream content,
+        CsvProfileDefinition? profile,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        var bytes = await ReadWithinLimit(content, cancellationToken);
+        if (bytes.Length == 0)
+            throw new CsvImportRejectedException("The selected CSV file is empty.");
+        var document = ReadDocument(bytes, CsvImportLimits.MaxRows + 1, cancellationToken);
+        if (document.Rows.Count == 0)
             throw new CsvImportRejectedException(
                 "The CSV file does not contain any transaction rows.");
-        }
+        if (document.Rows.Count > CsvImportLimits.MaxRows)
+            throw new CsvImportRejectedException(
+                $"A CSV import cannot contain more than {CsvImportLimits.MaxRows:N0} rows.");
 
-        return new CsvImportReadResult(bytes.Length, sha256Hash, rows);
+        var columns = profile is null
+            ? ResolveColumns(document.Headers, requireRecognized: true)
+            : ResolveProfileColumns(document.Headers, profile);
+        var rows = document.Rows
+            .Select((fields, index) => ParseRow(
+                document.Headers.ToArray(),
+                fields.ToArray(),
+                columns,
+                index + 2,
+                profile?.AmountConvention ?? ImportAmountConvention.SpendingPositive))
+            .ToList();
+        return new CsvImportReadResult(
+            bytes.Length,
+            Convert.ToHexString(SHA256.HashData(bytes)),
+            rows);
     }
 
     private static async Task<byte[]> ReadWithinLimit(
@@ -49,80 +84,49 @@ public sealed class CsvImportReader : ICsvImportReader
     {
         await using var buffer = new MemoryStream();
         var chunk = new byte[81920];
-
         while (true)
         {
-            var bytesRead = await content.ReadAsync(chunk, cancellationToken);
-            if (bytesRead == 0)
-            {
-                break;
-            }
-
-            if (buffer.Length + bytesRead > CsvImportLimits.MaxFileSizeBytes)
-            {
+            var count = await content.ReadAsync(chunk, cancellationToken);
+            if (count == 0) break;
+            if (buffer.Length + count > CsvImportLimits.MaxFileSizeBytes)
                 throw new CsvImportRejectedException(
                     $"CSV files cannot exceed {CsvImportLimits.MaxFileSizeBytes / 1024 / 1024} MB.");
-            }
-
-            await buffer.WriteAsync(
-                chunk.AsMemory(0, bytesRead),
-                cancellationToken);
+            await buffer.WriteAsync(chunk.AsMemory(0, count), cancellationToken);
         }
-
         return buffer.ToArray();
     }
 
-    private static IReadOnlyList<CsvImportRow> Parse(
+    private static CsvDocument ReadDocument(
         byte[] bytes,
+        int maximumRows,
         CancellationToken cancellationToken)
     {
         try
         {
             using var stream = new MemoryStream(bytes, writable: false);
             using var parser = new TextFieldParser(
-                stream,
-                new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true),
-                detectEncoding: true,
-                leaveOpen: false)
+                stream, new UTF8Encoding(false, true), true, false)
             {
                 HasFieldsEnclosedInQuotes = true,
                 TextFieldType = FieldType.Delimited,
                 TrimWhiteSpace = false
             };
             parser.SetDelimiters(",");
-
             var headers = parser.ReadFields() ?? [];
-            var columns = ResolveColumns(headers);
-            var rows = new List<CsvImportRow>();
-            var sourceRowNumber = 1;
-
-            while (!parser.EndOfData)
+            ValidateHeaders(headers);
+            var rows = new List<IReadOnlyList<string>>();
+            while (!parser.EndOfData && rows.Count < maximumRows)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                sourceRowNumber++;
                 var fields = parser.ReadFields() ?? [];
-                if (fields.All(string.IsNullOrWhiteSpace))
-                {
-                    continue;
-                }
-
-                if (rows.Count >= CsvImportLimits.MaxRows)
-                {
-                    throw new CsvImportRejectedException(
-                        $"A CSV import cannot contain more than {CsvImportLimits.MaxRows:N0} rows.");
-                }
-
+                if (fields.All(string.IsNullOrWhiteSpace)) continue;
                 if (fields.Length != headers.Length)
-                {
                     throw new CsvImportRejectedException(
-                        $"CSV row {sourceRowNumber} contains {fields.Length} fields; " +
+                        $"CSV row {rows.Count + 2} contains {fields.Length} fields; " +
                         $"the header defines {headers.Length}.");
-                }
-
-                rows.Add(ParseRow(headers, fields, columns, sourceRowNumber));
+                rows.Add(fields);
             }
-
-            return rows;
+            return new CsvDocument(headers, rows);
         }
         catch (CsvImportRejectedException)
         {
@@ -130,8 +134,7 @@ public sealed class CsvImportReader : ICsvImportReader
         }
         catch (DecoderFallbackException)
         {
-            throw new CsvImportRejectedException(
-                "The CSV file is not valid UTF-8 text.");
+            throw new CsvImportRejectedException("The CSV file is not valid UTF-8 text.");
         }
         catch (MalformedLineException exception)
         {
@@ -140,182 +143,98 @@ public sealed class CsvImportReader : ICsvImportReader
         }
     }
 
-    private static CsvColumns ResolveColumns(string[] headers)
+    private static CsvColumns ResolveColumns(
+        IReadOnlyList<string> headers,
+        bool requireRecognized)
     {
-        if (headers.Length == 0 || headers.All(string.IsNullOrWhiteSpace))
-        {
-            throw new CsvImportRejectedException("The CSV file must contain a header row.");
-        }
-
-        var normalizedHeaders = headers
-            .Select(NormalizeHeader)
-            .ToArray();
-        if (normalizedHeaders.Any(string.IsNullOrEmpty))
-        {
-            throw new CsvImportRejectedException("CSV column names cannot be empty.");
-        }
-
-        if (normalizedHeaders.Distinct().Count() != normalizedHeaders.Length)
-        {
-            throw new CsvImportRejectedException("CSV column names must be unique.");
-        }
-
-        var dateIndex = FindColumn(
-            normalizedHeaders,
-            "transactiondate",
-            "date",
-            "posteddate");
-        var descriptionIndex = FindColumn(
-            normalizedHeaders,
-            "description",
-            "details",
-            "memo",
-            "merchant",
-            "payee");
-        var amountIndex = FindColumn(normalizedHeaders, "amount");
-        var debitIndex = FindColumn(
-            normalizedHeaders,
-            "debit",
-            "withdrawal",
-            "withdrawals");
-        var creditIndex = FindColumn(
-            normalizedHeaders,
-            "credit",
-            "deposit",
-            "deposits");
-        var categoryIndex = FindColumn(normalizedHeaders, "category");
-        var subcategoryIndex = FindColumn(
-            normalizedHeaders,
-            "subcategory",
-            "subcat");
-
-        if (dateIndex < 0)
-        {
+        var normalized = headers.Select(NormalizeHeader).ToArray();
+        var date = FindColumn(normalized, "transactiondate", "date", "posteddate");
+        var description = FindColumn(
+            normalized, "description", "details", "memo", "merchant", "payee");
+        var amount = FindColumn(normalized, "amount");
+        var debit = FindColumn(normalized, "debit", "withdrawal", "withdrawals");
+        var credit = FindColumn(normalized, "credit", "deposit", "deposits");
+        var category = FindColumn(normalized, "category");
+        var subcategory = FindColumn(normalized, "subcategory", "subcat");
+        if (requireRecognized && date < 0)
             throw UnsupportedHeaders(headers, "a Date or Transaction Date column");
-        }
-
-        if (descriptionIndex < 0)
-        {
-            throw UnsupportedHeaders(
-                headers,
-                "a Description, Details, Memo, Merchant, or Payee column");
-        }
-
-        if (amountIndex < 0 && debitIndex < 0 && creditIndex < 0)
-        {
-            throw UnsupportedHeaders(
-                headers,
-                "an Amount column or Debit/Credit columns");
-        }
-
-        return new CsvColumns(
-            dateIndex,
-            descriptionIndex,
-            amountIndex,
-            debitIndex,
-            creditIndex,
-            categoryIndex,
-            subcategoryIndex);
+        if (requireRecognized && description < 0)
+            throw UnsupportedHeaders(headers, "a Description, Details, Memo, Merchant, or Payee column");
+        if (requireRecognized && amount < 0 && debit < 0 && credit < 0)
+            throw UnsupportedHeaders(headers, "an Amount column or Debit/Credit columns");
+        return new CsvColumns(date, description, amount, debit, credit, category, subcategory);
     }
 
-    private static CsvImportRejectedException UnsupportedHeaders(
-        string[] headers,
-        string requirement) =>
-        new(
-            $"The CSV layout is not recognized. It needs {requirement}. " +
-            $"Found: {string.Join(", ", headers.Select(header => header.Trim()))}.");
+    private static CsvColumns ResolveProfileColumns(
+        IReadOnlyList<string> headers,
+        CsvProfileDefinition profile)
+    {
+        if (ImportProfile.BuildHeaderSignature(headers) !=
+            ImportProfile.BuildHeaderSignature(profile.Headers))
+            throw new CsvImportRejectedException(
+                $"This file does not match the selected profile '{profile.Name}'.");
+        var normalized = headers.Select(NormalizeHeader).ToArray();
+        int Find(string? name) => string.IsNullOrWhiteSpace(name)
+            ? -1
+            : Array.IndexOf(normalized, NormalizeHeader(name));
+        return new CsvColumns(
+            Find(profile.DateColumn), Find(profile.DescriptionColumn),
+            Find(profile.AmountColumn), Find(profile.DebitColumn),
+            Find(profile.CreditColumn), Find(profile.CategoryColumn),
+            Find(profile.SubcategoryColumn));
+    }
 
     private static CsvImportRow ParseRow(
         string[] headers,
         string[] fields,
         CsvColumns columns,
-        int sourceRowNumber)
+        int sourceRowNumber,
+        ImportAmountConvention convention)
     {
         var errors = new List<string>();
-        var rawData = SerializeRawRow(headers, fields);
-        var transactionDate = ParseDate(
-            GetField(fields, columns.DateIndex),
-            errors);
         var amount = columns.AmountIndex >= 0
-            ? ParseSignedAmount(GetField(fields, columns.AmountIndex), errors)
+            ? ParseAmount(GetField(fields, columns.AmountIndex), errors)
             : ParseDebitCredit(
                 GetField(fields, columns.DebitIndex),
                 GetField(fields, columns.CreditIndex),
                 errors);
+        if (amount.HasValue &&
+            columns.AmountIndex >= 0 &&
+            convention == ImportAmountConvention.MoneyInPositive)
+            amount = -amount.Value;
         var description = GetField(fields, columns.DescriptionIndex)?.Trim();
-        var categoryName = GetField(fields, columns.CategoryIndex)?.Trim();
-        var subcategoryName = GetField(fields, columns.SubcategoryIndex)?.Trim();
         if (description?.Length > ImportTransactionDraft.ParsedDescriptionMaxLength)
         {
             errors.Add(
                 $"Description exceeds {ImportTransactionDraft.ParsedDescriptionMaxLength} characters.");
             description = null;
         }
-
         return new CsvImportRow(
             sourceRowNumber,
-            rawData,
-            transactionDate,
+            SerializeRawRow(headers, fields),
+            ParseDate(GetField(fields, columns.DateIndex), errors),
             amount,
             string.IsNullOrWhiteSpace(description) ? null : description,
-            string.IsNullOrWhiteSpace(categoryName) ? null : categoryName,
-            string.IsNullOrWhiteSpace(subcategoryName) ? null : subcategoryName,
+            CleanOptional(GetField(fields, columns.CategoryIndex)),
+            CleanOptional(GetField(fields, columns.SubcategoryIndex)),
             errors.Count == 0 ? null : string.Join(" ", errors.Distinct()));
-    }
-
-    private static string SerializeRawRow(string[] headers, string[] fields)
-    {
-        var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        for (var index = 0; index < headers.Length; index++)
-        {
-            values[headers[index].Trim()] = GetField(fields, index);
-        }
-
-        var rawData = JsonSerializer.Serialize(values);
-        if (rawData.Length > ImportTransactionDraft.RawDataMaxLength)
-        {
-            throw new CsvImportRejectedException(
-                "A CSV row is too large to stage safely.");
-        }
-
-        return rawData;
     }
 
     private static DateOnly? ParseDate(string? value, ICollection<string> errors)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
+        if (string.IsNullOrWhiteSpace(value)) return null;
         if (DateOnly.TryParseExact(
-                value.Trim(),
-                DateFormats,
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.AllowWhiteSpaces,
-                out var parsedDate))
-        {
-            return parsedDate;
-        }
-
+            value.Trim(), DateFormats, CultureInfo.InvariantCulture,
+            DateTimeStyles.AllowWhiteSpaces, out var result))
+            return result;
         errors.Add($"Date '{value.Trim()}' could not be parsed.");
         return null;
     }
 
-    private static decimal? ParseSignedAmount(
-        string? value,
-        ICollection<string> errors)
+    private static decimal? ParseAmount(string? value, ICollection<string> errors)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        if (TryParseDecimal(value, out var amount))
-        {
-            return amount;
-        }
-
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (TryParseDecimal(value, out var result)) return result;
         errors.Add($"Amount '{value.Trim()}' could not be parsed.");
         return null;
     }
@@ -327,77 +246,103 @@ public sealed class CsvImportReader : ICsvImportReader
     {
         var hasDebit = !string.IsNullOrWhiteSpace(debitValue);
         var hasCredit = !string.IsNullOrWhiteSpace(creditValue);
-        decimal debit = 0;
-        decimal credit = 0;
-
+        var debit = 0m;
+        var credit = 0m;
         if (hasDebit && !TryParseDecimal(debitValue!, out debit))
         {
             errors.Add($"Debit '{debitValue!.Trim()}' could not be parsed.");
             hasDebit = false;
         }
-
         if (hasCredit && !TryParseDecimal(creditValue!, out credit))
         {
             errors.Add($"Credit '{creditValue!.Trim()}' could not be parsed.");
             hasCredit = false;
         }
-
-        if (!hasDebit && !hasCredit)
-        {
-            return null;
-        }
-
+        if (!hasDebit && !hasCredit) return null;
         if (hasDebit && hasCredit && debit != 0 && credit != 0)
         {
             errors.Add("A row cannot contain both a debit and a credit amount.");
             return null;
         }
-
-        return hasCredit && credit != 0
-            ? -decimal.Abs(credit)
-            : decimal.Abs(debit);
+        return hasCredit && credit != 0 ? -decimal.Abs(credit) : decimal.Abs(debit);
     }
 
     private static bool TryParseDecimal(string value, out decimal amount)
     {
-        var normalizedValue = value
-            .Trim()
-            .Replace("CAD", string.Empty, StringComparison.OrdinalIgnoreCase)
-            .Replace("USD", string.Empty, StringComparison.OrdinalIgnoreCase)
-            .Trim();
-
+        var normalized = value.Trim()
+            .Replace("CAD", "", StringComparison.OrdinalIgnoreCase)
+            .Replace("USD", "", StringComparison.OrdinalIgnoreCase).Trim();
         return decimal.TryParse(
-            normalizedValue,
-            NumberStyles.Number |
-            NumberStyles.AllowCurrencySymbol |
+            normalized,
+            NumberStyles.Number | NumberStyles.AllowCurrencySymbol |
             NumberStyles.AllowParentheses,
             CultureInfo.InvariantCulture,
             out amount);
     }
 
-    private static string? GetField(string[] fields, int index) =>
-        index >= 0 && index < fields.Length ? fields[index] : null;
+    private static string SerializeRawRow(string[] headers, string[] fields)
+    {
+        var values = headers.Select((header, index) =>
+            new KeyValuePair<string, string?>(header.Trim(), GetField(fields, index)))
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.OrdinalIgnoreCase);
+        var raw = JsonSerializer.Serialize(values);
+        if (raw.Length > ImportTransactionDraft.RawDataMaxLength)
+            throw new CsvImportRejectedException("A CSV row is too large to stage safely.");
+        return raw;
+    }
+
+    private static CsvProfileDefinition CreateSuggestedProfile(
+        IReadOnlyList<string> headers,
+        CsvColumns columns)
+    {
+        string? At(int index) => index >= 0 ? headers[index] : null;
+        return new CsvProfileDefinition(
+            null, "New CSV profile", headers,
+            At(columns.DateIndex) ?? "",
+            At(columns.DescriptionIndex) ?? "",
+            At(columns.AmountIndex), At(columns.DebitIndex),
+            At(columns.CreditIndex), At(columns.CategoryIndex),
+            At(columns.SubcategoryIndex),
+            ImportAmountConvention.SpendingPositive);
+    }
+
+    private static void ValidateHeaders(IReadOnlyList<string> headers)
+    {
+        if (headers.Count == 0 || headers.All(string.IsNullOrWhiteSpace))
+            throw new CsvImportRejectedException("The CSV file must contain a header row.");
+        var normalized = headers.Select(NormalizeHeader).ToArray();
+        if (normalized.Any(string.IsNullOrEmpty))
+            throw new CsvImportRejectedException("CSV column names cannot be empty.");
+        if (normalized.Distinct().Count() != normalized.Length)
+            throw new CsvImportRejectedException("CSV column names must be unique.");
+    }
+
+    private static CsvImportRejectedException UnsupportedHeaders(
+        IReadOnlyList<string> headers,
+        string requirement) =>
+        new(
+            $"The CSV layout is not recognized. It needs {requirement}. " +
+            $"Found: {string.Join(", ", headers.Select(header => header.Trim()))}.");
 
     private static int FindColumn(string[] headers, params string[] aliases)
     {
         foreach (var alias in aliases)
         {
             var index = Array.IndexOf(headers, alias);
-            if (index >= 0)
-            {
-                return index;
-            }
+            if (index >= 0) return index;
         }
-
         return -1;
     }
 
     private static string NormalizeHeader(string header) =>
-        new(header
-            .Trim()
-            .Where(char.IsLetterOrDigit)
-            .Select(char.ToLowerInvariant)
-            .ToArray());
+        new(header.Trim().Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant).ToArray());
+
+    private static string? GetField(string[] fields, int index) =>
+        index >= 0 && index < fields.Length ? fields[index] : null;
+
+    private static string? CleanOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private sealed record CsvColumns(
         int DateIndex,
@@ -407,4 +352,8 @@ public sealed class CsvImportReader : ICsvImportReader
         int CreditIndex,
         int CategoryIndex,
         int SubcategoryIndex);
+
+    private sealed record CsvDocument(
+        IReadOnlyList<string> Headers,
+        IReadOnlyList<IReadOnlyList<string>> Rows);
 }

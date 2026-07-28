@@ -62,6 +62,7 @@ public sealed class ImportsController(
         [FromForm] Guid accountId,
         [FromForm] IFormFile? file,
         [FromForm] bool allowDuplicateFile,
+        [FromForm] Guid? profileId,
         CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId))
@@ -92,6 +93,7 @@ public sealed class ImportsController(
                 safeFileName,
                 content,
                 allowDuplicateFile,
+                profileId,
                 cancellationToken);
             logger.LogInformation(
                 "User {UserId} staged import {ImportFileId} with {TotalRows} rows " +

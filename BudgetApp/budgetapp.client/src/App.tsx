@@ -12,6 +12,7 @@ import { CategoryManagementPage } from './pages/CategoryManagementPage'
 import { CsvImportPage } from './pages/CsvImportPage'
 import { HouseholdSetupPage } from './pages/HouseholdSetupPage'
 import { ImportReviewPage } from './pages/ImportReviewPage'
+import { ImportProfileManagementPage } from './pages/ImportProfileManagementPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { RecurringExpenseManagementPage } from './pages/RecurringExpenseManagementPage'
@@ -185,6 +186,14 @@ function AppRoutes() {
         <ProtectedRoute>
           <HouseholdRequiredRoute>
             <ImportReviewPage />
+          </HouseholdRequiredRoute>
+        </ProtectedRoute>
+      )
+    case '/settings/import-profiles':
+      return (
+        <ProtectedRoute>
+          <HouseholdRequiredRoute>
+            <ImportProfileManagementPage />
           </HouseholdRequiredRoute>
         </ProtectedRoute>
       )
