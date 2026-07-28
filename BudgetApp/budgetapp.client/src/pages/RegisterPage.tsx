@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
+import { BrandLogo } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { AppLink } from '../routing/AppLink'
 import { useRouter } from '../routing/useRouter'
@@ -43,9 +44,8 @@ export function RegisterPage() {
   return (
     <main className="auth-page">
       <section className="auth-card" aria-labelledby="register-heading">
-        <header className="auth-header">
-          <span className="brand-mark" aria-hidden="true">B</span>
-          <p className="eyebrow">BudgetApp</p>
+        <header className="auth-header auth-header-centered">
+          <BrandLogo />
           <h1 id="register-heading">Create your account</h1>
           <p>Start with your account. Household setup comes next.</p>
         </header>

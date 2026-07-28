@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
+import { BrandMark } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { currencies } from '../finance/currencies'
 import { useHouseholds } from '../households/useHouseholds'
@@ -71,7 +72,7 @@ export function HouseholdSetupPage() {
       <section className="auth-card" aria-labelledby="household-heading">
         <header className="auth-header">
           <div className="setup-header-row">
-            <span className="brand-mark" aria-hidden="true">B</span>
+            <BrandMark />
             <button
               className="text-button"
               type="button"

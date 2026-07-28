@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
+import { BrandLockup } from '../components/Brand'
 import {
   changeBudgetStatus,
   copyBudget,
@@ -278,7 +279,7 @@ export function BudgetManagementPage() {
   return (
     <main className="management-page budget-page">
       <header className="app-header">
-        <div className="brand-lockup"><span className="brand-mark" aria-hidden="true">B</span><span>BudgetApp</span></div>
+        <BrandLockup />
         <AppLink className="header-link" to="/dashboard" onClick={event => {
           if (!confirmDiscard()) event.preventDefault()
         }}>Dashboard</AppLink>
