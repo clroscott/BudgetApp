@@ -3,6 +3,7 @@ import './App.css'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
 import { BackToTopButton } from './components/BackToTopButton'
+import { BrandMark } from './components/Brand'
 import { HouseholdProvider } from './households/HouseholdProvider'
 import { useHouseholds } from './households/useHouseholds'
 import { AccountManagementPage } from './pages/AccountManagementPage'
@@ -94,7 +95,7 @@ function LoadingScreen({ message }: { message: string }) {
   return (
     <main className="centered-page" aria-busy="true">
       <section className="status-card">
-        <span className="brand-mark" aria-hidden="true">B</span>
+        <BrandMark />
         <p>{message}</p>
       </section>
     </main>
@@ -105,7 +106,7 @@ function StatusError({ message, onRetry }: { message: string, onRetry: () => voi
   return (
     <main className="centered-page">
       <section className="status-card" role="alert">
-        <span className="brand-mark" aria-hidden="true">B</span>
+        <BrandMark />
         <h1>BudgetApp is unavailable</h1>
         <p>{message}</p>
         <button type="button" onClick={onRetry}>Try again</button>

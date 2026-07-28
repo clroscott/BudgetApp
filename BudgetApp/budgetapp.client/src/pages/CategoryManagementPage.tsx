@@ -8,6 +8,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
+import { BrandLockup } from '../components/Brand'
 import {
   createCategory,
   getCategories,
@@ -350,10 +351,7 @@ export function CategoryManagementPage() {
   return (
     <main className="management-page">
       <header className="app-header">
-        <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true">B</span>
-          <span>BudgetApp</span>
-        </div>
+        <BrandLockup />
         <AppLink className="header-link" to="/dashboard">Dashboard</AppLink>
       </header>
 

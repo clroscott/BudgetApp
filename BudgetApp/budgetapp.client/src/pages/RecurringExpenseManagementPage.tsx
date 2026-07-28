@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
 import { getCategories, type CategoryItem } from '../categories/categoryApi'
+import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import {
@@ -177,7 +178,7 @@ export function RecurringExpenseManagementPage() {
   }).format(amount)
 
   return <main className="management-page">
-    <header className="app-header"><div className="brand-lockup"><span className="brand-mark" aria-hidden="true">B</span><span>BudgetApp</span></div><AppLink className="header-link" to="/budgeting">Monthly budget</AppLink></header>
+    <header className="app-header"><BrandLockup /><AppLink className="header-link" to="/budgeting">Monthly budget</AppLink></header>
     <section className="management-content recurring-content">
       <div className="page-title-row"><div><p className="eyebrow">Budgeting</p><h1>Recurring expenses</h1><p>Configure predictable monthly expenses once and use them to build future budgets.</p></div><label className="checkbox-row"><input type="checkbox" checked={showInactive} onChange={event => setShowInactive(event.target.checked)} /><span>Show deactivated</span></label></div>
       <ErrorSummary errors={errors} />

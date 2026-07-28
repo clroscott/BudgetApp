@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
+import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { useRouter } from '../routing/useRouter'
@@ -33,10 +34,7 @@ export function DashboardPage() {
   return (
     <main className="dashboard-page">
       <header className="app-header">
-        <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true">B</span>
-          <span>BudgetApp</span>
-        </div>
+        <BrandLockup />
         <button
           className="secondary-button"
           type="button"

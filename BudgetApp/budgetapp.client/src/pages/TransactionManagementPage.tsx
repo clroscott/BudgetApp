@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
 import { getCategories, type CategoryItem, type CategoryType } from '../categories/categoryApi'
+import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
@@ -317,10 +318,7 @@ export function TransactionManagementPage() {
   return (
     <main className="management-page">
       <header className="app-header">
-        <div className="brand-lockup">
-          <span className="brand-mark" aria-hidden="true">B</span>
-          <span>BudgetApp</span>
-        </div>
+        <BrandLockup />
         <AppLink className="header-link" to="/dashboard">Dashboard</AppLink>
       </header>
 
