@@ -28,6 +28,11 @@
   text-align: center;
 }
 
+.status-card > .brand-mark,
+.status-card > .brand-mark-image {
+  margin-inline: auto;
+}
+
 .status-card h1 {
   margin: 1rem 0 0.5rem;
 }
@@ -1707,6 +1712,12 @@ a {
   color: var(--heading);
   font-size: 0.85rem;
   font-weight: 700;
+}
+
+.recurring-form-grid label > small {
+  color: var(--muted-text);
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .recurring-list {

@@ -19,6 +19,7 @@ public sealed class RecurringExpense
         decimal amount,
         string currency,
         Guid categoryId,
+        RecurringExpenseBudgetMode budgetMode,
         Guid? accountId,
         int? expectedDayOfMonth,
         DateOnly startsOn,
@@ -28,7 +29,7 @@ public sealed class RecurringExpense
         Id = id;
         HouseholdId = ValidateRequiredId(householdId, nameof(householdId), "Household ID");
         SetScope(scope, ownerUserId);
-        SetDetails(name, amount, currency, categoryId, accountId);
+        SetDetails(name, amount, currency, categoryId, budgetMode, accountId);
         SetSchedule(expectedDayOfMonth, startsOn, endsOn);
         IsActive = true;
         CreatedAtUtc = createdAtUtc;
@@ -50,6 +51,8 @@ public sealed class RecurringExpense
     public string Currency { get; private set; } = string.Empty;
 
     public Guid CategoryId { get; private set; }
+
+    public RecurringExpenseBudgetMode BudgetMode { get; private set; }
 
     public Guid? AccountId { get; private set; }
 
@@ -75,10 +78,11 @@ public sealed class RecurringExpense
         int? expectedDayOfMonth,
         DateOnly startsOn,
         DateOnly? endsOn,
-        DateTimeOffset createdAtUtc) =>
+        DateTimeOffset createdAtUtc,
+        RecurringExpenseBudgetMode budgetMode = RecurringExpenseBudgetMode.Detailed) =>
         new(
             Guid.NewGuid(), householdId, RecurringExpenseScope.Household,
-            ownerUserId: null, name, amount, currency, categoryId, accountId,
+            ownerUserId: null, name, amount, currency, categoryId, budgetMode, accountId,
             expectedDayOfMonth, startsOn, endsOn, createdAtUtc);
 
     public static RecurringExpense CreatePersonal(
@@ -92,10 +96,11 @@ public sealed class RecurringExpense
         int? expectedDayOfMonth,
         DateOnly startsOn,
         DateOnly? endsOn,
-        DateTimeOffset createdAtUtc) =>
+        DateTimeOffset createdAtUtc,
+        RecurringExpenseBudgetMode budgetMode = RecurringExpenseBudgetMode.Detailed) =>
         new(
             Guid.NewGuid(), householdId, RecurringExpenseScope.Personal,
-            ownerUserId, name, amount, currency, categoryId, accountId,
+            ownerUserId, name, amount, currency, categoryId, budgetMode, accountId,
             expectedDayOfMonth, startsOn, endsOn, createdAtUtc);
 
     public void Update(
@@ -105,6 +110,7 @@ public sealed class RecurringExpense
         decimal amount,
         string currency,
         Guid categoryId,
+        RecurringExpenseBudgetMode budgetMode,
         Guid? accountId,
         int? expectedDayOfMonth,
         DateOnly startsOn,
@@ -112,7 +118,7 @@ public sealed class RecurringExpense
         DateTimeOffset updatedAtUtc)
     {
         SetScope(scope, ownerUserId);
-        SetDetails(name, amount, currency, categoryId, accountId);
+        SetDetails(name, amount, currency, categoryId, budgetMode, accountId);
         SetSchedule(expectedDayOfMonth, startsOn, endsOn);
         UpdatedAtUtc = updatedAtUtc;
     }
@@ -191,12 +197,19 @@ public sealed class RecurringExpense
         decimal amount,
         string currency,
         Guid categoryId,
+        RecurringExpenseBudgetMode budgetMode,
         Guid? accountId)
     {
         Name = ValidateName(name);
         Amount = ValidateAmount(amount);
         Currency = ValidateCurrency(currency);
         CategoryId = ValidateRequiredId(categoryId, nameof(categoryId), "Category ID");
+        if (!Enum.IsDefined(budgetMode))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(budgetMode), "Recurring expense budget mode is not supported.");
+        }
+        BudgetMode = budgetMode;
         if (accountId == Guid.Empty)
         {
             throw new ArgumentException("Account ID cannot be empty.", nameof(accountId));

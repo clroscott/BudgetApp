@@ -42,7 +42,8 @@ public sealed class RecurringExpensesController(
         {
             var id = await managementService.CreateAsync(
                 householdId, userId, request.Name, request.Amount, request.Scope,
-                request.SubcategoryId, request.AccountId, request.ExpectedDayOfMonth,
+                request.BudgetMode, request.SubcategoryId,
+                request.AccountId, request.ExpectedDayOfMonth,
                 request.StartsOn, request.EndsOn, cancellationToken);
             logger.LogInformation(
                 "User {UserId} created recurring expense {RecurringExpenseId} in household {HouseholdId}",
@@ -70,7 +71,8 @@ public sealed class RecurringExpensesController(
             await managementService.UpdateAsync(
                 householdId, userId, recurringExpenseId,
                 request.Name, request.Amount, request.Scope,
-                request.SubcategoryId, request.AccountId, request.ExpectedDayOfMonth,
+                request.BudgetMode, request.SubcategoryId,
+                request.AccountId, request.ExpectedDayOfMonth,
                 request.StartsOn, request.EndsOn, cancellationToken);
             return NoContent();
         }
@@ -156,6 +158,7 @@ public sealed record RecurringExpenseRequest(
     Guid? AccountId,
     [param: Range(1, 31)] int? ExpectedDayOfMonth,
     DateOnly StartsOn,
-    DateOnly? EndsOn);
+    DateOnly? EndsOn,
+    string BudgetMode = "Detailed");
 
 public sealed record CreateRecurringExpenseResponse(Guid Id);

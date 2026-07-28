@@ -30,6 +30,7 @@ public sealed class RecurringExpenseManagementTests(BudgetAppWebApplicationFacto
                 name = "Netflix",
                 amount = 22.99m,
                 scope = "Personal",
+                budgetMode = "Detailed",
                 subcategoryId = streaming.Id,
                 accountId = (Guid?)null,
                 expectedDayOfMonth = 15,
@@ -45,6 +46,7 @@ public sealed class RecurringExpenseManagementTests(BudgetAppWebApplicationFacto
         Assert.Equal("Subscriptions", netflix.CategoryName);
         Assert.Equal("Streaming", netflix.SubcategoryName);
         Assert.Equal(22.99m, netflix.Amount);
+        Assert.Equal("Detailed", netflix.BudgetMode);
         Assert.True(netflix.IsActive);
 
         var update = await SendWithAntiforgery(
@@ -56,6 +58,7 @@ public sealed class RecurringExpenseManagementTests(BudgetAppWebApplicationFacto
                 name = "Netflix Premium",
                 amount = 25.99m,
                 scope = "Personal",
+                budgetMode = "Overall",
                 subcategoryId = streaming.Id,
                 accountId = (Guid?)null,
                 expectedDayOfMonth = 16,
@@ -78,6 +81,7 @@ public sealed class RecurringExpenseManagementTests(BudgetAppWebApplicationFacto
             item => item.Id == netflix.Id);
         Assert.Equal("Netflix Premium", updated.Name);
         Assert.Equal(25.99m, updated.Amount);
+        Assert.Equal("Overall", updated.BudgetMode);
         Assert.False(updated.IsActive);
     }
 
@@ -176,5 +180,6 @@ public sealed class RecurringExpenseManagementTests(BudgetAppWebApplicationFacto
         decimal Amount,
         string CategoryName,
         string SubcategoryName,
+        string BudgetMode,
         bool IsActive);
 }

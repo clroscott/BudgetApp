@@ -29,7 +29,8 @@ public sealed class RecurringExpensePersistenceTests
             15,
             new DateOnly(2026, 1, 1),
             null,
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            RecurringExpenseBudgetMode.Overall);
 
         context.RecurringExpenses.Add(expense);
         await context.SaveChangesAsync();
@@ -42,6 +43,7 @@ public sealed class RecurringExpensePersistenceTests
         Assert.Equal(dependencies.Subcategory.Id, saved.CategoryId);
         Assert.Equal(dependencies.Account.Id, saved.AccountId);
         Assert.Equal(RecurringExpenseScope.Personal, saved.Scope);
+        Assert.Equal(RecurringExpenseBudgetMode.Overall, saved.BudgetMode);
         Assert.Equal(22.99m, saved.Amount);
     }
 
