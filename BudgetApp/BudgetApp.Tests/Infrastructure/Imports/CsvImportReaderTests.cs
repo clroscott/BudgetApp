@@ -1,6 +1,7 @@
 using System.Text;
 using BudgetApp.Application.Imports;
 using BudgetApp.Infrastructure.Imports;
+using BudgetApp.Domain.Imports;
 
 namespace BudgetApp.Tests.Infrastructure.Imports;
 
@@ -82,6 +83,39 @@ public sealed class CsvImportReaderTests
 
         Assert.Contains("layout is not recognized", exception.Message);
         Assert.Contains("When, What, Value", exception.Message);
+    }
+
+    [Fact]
+    public async Task InspectAndProfile_ReadCustomLayoutAndConvertSigns()
+    {
+        const string csv =
+            "When,Vendor,Value,Group\n" +
+            "2026-07-20,Market,-42.50,Food & Dining\n";
+        var content = Encoding.UTF8.GetBytes(csv);
+        var inspection = await reader.InspectAsync(
+            new MemoryStream(content), CancellationToken.None);
+        Assert.Equal(["When", "Vendor", "Value", "Group"], inspection.Headers);
+        Assert.Null(inspection.SuggestedProfile.AmountColumn);
+
+        var profile = new CsvProfileDefinition(
+            Guid.NewGuid(),
+            "Custom bank",
+            inspection.Headers,
+            "When",
+            "Vendor",
+            "Value",
+            null,
+            null,
+            "Group",
+            null,
+            ImportAmountConvention.MoneyInPositive);
+        var result = await reader.ReadAsync(
+            new MemoryStream(content), profile, CancellationToken.None);
+
+        var row = Assert.Single(result.Rows);
+        Assert.Equal(42.50m, row.Amount);
+        Assert.Equal("Market", row.Description);
+        Assert.Equal("Food & Dining", row.CategoryName);
     }
 
     [Fact]

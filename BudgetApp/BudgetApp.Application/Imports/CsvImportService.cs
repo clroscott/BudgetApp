@@ -12,6 +12,7 @@ public sealed class CsvImportService(
     ICategoryRepository categoryRepository,
     IImportRepository importRepository,
     ICsvImportReader csvImportReader,
+    ImportProfileService importProfileService,
     ImportReviewService importReviewService,
     HouseholdAuthorizationService authorizationService,
     TimeProvider timeProvider)
@@ -23,6 +24,7 @@ public sealed class CsvImportService(
         string originalFileName,
         Stream content,
         bool allowDuplicateFile,
+        Guid? profileId,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(content);
@@ -39,7 +41,13 @@ public sealed class CsvImportService(
 
         RequireImportPermission(account, role, userId);
 
-        var readResult = await csvImportReader.ReadAsync(content, cancellationToken);
+        var profile = profileId.HasValue
+            ? await importProfileService.ResolveAsync(
+                householdId, profileId.Value, cancellationToken)
+            : null;
+        var readResult = profile is null
+            ? await csvImportReader.ReadAsync(content, cancellationToken)
+            : await csvImportReader.ReadAsync(content, profile, cancellationToken);
         if (!allowDuplicateFile &&
             await importRepository.ExistsByAccountAndHashAsync(
                 account.Id,

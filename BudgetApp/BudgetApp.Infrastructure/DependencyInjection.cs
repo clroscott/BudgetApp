@@ -41,6 +41,8 @@ public static class DependencyInjection
         services.AddScoped<HouseholdAuthorizationService>();
         services.AddScoped<HouseholdOnboardingService>();
         services.AddScoped<IImportRepository, ImportRepository>();
+        services.AddScoped<IImportProfileRepository, ImportProfileRepository>();
+        services.AddScoped<ImportProfileService>();
         services.AddScoped<ICsvImportReader, CsvImportReader>();
         services.AddScoped<CsvImportService>();
         services.AddScoped<ImportReviewService>();

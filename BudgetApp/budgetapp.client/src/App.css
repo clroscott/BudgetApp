@@ -892,6 +892,178 @@ a {
   max-width: 72rem;
 }
 
+.import-profile-content {
+  max-width: 80rem;
+}
+
+.import-profile-form,
+.import-mapping-panel {
+  margin-bottom: 1.5rem;
+}
+
+.import-profile-sections {
+  display: grid;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.import-profile-section {
+  margin: 0;
+  border-left-width: 4px;
+}
+
+.import-profile-section-active {
+  border-left-color: var(--accent);
+}
+
+.import-profile-section-inactive {
+  border-left-color: var(--border-strong);
+  background: var(--surface-soft);
+}
+
+.import-profile-section-inactive .account-section-heading > span {
+  background: var(--border);
+  color: var(--muted-text);
+}
+
+.import-profile-details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin: 1rem 0;
+}
+
+.import-profile-details-grid label,
+.import-profile-column-row label,
+.import-profile-signs {
+  display: grid;
+  align-content: start;
+  gap: 0.35rem;
+}
+
+.import-profile-details-grid label > span,
+.import-profile-column-row label > span,
+.import-profile-signs > span {
+  color: var(--heading);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.import-profile-column-builder {
+  margin: 1.25rem 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+}
+
+.import-profile-column-heading,
+.import-profile-column-actions {
+  display: flex;
+  align-items: center;
+}
+
+.import-profile-column-heading {
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--surface-soft);
+}
+
+.import-profile-column-heading h3,
+.import-profile-column-heading p {
+  margin: 0;
+}
+
+.import-profile-column-heading p {
+  margin-top: 0.25rem;
+  color: var(--muted-text);
+  font-size: 0.85rem;
+}
+
+.import-profile-mapping-guide {
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--border);
+  background: var(--accent-soft);
+  color: var(--heading);
+  font-size: 0.85rem;
+}
+
+.import-profile-mapping-guide p {
+  margin: 0.3rem 0 0;
+  color: var(--muted-text);
+}
+
+.import-profile-column-row {
+  display: grid;
+  grid-template-columns: 2rem minmax(10rem, 1fr) minmax(12rem, 1fr) auto;
+  align-items: start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.import-profile-column-row label small {
+  color: var(--muted-text);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.import-profile-column-number {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  margin-top: 1.45rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.import-profile-column-actions {
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+  padding-bottom: 0.1rem;
+}
+
+.import-profile-signs {
+  width: min(22rem, 100%);
+  margin-bottom: 0.75rem;
+}
+
+.import-profile-requirements {
+  margin: 0 0 1rem;
+}
+
+.csv-preview-table {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 1rem 0;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+}
+
+.csv-preview-table > div {
+  display: grid;
+  grid-auto-columns: minmax(9rem, 1fr);
+  grid-auto-flow: column;
+  border-bottom: 1px solid var(--border);
+}
+
+.csv-preview-table > div:last-child {
+  border-bottom: 0;
+}
+
+.csv-preview-table strong,
+.csv-preview-table span {
+  overflow: hidden;
+  padding: 0.5rem;
+  border-right: 1px solid var(--border);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .import-selector {
   display: grid;
   gap: 0.45rem;
@@ -1538,6 +1710,12 @@ a {
 }
 
 @media (max-width: 55rem) {
+  .import-profile-column-row {
+    grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .import-profile-column-actions {
+    grid-column: 2 / -1;
+  }
   .budget-initialization-grid {
     grid-template-columns: 1fr;
   }
@@ -1610,6 +1788,23 @@ a {
 }
 
 @media (max-width: 40rem) {
+  .import-profile-details-grid {
+    grid-template-columns: 1fr;
+  }
+  .import-profile-column-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .import-profile-column-heading .secondary-button {
+    align-self: flex-start;
+  }
+  .import-profile-column-row {
+    grid-template-columns: 2rem minmax(0, 1fr);
+  }
+  .import-profile-column-row label,
+  .import-profile-column-actions {
+    grid-column: 2;
+  }
   .budget-page {
     padding-bottom: 13rem;
   }

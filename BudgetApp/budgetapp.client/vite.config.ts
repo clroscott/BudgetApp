@@ -40,8 +40,10 @@ function getDevelopmentHttpsOptions() {
     };
 }
 
-const target = env.ASPNETCORE_HTTPS_PORT ? `https://localhost:${env.ASPNETCORE_HTTPS_PORT}` :
-    env.ASPNETCORE_URLS ? env.ASPNETCORE_URLS.split(';')[0] : 'https://localhost:7151';
+const target = env.VITE_API_TARGET ||
+    (env.ASPNETCORE_HTTPS_PORT
+        ? `https://localhost:${env.ASPNETCORE_HTTPS_PORT}`
+        : 'https://localhost:7151');
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({

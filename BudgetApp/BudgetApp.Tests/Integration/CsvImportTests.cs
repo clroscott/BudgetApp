@@ -14,6 +14,76 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
     : IClassFixture<BudgetAppWebApplicationFactory>
 {
     [Fact]
+    public async Task CustomProfile_CanBeSavedAndUsedForFutureUploads()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        await Register(client);
+        var householdId = await CreateHousehold(client);
+        var accountId = await CreateAccount(client, householdId);
+        var token = await GetAntiforgeryToken(client);
+        var profileResponse = await PostJson(
+            client,
+            $"/api/households/{householdId}/import-profiles",
+            new
+            {
+                name = "Custom bank",
+                headers = new[] { "When", "Vendor", "Value" },
+                dateColumn = "When",
+                descriptionColumn = "Vendor",
+                amountColumn = "Value",
+                debitColumn = (string?)null,
+                creditColumn = (string?)null,
+                categoryColumn = (string?)null,
+                subcategoryColumn = (string?)null,
+                amountConvention = "MoneyInPositive",
+                defaultAccountId = accountId
+            },
+            token);
+        Assert.Equal(HttpStatusCode.Created, profileResponse.StatusCode);
+        var profile = await profileResponse.Content.ReadFromJsonAsync<ImportProfileResponse>();
+
+        var upload = await Upload(
+            client,
+            householdId,
+            accountId,
+            "When,Vendor,Value\n2026-07-20,Market,-42.50\n",
+            token,
+            profileId: profile!.Id);
+
+        Assert.Equal(HttpStatusCode.Created, upload.StatusCode);
+        var imported = await upload.Content.ReadFromJsonAsync<CsvImportResponse>();
+        var review = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{imported!.ImportFileId}");
+        var row = Assert.Single(review!.Drafts);
+        Assert.Equal(42.50m, row.Amount);
+        Assert.Equal("Market", row.Description);
+
+        var activeDelete = await DeleteWithAntiforgery(
+            client,
+            $"/api/households/{householdId}/import-profiles/{profile.Id}",
+            token);
+        Assert.Equal(HttpStatusCode.BadRequest, activeDelete.StatusCode);
+
+        var deactivate = await PostJson(
+            client,
+            $"/api/households/{householdId}/import-profiles/{profile.Id}/deactivate",
+            new { },
+            token);
+        Assert.Equal(HttpStatusCode.NoContent, deactivate.StatusCode);
+
+        var delete = await DeleteWithAntiforgery(
+            client,
+            $"/api/households/{householdId}/import-profiles/{profile.Id}",
+            token);
+        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        Assert.False(await dbContext.ImportProfiles.AnyAsync(
+            item => item.Id == profile.Id));
+    }
+
+    [Fact]
     public async Task Upload_WithoutAuthentication_ReturnsUnauthorized()
     {
         using var client = factory.CreateAuthenticatedTestClient();
@@ -368,13 +438,16 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         Guid accountId,
         string csv,
         string token,
-        bool allowDuplicateFile = false)
+        bool allowDuplicateFile = false,
+        Guid? profileId = null)
     {
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(accountId.ToString()), "accountId");
         content.Add(
             new StringContent(allowDuplicateFile.ToString()),
             "allowDuplicateFile");
+        if (profileId.HasValue)
+            content.Add(new StringContent(profileId.Value.ToString()), "profileId");
         var fileContent = new ByteArrayContent(Encoding.UTF8.GetBytes(csv));
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
         content.Add(fileContent, "file", "transactions.csv");
@@ -503,6 +576,7 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
     private sealed record AntiforgeryResponse(string Token);
     private sealed record CreatedResponse(Guid Id);
     private sealed record CurrentUserResponse(Guid Id);
+    private sealed record ImportProfileResponse(Guid Id);
     private sealed record CsvImportResponse(
         Guid ImportFileId,
         string OriginalFileName,
@@ -520,6 +594,8 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
     private sealed record ImportDraftResponse(
         Guid Id,
         int SourceRowNumber,
+        decimal? Amount,
+        string? Description,
         string ValidationStatus,
         string DuplicateStatus,
         string? ImportedCategoryName,
