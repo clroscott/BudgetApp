@@ -3,6 +3,7 @@ import './App.css'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
 import { BackToTopButton } from './components/BackToTopButton'
+import { AppShell } from './components/AppShell'
 import { BrandMark } from './components/Brand'
 import { HouseholdProvider } from './households/HouseholdProvider'
 import { useHouseholds } from './households/useHouseholds'
@@ -64,7 +65,9 @@ function HouseholdRequiredRoute({ children }: { children: ReactNode }) {
     )
   }
 
-  return currentHousehold ? children : <Redirect to="/household/setup" />
+  return currentHousehold
+    ? <AppShell>{children}</AppShell>
+    : <Redirect to="/household/setup" />
 }
 
 function HouseholdSetupRoute({ children }: { children: ReactNode }) {

@@ -1,6 +1,7 @@
 using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Budgeting;
 using BudgetApp.Domain.Categories;
+using BudgetApp.Domain.Dashboards;
 using BudgetApp.Domain.Households;
 using BudgetApp.Domain.Imports;
 using BudgetApp.Domain.RecurringExpenses;
@@ -21,6 +22,11 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
     public DbSet<BudgetMonth> BudgetMonths => Set<BudgetMonth>();
 
     public DbSet<Category> Categories => Set<Category>();
+
+    public DbSet<DashboardLayout> DashboardLayouts => Set<DashboardLayout>();
+
+    public DbSet<DashboardPanelPreference> DashboardPanelPreferences =>
+        Set<DashboardPanelPreference>();
 
     public DbSet<Household> Households => Set<Household>();
 

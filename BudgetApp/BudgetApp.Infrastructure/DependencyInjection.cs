@@ -1,5 +1,6 @@
 using BudgetApp.Application.Accounts;
 using BudgetApp.Application.Categories;
+using BudgetApp.Application.Dashboards;
 using BudgetApp.Application.Budgets;
 using BudgetApp.Application.Households;
 using BudgetApp.Application.Imports;
@@ -7,6 +8,7 @@ using BudgetApp.Application.RecurringExpenses;
 using BudgetApp.Application.Transactions;
 using BudgetApp.Infrastructure.Accounts;
 using BudgetApp.Infrastructure.Categories;
+using BudgetApp.Infrastructure.Dashboards;
 using BudgetApp.Infrastructure.Budgets;
 using BudgetApp.Infrastructure.Data;
 using BudgetApp.Infrastructure.Households;
@@ -34,6 +36,8 @@ public static class DependencyInjection
         services.AddScoped<AccountManagementService>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<CategoryManagementService>();
+        services.AddScoped<IDashboardLayoutRepository, DashboardLayoutRepository>();
+        services.AddScoped<DashboardLayoutService>();
         services.AddScoped<IBudgetRepository, BudgetRepository>();
         services.AddScoped<BudgetManagementService>();
         services.AddScoped<IHouseholdRepository, HouseholdRepository>();
