@@ -218,6 +218,29 @@ function AppRoutes() {
 }
 
 function App() {
+  useEffect(() => {
+    const stopNumberWheelChanges = (event: WheelEvent) => {
+      const target = event.target
+      if (
+        target instanceof HTMLInputElement &&
+        target.type === 'number' &&
+        document.activeElement === target
+      ) {
+        target.blur()
+      }
+    }
+
+    document.addEventListener('wheel', stopNumberWheelChanges, {
+      capture: true,
+      passive: true,
+    })
+    return () => document.removeEventListener(
+      'wheel',
+      stopNumberWheelChanges,
+      { capture: true },
+    )
+  }, [])
+
   return (
     <RouterProvider>
       <AuthProvider>

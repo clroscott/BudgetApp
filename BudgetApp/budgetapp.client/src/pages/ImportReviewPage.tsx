@@ -19,7 +19,7 @@ import {
 } from '../imports/importApi'
 import { AppLink } from '../routing/AppLink'
 
-const rowsPerPage = 50
+const rowsPerPage = 100
 
 function findCategorySelection(categories: CategoryItem[], selectedCategoryId: string | null) {
   if (!selectedCategoryId) return { categoryId: '', subcategoryId: '' }
@@ -72,9 +72,6 @@ function DraftRow({
   const [description, setDescription] = useState(draft.description ?? '')
   const [categoryId, setCategoryId] = useState(savedCategorySelection.categoryId)
   const [subcategoryId, setSubcategoryId] = useState(savedCategorySelection.subcategoryId)
-  const [acknowledgeDuplicate, setAcknowledgeDuplicate] = useState(
-    draft.isDuplicateAcknowledged,
-  )
   const [isBusy, setIsBusy] = useState(false)
   const editable = canEdit && !isCompleted && !draft.approvedTransactionId
   const selectedCategoryId = subcategoryId || categoryId || null
@@ -100,7 +97,6 @@ function DraftRow({
     setDescription(draft.description ?? '')
     setCategoryId(savedSelection.categoryId)
     setSubcategoryId(savedSelection.subcategoryId)
-    setAcknowledgeDuplicate(draft.isDuplicateAcknowledged)
   }
 
   const persistVisibleValues = async () => {
@@ -141,7 +137,9 @@ function DraftRow({
         importFileId,
         draft.id,
         decision,
-        acknowledgeDuplicate,
+        decision === 'Approved' && draft.duplicateStatus === 'PossibleDuplicate'
+          ? true
+          : draft.isDuplicateAcknowledged,
       )
       await onChanged()
     } catch (error) {
@@ -153,37 +151,9 @@ function DraftRow({
 
   return (
     <article className={`import-draft-card import-decision-${draft.reviewDecision.toLowerCase()}`}>
-      <div className="import-draft-heading">
-        <div>
-          <strong>CSV row {draft.sourceRowNumber}</strong>
-          <span>{draft.reviewDecision}</span>
-        </div>
-        <div className="import-row-badges">
-          <span>{draft.validationStatus}</span>
-          {draft.duplicateStatus === 'PossibleDuplicate' && <span>Possible duplicate</span>}
-        </div>
-      </div>
-
       {draft.validationMessage && (
         <p className="row-validation-message" role="alert">{draft.validationMessage}</p>
       )}
-      {draft.duplicateStatus === 'PossibleDuplicate' && (
-        <div className="duplicate-warning">
-          <p>
-            This row exactly matches the date, amount, and description of an existing transaction.
-          </p>
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={acknowledgeDuplicate}
-              disabled={!editable}
-              onChange={event => setAcknowledgeDuplicate(event.target.checked)}
-            />
-            <span>I reviewed the match and still want to approve this row.</span>
-          </label>
-        </div>
-      )}
-
       <form onSubmit={(event) => void save(event)}>
         <div className="import-draft-fields">
           <label>
@@ -204,6 +174,9 @@ function DraftRow({
           <label>
             <span>Category</span>
             <select value={categoryId} disabled={!editable || isBusy}
+              title={draft.importedCategoryName
+                ? `Imported category: ${draft.importedCategoryName}`
+                : undefined}
               onChange={event => {
                 setCategoryId(event.target.value)
                 setSubcategoryId('')
@@ -217,11 +190,13 @@ function DraftRow({
                   </option>
                 ))}
             </select>
-            {draft.importedCategoryName && <small>Imported: {draft.importedCategoryName}</small>}
           </label>
           <label>
             <span>Subcategory</span>
             <select value={subcategoryId} disabled={!editable || isBusy || !categoryId}
+              title={draft.importedSubcategoryName
+                ? `Imported subcategory: ${draft.importedSubcategoryName}`
+                : undefined}
               onChange={event => setSubcategoryId(event.target.value)}>
               <option value="">None</option>
               {subcategories
@@ -232,25 +207,30 @@ function DraftRow({
                   </option>
                 ))}
             </select>
-            {draft.importedSubcategoryName && (
-              <small>Imported: {draft.importedSubcategoryName}</small>
-            )}
           </label>
         </div>
-        {editable && (
-          <div className="import-row-actions">
-            <button className="secondary-button" type="submit" disabled={isBusy || !isDirty}>
-              Save corrections
-            </button>
-            <button className="text-button" type="button" disabled={isBusy || !isDirty}
-              onClick={resetChanges}>
-              Refresh
-            </button>
+        <div className="import-row-footer">
+          <div className="import-row-badges">
+            <span>{draft.reviewDecision}</span>
+            <span>{draft.validationStatus}</span>
+            {draft.duplicateStatus === 'PossibleDuplicate' && (
+              <span className="possible-duplicate-badge">Possible duplicate transaction</span>
+            )}
+          </div>
+          {editable && <div className="import-row-actions">
+            {isDirty && <>
+              <button className="secondary-button" type="submit" disabled={isBusy}>
+                Save corrections
+              </button>
+              <button className="text-button" type="button" disabled={isBusy}
+                onClick={resetChanges}>
+                Refresh
+              </button>
+            </>}
             <button className="primary-button" type="button" disabled={
               isBusy ||
               draft.validationStatus !== 'Valid' ||
-              draft.duplicateStatus === 'NotChecked' ||
-              (draft.duplicateStatus === 'PossibleDuplicate' && !acknowledgeDuplicate)
+              draft.duplicateStatus === 'NotChecked'
             } onClick={() => void decide('Approved')}>
               {isDirty ? 'Save and approve' : 'Approve'}
             </button>
@@ -264,10 +244,10 @@ function DraftRow({
             </button>
             <button className="danger-button" type="button" disabled={isBusy}
               onClick={() => void onRemove(draft.id, draft.sourceRowNumber)}>
-              Remove row
+              Remove
             </button>
-          </div>
-        )}
+          </div>}
+        </div>
       </form>
     </article>
   )
@@ -631,6 +611,13 @@ export function ImportReviewPage() {
               )}
             </section>
 
+            <div className="import-draft-column-headings" aria-hidden="true">
+              <span>Date</span>
+              <span>Amount</span>
+              <span>Description</span>
+              <span>Category</span>
+              <span>Subcategory</span>
+            </div>
             <div className="import-draft-list">
               {visibleDrafts.map(draft => (
                 <DraftRow
