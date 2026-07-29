@@ -64,9 +64,7 @@ public sealed class ImportFile
 
     public int ApprovedRowCount { get; private set; }
 
-    public int RejectedRowCount { get; private set; }
-
-    public int SkippedRowCount { get; private set; }
+    public int ExcludedRowCount { get; private set; }
 
     public int DuplicateRowCount { get; private set; }
 
@@ -192,7 +190,7 @@ public sealed class ImportFile
         if (statistics.PendingRows != 0)
         {
             throw new InvalidOperationException(
-                "Every import row must be approved, rejected, or skipped before completion.");
+                "Every import row must be approved or excluded before completion.");
         }
 
         SetStatistics(statistics);
@@ -225,8 +223,7 @@ public sealed class ImportFile
         ValidRowCount = statistics.ValidRows;
         InvalidRowCount = statistics.InvalidRows;
         ApprovedRowCount = statistics.ApprovedRows;
-        RejectedRowCount = statistics.RejectedRows;
-        SkippedRowCount = statistics.SkippedRows;
+        ExcludedRowCount = statistics.ExcludedRows;
         DuplicateRowCount = statistics.DuplicateRows;
     }
 

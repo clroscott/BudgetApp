@@ -74,7 +74,7 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task ApplyCategorizationRules_FillsExistingUncategorizedDraft()
+    public async Task ApplyCategorizationRules_ReplacesExistingCategory()
     {
         using var client = factory.CreateAuthenticatedTestClient();
         await Register(client);
@@ -86,26 +86,15 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
             client,
             householdId,
             accountId,
-            "Date,Description,Amount\n2026-07-20,NETFLIX.COM,-20\n",
+            "Date,Description,Amount\n" +
+            "2026-07-20,NETFLIX.COM,-20\n" +
+            "2026-07-21,NETFLIX SECOND,-25\n",
             token);
         var imported = await upload.Content.ReadFromJsonAsync<CsvImportResponse>();
         var initialReview = await client.GetFromJsonAsync<ImportReviewResponse>(
             $"/api/households/{householdId}/imports/{imported!.ImportFileId}");
-        var approve = await PostJson(
-            client,
-            DecisionPath(
-                householdId,
-                imported.ImportFileId,
-                Assert.Single(initialReview!.Drafts).Id),
-            new
-            {
-                decision = "Approved",
-                acknowledgePossibleDuplicate = false
-            },
-            token);
-        Assert.Equal(HttpStatusCode.NoContent, approve.StatusCode);
-
         Guid subscriptionsId;
+        Guid groceriesId;
         using (var scope = factory.Services.CreateScope())
         {
             var dbContext = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
@@ -114,7 +103,37 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
                 .Where(category => category.Name == "Subscriptions")
                 .Select(category => category.Id)
                 .SingleAsync();
+            groceriesId = await dbContext.Categories
+                .Where(category => category.HouseholdId == householdId)
+                .Where(category => category.Name == "Groceries")
+                .Select(category => category.Id)
+                .SingleAsync();
         }
+
+        var draft = initialReview!.Drafts.Single(row => row.SourceRowNumber == 2);
+        var setDifferentCategory = await PutJson(
+            client,
+            $"/api/households/{householdId}/imports/{imported.ImportFileId}/drafts/{draft.Id}",
+            new
+            {
+                transactionDate = "2026-07-20",
+                amount = -20m,
+                description = "NETFLIX.COM",
+                selectedCategoryId = groceriesId
+            },
+            token);
+        Assert.Equal(HttpStatusCode.NoContent, setDifferentCategory.StatusCode);
+
+        var approve = await PostJson(
+            client,
+            DecisionPath(householdId, imported.ImportFileId, draft.Id),
+            new
+            {
+                decision = "Approved",
+                acknowledgePossibleDuplicate = false
+            },
+            token);
+        Assert.Equal(HttpStatusCode.NoContent, approve.StatusCode);
 
         var createRule = await PostJson(
             client,
@@ -131,19 +150,58 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
             token);
         Assert.Equal(HttpStatusCode.Created, createRule.StatusCode);
 
-        var applyRules = await PostJson(
+        var initialPreview =
+            await client.GetFromJsonAsync<RuleApplicationPreviewResponse>(
+                $"/api/households/{householdId}/imports/{imported.ImportFileId}/categorization-rule-application-preview");
+        Assert.NotNull(initialPreview);
+        Assert.Equal(1, initialPreview.FillChangedRows);
+        Assert.Equal(2, initialPreview.ReapplyChangedRows);
+        Assert.Equal(0, initialPreview.ReapplyUnchangedRows);
+
+        var fillOnly = await PostJson(
             client,
             $"/api/households/{householdId}/imports/{imported.ImportFileId}/apply-categorization-rules",
-            new { },
+            new { replaceExistingCategories = false },
             token);
 
-        Assert.Equal(HttpStatusCode.OK, applyRules.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, fillOnly.StatusCode);
+        var fillResult =
+            await fillOnly.Content.ReadFromJsonAsync<ApplyRulesResponse>();
+        Assert.Equal(1, fillResult!.MatchedRows);
+        Assert.Equal(1, fillResult.ChangedRows);
+        Assert.Equal(0, fillResult.UnchangedRows);
+        var filledReview = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{imported.ImportFileId}");
+        Assert.Equal(
+            groceriesId,
+            filledReview!.Drafts.Single(row => row.SourceRowNumber == 2).SelectedCategoryId);
+        Assert.Equal(
+            subscriptionsId,
+            filledReview.Drafts.Single(row => row.SourceRowNumber == 3).SelectedCategoryId);
+
+        var updatedPreview =
+            await client.GetFromJsonAsync<RuleApplicationPreviewResponse>(
+                $"/api/households/{householdId}/imports/{imported.ImportFileId}/categorization-rule-application-preview");
+        Assert.NotNull(updatedPreview);
+        Assert.Equal(0, updatedPreview.FillChangedRows);
+        Assert.Equal(1, updatedPreview.ReapplyChangedRows);
+        Assert.Equal(1, updatedPreview.ReapplyUnchangedRows);
+
+        var reapplyAll = await PostJson(
+            client,
+            $"/api/households/{householdId}/imports/{imported.ImportFileId}/apply-categorization-rules",
+            new { replaceExistingCategories = true },
+            token);
+
+        Assert.Equal(HttpStatusCode.OK, reapplyAll.StatusCode);
         var applyResult =
-            await applyRules.Content.ReadFromJsonAsync<ApplyRulesResponse>();
-        Assert.Equal(1, applyResult!.AppliedRows);
+            await reapplyAll.Content.ReadFromJsonAsync<ApplyRulesResponse>();
+        Assert.Equal(2, applyResult!.MatchedRows);
+        Assert.Equal(1, applyResult.ChangedRows);
+        Assert.Equal(1, applyResult.UnchangedRows);
         var review = await client.GetFromJsonAsync<ImportReviewResponse>(
             $"/api/households/{householdId}/imports/{imported.ImportFileId}");
-        var categorizedDraft = Assert.Single(review!.Drafts);
+        var categorizedDraft = review!.Drafts.Single(row => row.SourceRowNumber == 2);
         Assert.Equal("Approved", categorizedDraft.ReviewDecision);
         Assert.Equal(subscriptionsId, categorizedDraft.SelectedCategoryId);
     }
@@ -466,12 +524,40 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         Assert.Equal(ImportDraftReviewDecision.Approved.ToString(), duplicate.ReviewDecision);
         Assert.True(duplicate.IsDuplicateAcknowledged);
 
-        var bulkReject = await PostJson(
+        var bulkExclude = await PostJson(
             client,
             $"/api/households/{householdId}/imports/{uploaded.ImportFileId}/decisions",
-            new { decision = "Rejected" },
+            new { decision = "Excluded" },
             await GetAntiforgeryToken(client));
-        Assert.Equal(HttpStatusCode.NoContent, bulkReject.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, bulkExclude.StatusCode);
+
+        var resetDecisions = await PostJson(
+            client,
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}/decisions",
+            new { decision = "Pending" },
+            await GetAntiforgeryToken(client));
+        Assert.Equal(HttpStatusCode.NoContent, resetDecisions.StatusCode);
+
+        review = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}");
+        Assert.NotNull(review);
+        Assert.All(review.Drafts, draft =>
+            Assert.Equal(
+                ImportDraftReviewDecision.Pending.ToString(),
+                draft.ReviewDecision));
+        Assert.All(review.Drafts, draft =>
+            Assert.False(draft.IsDuplicateAcknowledged));
+
+        Assert.Equal(HttpStatusCode.NoContent, (await PostJson(
+            client,
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}/decisions",
+            new { decision = "Approved" },
+            await GetAntiforgeryToken(client))).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await PostJson(
+            client,
+            $"/api/households/{householdId}/imports/{uploaded.ImportFileId}/decisions",
+            new { decision = "Excluded" },
+            await GetAntiforgeryToken(client))).StatusCode);
 
         var completed = await PostJson(
             client,
@@ -482,6 +568,7 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
         Assert.NotNull(completion);
         Assert.Equal(2, completion.CreatedTransactionCount);
+        Assert.Equal(1, completion.ExcludedRows);
     }
 
     [Fact]
@@ -519,7 +606,7 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         Assert.NotNull(review);
         Assert.Equal(3, review.Drafts.Count);
         var duplicate = review.Drafts.Single(row => row.SourceRowNumber == 2);
-        var rejected = review.Drafts.Single(row => row.SourceRowNumber == 3);
+        var excluded = review.Drafts.Single(row => row.SourceRowNumber == 3);
         var corrected = review.Drafts.Single(row => row.SourceRowNumber == 4);
         Assert.Equal("PossibleDuplicate", duplicate.DuplicateStatus);
         Assert.Equal("Invalid", corrected.ValidationStatus);
@@ -538,8 +625,8 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
             await GetAntiforgeryToken(client))).StatusCode);
         Assert.Equal(HttpStatusCode.NoContent, (await PostJson(
             client,
-            DecisionPath(householdId, uploaded.ImportFileId, rejected.Id),
-            new { decision = "Rejected", acknowledgePossibleDuplicate = false },
+            DecisionPath(householdId, uploaded.ImportFileId, excluded.Id),
+            new { decision = "Excluded", acknowledgePossibleDuplicate = false },
             await GetAntiforgeryToken(client))).StatusCode);
 
         var correction = await PutJson(
@@ -569,6 +656,7 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         var completion = await completed.Content.ReadFromJsonAsync<CompleteImportResponse>();
         Assert.NotNull(completion);
         Assert.Equal(2, completion.CreatedTransactionCount);
+        Assert.Equal(1, completion.ExcludedRows);
         Assert.Equal("Completed", completion.Status);
 
         var retry = await PostJson(
@@ -791,7 +879,15 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         bool IsDuplicateAcknowledged);
     private sealed record CompleteImportResponse(
         int CreatedTransactionCount,
+        int ExcludedRows,
         string Status);
-    private sealed record ApplyRulesResponse(int AppliedRows);
+    private sealed record ApplyRulesResponse(
+        int MatchedRows,
+        int ChangedRows,
+        int UnchangedRows);
+    private sealed record RuleApplicationPreviewResponse(
+        int FillChangedRows,
+        int ReapplyChangedRows,
+        int ReapplyUnchangedRows);
     private sealed record BulkSaveResponse(int SavedRows);
 }

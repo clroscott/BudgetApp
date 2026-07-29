@@ -16,6 +16,7 @@ import {
   completeImport,
   discardImport,
   getImport,
+  getImportCategorizationRulePreview,
   getImports,
   removeImportDraft,
   reviewImportDraft,
@@ -24,6 +25,7 @@ import {
   type ImportDraftUpdate,
   type ImportListItem,
   type ImportReviewDetail,
+  type CategorizationRuleApplicationPreview,
 } from '../imports/importApi'
 import { AppLink } from '../routing/AppLink'
 
@@ -83,6 +85,19 @@ interface PendingDraftUpdate {
   selectedCategoryId: string | null
 }
 
+type DraftRowFilter =
+  | 'all'
+  | 'pending'
+  | 'uncategorized'
+  | 'parentOnly'
+  | 'categorized'
+  | 'possibleDuplicates'
+  | 'invalid'
+  | 'approved'
+  | 'excluded'
+
+type RuleApplicationMode = 'fill' | 'reapply'
+
 function DraftRow({
   householdId,
   importFileId,
@@ -126,6 +141,27 @@ function DraftRow({
     selectedCategoryId !== draft.selectedCategoryId
 
   useEffect(() => {
+    if (pendingUpdate) return
+
+    const refreshedSelection = findCategorySelection(
+      categories,
+      draft.selectedCategoryId,
+    )
+    setTransactionDate(draft.transactionDate ?? '')
+    setAmount(draft.amount?.toString() ?? '')
+    setDescription(draft.description ?? '')
+    setCategoryId(refreshedSelection.categoryId)
+    setSubcategoryId(refreshedSelection.subcategoryId)
+  }, [
+    categories,
+    draft.amount,
+    draft.description,
+    draft.selectedCategoryId,
+    draft.transactionDate,
+    pendingUpdate,
+  ])
+
+  useEffect(() => {
     onDirtyChange(draft.id, isDirty ? {
       transactionDate,
       amount,
@@ -156,7 +192,8 @@ function DraftRow({
     try {
       if (isDirty) {
         await persistVisibleValues()
-        await onChanged()
+        // Keep this row mounted while its rule is being created. Refreshing here
+        // would immediately remove it from uncategorized/parent-only filters.
       }
 
       const currentDescription = description.trim()
@@ -187,10 +224,22 @@ function DraftRow({
       })
       setRuleCreated(true)
       setIsRuleEditorOpen(false)
+      await onChanged()
+      onDirtyChange(draft.id, null)
     } catch (error) {
       onError(error)
     } finally {
       setIsCreatingRule(false)
+    }
+  }
+
+  const closeRuleEditor = async () => {
+    setIsRuleEditorOpen(false)
+    try {
+      await onChanged()
+      onDirtyChange(draft.id, null)
+    } catch (error) {
+      onError(error)
     }
   }
 
@@ -221,7 +270,9 @@ function DraftRow({
     }
   }
 
-  const decide = async (decision: 'Approved' | 'Rejected' | 'Skipped') => {
+  const decide = async (
+    decision: 'Approved' | 'Excluded' | 'Pending',
+  ) => {
     setIsBusy(true)
     try {
       if (decision === 'Approved' && isDirty) {
@@ -313,44 +364,53 @@ function DraftRow({
             )}
           </div>
           {editable && <div className="import-row-actions">
-            {isDirty && <>
-              <button className="secondary-button" type="submit" disabled={isBusy}>
-                Save corrections
+            <div className="import-row-preparation-actions">
+              {isDirty && <>
+                <button className="secondary-button" type="submit" disabled={isBusy}>
+                  Save corrections
+                </button>
+                <button className="text-button" type="button" disabled={isBusy}
+                  onClick={resetChanges}>
+                  Refresh
+                </button>
+              </>}
+              {selectedCategoryId && description.trim() && (
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={isBusy}
+                  title="Save this category choice and create a rule for future imports."
+                  onClick={() => void openRuleEditor()}>
+                  {isDirty ? 'Save & create rule' : 'Create rule'}
+                </button>
+              )}
+            </div>
+            <div className="import-row-decision-actions">
+              {draft.reviewDecision === 'Pending' ? <>
+                <button className="primary-button" type="button" disabled={
+                  isBusy ||
+                  draft.validationStatus !== 'Valid' ||
+                  draft.duplicateStatus === 'NotChecked'
+                } onClick={() => void decide('Approved')}>
+                  {isDirty ? 'Save and approve' : 'Approve'}
+                </button>
+                <button className="text-button" type="button" disabled={isBusy}
+                  onClick={() => void decide('Excluded')}>
+                  Exclude
+                </button>
+              </> : (
+                <button className="secondary-button" type="button" disabled={isBusy}
+                  onClick={() => void decide('Pending')}>
+                  Mark pending
+                </button>
+              )}
+            </div>
+            <div className="import-row-destructive-actions">
+              <button className="danger-button" type="button" disabled={isBusy}
+                onClick={() => void onRemove(draft.id, draft.sourceRowNumber)}>
+                Remove
               </button>
-              <button className="text-button" type="button" disabled={isBusy}
-                onClick={resetChanges}>
-                Refresh
-              </button>
-            </>}
-            {selectedCategoryId && description.trim() && (
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={isBusy}
-                title="Save this category choice and create a rule for future imports."
-                onClick={() => void openRuleEditor()}>
-                {isDirty ? 'Save & create rule' : 'Create rule'}
-              </button>
-            )}
-            <button className="primary-button" type="button" disabled={
-              isBusy ||
-              draft.validationStatus !== 'Valid' ||
-              draft.duplicateStatus === 'NotChecked'
-            } onClick={() => void decide('Approved')}>
-              {isDirty ? 'Save and approve' : 'Approve'}
-            </button>
-            <button className="text-button" type="button" disabled={isBusy}
-              onClick={() => void decide('Rejected')}>
-              Reject
-            </button>
-            <button className="text-button" type="button" disabled={isBusy}
-              onClick={() => void decide('Skipped')}>
-              Skip
-            </button>
-            <button className="danger-button" type="button" disabled={isBusy}
-              onClick={() => void onRemove(draft.id, draft.sourceRowNumber)}>
-              Remove
-            </button>
+            </div>
           </div>}
         </div>
       </form>
@@ -375,7 +435,7 @@ function DraftRow({
               className="text-button"
               type="button"
               disabled={isCreatingRule}
-              onClick={() => setIsRuleEditorOpen(false)}>
+              onClick={() => void closeRuleEditor()}>
               Cancel
             </button>
           </div>
@@ -424,16 +484,21 @@ export function ImportReviewPage() {
   const [importFilter, setImportFilter] = useState<'inProgress' | 'completed' | 'all'>(
     'inProgress',
   )
+  const [rowFilter, setRowFilter] = useState<DraftRowFilter>('all')
   const [draftPage, setDraftPage] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
   const [isCompleting, setIsCompleting] = useState(false)
   const [isDiscarding, setIsDiscarding] = useState(false)
-  const [isApplyingRules, setIsApplyingRules] = useState(false)
+  const [applyingRuleMode, setApplyingRuleMode] =
+    useState<RuleApplicationMode | null>(null)
+  const [rulePreview, setRulePreview] =
+    useState<CategorizationRuleApplicationPreview | null>(null)
+  const [isLoadingRulePreview, setIsLoadingRulePreview] = useState(false)
   const [ruleApplicationMessage, setRuleApplicationMessage] = useState('')
   const [isSavingAll, setIsSavingAll] = useState(false)
   const [bulkSaveMessage, setBulkSaveMessage] = useState('')
   const [bulkDecision, setBulkDecision] = useState<
-    'Approved' | 'Rejected' | 'Skipped' | null
+    'Approved' | 'Excluded' | 'Pending' | null
   >(null)
   const [dirtyDraftUpdates, setDirtyDraftUpdates] =
     useState<Map<string, PendingDraftUpdate>>(new Map())
@@ -524,8 +589,32 @@ export function ImportReviewPage() {
     return () => { isCurrent = false }
   }, [currentHousehold, selectedImportId])
 
+  useEffect(() => {
+    if (!currentHousehold || !detail?.canEdit ||
+        detail.status !== 'ReadyForReview') {
+      setRulePreview(null)
+      setIsLoadingRulePreview(false)
+      return
+    }
+
+    let isCurrent = true
+    setRulePreview(null)
+    setIsLoadingRulePreview(true)
+    void getImportCategorizationRulePreview(
+      currentHousehold.id,
+      detail.id,
+    ).then(preview => {
+      if (isCurrent) setRulePreview(preview)
+    }).catch(error => {
+      if (isCurrent) setErrors(getErrorMessages(error))
+    }).finally(() => {
+      if (isCurrent) setIsLoadingRulePreview(false)
+    })
+    return () => { isCurrent = false }
+  }, [currentHousehold, detail])
+
   const pendingRows = useMemo(() => detail
-    ? detail.totalRows - detail.approvedRows - detail.rejectedRows - detail.skippedRows
+    ? detail.totalRows - detail.approvedRows - detail.excludedRows
     : 0, [detail])
   const pendingDrafts = detail?.drafts.filter(
     draft => draft.reviewDecision === 'Pending') ?? []
@@ -534,22 +623,60 @@ export function ImportReviewPage() {
   const pendingPossibleDuplicates = pendingDrafts.filter(draft =>
     draft.validationStatus === 'Valid' &&
     draft.duplicateStatus === 'PossibleDuplicate').length
-  const uncategorizedRuleEligibleRows = detail?.drafts.filter(
-    draft =>
-      (draft.reviewDecision === 'Pending' ||
-        draft.reviewDecision === 'Approved') &&
-      !draft.selectedCategoryId,
-  ).length ?? 0
+  const reviewedRows = detail
+    ? detail.approvedRows + detail.excludedRows
+    : 0
+  const parentCategoryIds = useMemo(
+    () => new Set(categories
+      .filter(category => category.children.length > 0)
+      .map(category => category.id)),
+    [categories],
+  )
+  const fillRulePotentialCount = rulePreview?.fillChangedRows ?? 0
+  const reapplyRulePotentialCount = rulePreview?.reapplyChangedRows ?? 0
   const hasUnsavedRows = dirtyDraftUpdates.size > 0
   const hasUncheckedDuplicates = detail?.drafts.some(
     draft => draft.duplicateStatus === 'NotChecked') ?? false
-  const draftPageCount = detail
-    ? Math.max(1, Math.ceil(detail.drafts.length / rowsPerPage))
-    : 1
-  const visibleDrafts = detail?.drafts.slice(
+  const filteredDrafts = useMemo(() => {
+    const drafts = detail?.drafts ?? []
+    return drafts.filter(draft => {
+      switch (rowFilter) {
+        case 'pending':
+          return draft.reviewDecision === 'Pending'
+        case 'uncategorized':
+          return !draft.selectedCategoryId
+        case 'parentOnly':
+          return Boolean(
+            draft.selectedCategoryId &&
+            parentCategoryIds.has(draft.selectedCategoryId),
+          )
+        case 'categorized':
+          return Boolean(draft.selectedCategoryId)
+        case 'possibleDuplicates':
+          return draft.duplicateStatus === 'PossibleDuplicate'
+        case 'invalid':
+          return draft.validationStatus === 'Invalid'
+        case 'approved':
+          return draft.reviewDecision === 'Approved'
+        case 'excluded':
+          return draft.reviewDecision === 'Excluded'
+        default:
+          return true
+      }
+    })
+  }, [detail, parentCategoryIds, rowFilter])
+  const draftPageCount = Math.max(
+    1,
+    Math.ceil(filteredDrafts.length / rowsPerPage),
+  )
+  const visibleDrafts = filteredDrafts.slice(
     (draftPage - 1) * rowsPerPage,
     draftPage * rowsPerPage,
-  ) ?? []
+  )
+
+  useEffect(() => {
+    setDraftPage(current => Math.min(current, draftPageCount))
+  }, [draftPageCount])
 
   if (!currentHousehold) return null
 
@@ -564,24 +691,41 @@ export function ImportReviewPage() {
     }
   }
 
-  const handleApplyCategorizationRules = async () => {
+  const handleApplyCategorizationRules = async (
+    mode: RuleApplicationMode,
+  ) => {
     if (!detail || hasUnsavedRows) return
-    setIsApplyingRules(true)
+    if (mode === 'reapply' && !window.confirm(
+      `Reapply rules to ${reapplyRulePotentialCount} matching staged ${
+        reapplyRulePotentialCount === 1 ? 'row' : 'rows'
+      } that would change? Existing categories will be replaced.`,
+    )) return
+
+    setApplyingRuleMode(mode)
     setErrors([])
     setRuleApplicationMessage('')
     try {
       const result = await applyImportCategorizationRules(
         currentHousehold.id,
         detail.id,
+        mode === 'reapply',
       )
       await refreshDetail()
-      setRuleApplicationMessage(result.appliedRows === 0
-        ? 'No uncategorized rows matched an active rule.'
-        : `${result.appliedRows} ${result.appliedRows === 1 ? 'row was' : 'rows were'} categorized.`)
+      setRuleApplicationMessage(result.matchedRows === 0
+        ? mode === 'fill'
+          ? 'No uncategorized or parent-category rows matched an active rule.'
+          : 'No staged rows matched an active rule.'
+        : mode === 'fill'
+          ? `${result.changedRows} ${
+            result.changedRows === 1 ? 'row was' : 'rows were'
+          } filled by rules.`
+          : `${result.changedRows} ${
+            result.changedRows === 1 ? 'row was' : 'rows were'
+          } changed; ${result.unchangedRows} stayed the same.`)
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {
-      setIsApplyingRules(false)
+      setApplyingRuleMode(null)
     }
   }
 
@@ -646,21 +790,24 @@ export function ImportReviewPage() {
   }
 
   const handleBulkDecision = async (
-    decision: 'Approved' | 'Rejected' | 'Skipped',
+    decision: 'Approved' | 'Excluded' | 'Pending',
   ) => {
     if (!detail || hasUnsavedRows) return
 
-    const affectedRows = decision === 'Approved' ? validPendingRows : pendingRows
+    const affectedRows = decision === 'Pending'
+      ? reviewedRows
+      : decision === 'Approved' ? validPendingRows : pendingRows
     const duplicateNote = decision === 'Approved' && pendingPossibleDuplicates > 0
       ? `, including ${pendingPossibleDuplicates} possible duplicate${
         pendingPossibleDuplicates === 1 ? '' : 's'}`
       : ''
-    const action = decision === 'Approved'
-      ? 'Approve'
-      : decision === 'Rejected' ? 'Reject' : 'Skip'
-    if (!window.confirm(
-      `${action} ${affectedRows} pending row${affectedRows === 1 ? '' : 's'}${duplicateNote}?`,
-    )) return
+    const confirmation = decision === 'Pending'
+      ? `Reset ${affectedRows} reviewed row${affectedRows === 1 ? '' : 's'} to pending? Saved corrections and categories will be preserved.`
+      : `${decision === 'Approved'
+        ? 'Approve'
+        : 'Exclude'} ${affectedRows} pending row${
+        affectedRows === 1 ? '' : 's'}${duplicateNote}?`
+    if (!window.confirm(confirmation)) return
 
     setBulkDecision(decision)
     setErrors([])
@@ -796,18 +943,19 @@ export function ImportReviewPage() {
                 <span><strong>{detail.invalidRows}</strong>Invalid</span>
                 <span><strong>{detail.duplicateRows}</strong>Possible duplicates</span>
                 <span><strong>{detail.approvedRows}</strong>Approved</span>
-                <span><strong>{detail.rejectedRows + detail.skippedRows}</strong>Not imported</span>
+                <span><strong>{detail.excludedRows}</strong>Excluded</span>
               </div>
-              {hasUncheckedDuplicates && detail.canEdit && detail.status === 'ReadyForReview' && (
-                <button className="secondary-button" type="button" onClick={() => void handleDuplicates()}>
-                  Check for duplicates
-                </button>
-              )}
               {detail.canEdit && detail.status === 'ReadyForReview' && (
                 <div className="import-control-groups">
-                  <div>
-                    <strong>Review remaining</strong>
+                  <div className="import-control-group">
+                    <strong>1. Prepare rows</strong>
                     <div className="import-control-actions">
+                      {hasUncheckedDuplicates && (
+                        <button className="secondary-button" type="button"
+                          onClick={() => void handleDuplicates()}>
+                          Check for duplicates
+                        </button>
+                      )}
                       <button
                         className="primary-button"
                         type="button"
@@ -819,29 +967,33 @@ export function ImportReviewPage() {
                       </button>
                       <button className="secondary-button" type="button"
                         disabled={
-                          uncategorizedRuleEligibleRows === 0 ||
+                          isLoadingRulePreview ||
+                          !rulePreview ||
+                          fillRulePotentialCount === 0 ||
                           hasUnsavedRows ||
-                          isApplyingRules
+                          applyingRuleMode !== null
                         }
-                        onClick={() => void handleApplyCategorizationRules()}>
-                        {isApplyingRules
-                          ? 'Applying rules...'
-                          : 'Apply rules'}
-                      </button>
-                      <button className="primary-button" type="button"
-                        disabled={validPendingRows === 0 || hasUnsavedRows || bulkDecision !== null}
-                        onClick={() => void handleBulkDecision('Approved')}>
-                        {bulkDecision === 'Approved' ? 'Approving...' : 'Approve all valid'}
+                        onClick={() => void handleApplyCategorizationRules('fill')}>
+                        {applyingRuleMode === 'fill'
+                          ? 'Filling categories...'
+                          : `Fill uncategorized (${
+                            isLoadingRulePreview ? '...' : fillRulePotentialCount
+                          })`}
                       </button>
                       <button className="secondary-button" type="button"
-                        disabled={pendingRows === 0 || hasUnsavedRows || bulkDecision !== null}
-                        onClick={() => void handleBulkDecision('Rejected')}>
-                        {bulkDecision === 'Rejected' ? 'Rejecting...' : 'Reject all'}
-                      </button>
-                      <button className="secondary-button" type="button"
-                        disabled={pendingRows === 0 || hasUnsavedRows || bulkDecision !== null}
-                        onClick={() => void handleBulkDecision('Skipped')}>
-                        {bulkDecision === 'Skipped' ? 'Skipping...' : 'Skip all'}
+                        disabled={
+                          isLoadingRulePreview ||
+                          !rulePreview ||
+                          reapplyRulePotentialCount === 0 ||
+                          hasUnsavedRows ||
+                          applyingRuleMode !== null
+                        }
+                        onClick={() => void handleApplyCategorizationRules('reapply')}>
+                        {applyingRuleMode === 'reapply'
+                          ? 'Reapplying rules...'
+                          : `Reapply to all (${
+                            isLoadingRulePreview ? '...' : reapplyRulePotentialCount
+                          })`}
                       </button>
                     </div>
                     {hasUnsavedRows && (
@@ -852,24 +1004,58 @@ export function ImportReviewPage() {
                     {bulkSaveMessage && (
                       <p className="field-help" role="status">{bulkSaveMessage}</p>
                     )}
-                    {!hasUnsavedRows && uncategorizedRuleEligibleRows > 0 && (
+                    {!hasUnsavedRows && rulePreview && (
                       <p className="field-help">
-                        Check {uncategorizedRuleEligibleRows} uncategorized pending or approved
-                        {uncategorizedRuleEligibleRows === 1 ? ' row' : ' rows'}.
+                        Counts show matching rows that would actually change.
+                        {rulePreview.reapplyUnchangedRows > 0 && ` ${
+                          rulePreview.reapplyUnchangedRows
+                        } matching ${
+                          rulePreview.reapplyUnchangedRows === 1 ? 'row already has' : 'rows already have'
+                        } the rule category.`}
                       </p>
                     )}
                     {ruleApplicationMessage && (
                       <p className="field-help" role="status">{ruleApplicationMessage}</p>
                     )}
                   </div>
-                  <div>
-                    <strong>Import</strong>
+                  <div className="import-control-group">
+                    <strong>2. Review decisions</strong>
+                    <div className="import-control-actions">
+                      <button className="primary-button" type="button"
+                        disabled={validPendingRows === 0 || hasUnsavedRows || bulkDecision !== null}
+                        onClick={() => void handleBulkDecision('Approved')}>
+                        {bulkDecision === 'Approved' ? 'Approving...' : 'Approve all valid'}
+                      </button>
+                      <button className="secondary-button" type="button"
+                        disabled={pendingRows === 0 || hasUnsavedRows || bulkDecision !== null}
+                        onClick={() => void handleBulkDecision('Excluded')}>
+                        {bulkDecision === 'Excluded' ? 'Excluding...' : 'Exclude all'}
+                      </button>
+                    </div>
+                    <div className="import-control-undo">
+                      <button className="secondary-button" type="button"
+                        disabled={reviewedRows === 0 || hasUnsavedRows || bulkDecision !== null}
+                        onClick={() => void handleBulkDecision('Pending')}>
+                        {bulkDecision === 'Pending'
+                          ? 'Resetting decisions...'
+                          : `Reset decisions to pending (${reviewedRows})`}
+                      </button>
+                      <span>Saved corrections and categories are preserved.</span>
+                    </div>
+                  </div>
+                  <div className="import-control-group">
+                    <strong>3. Finalize import</strong>
                     <div className="import-control-actions">
                       <button className="primary-button" type="button"
                         disabled={pendingRows !== 0 || isCompleting || hasUnsavedRows}
                         onClick={() => void handleComplete()}>
                         {isCompleting ? 'Creating...' : 'Create approved transactions'}
                       </button>
+                    </div>
+                  </div>
+                  <div className="import-control-group import-control-danger">
+                    <strong>Staged data</strong>
+                    <div className="import-control-actions">
                       <button className="danger-button" type="button"
                         disabled={isDiscarding}
                         onClick={() => void handleDiscard()}>
@@ -889,31 +1075,57 @@ export function ImportReviewPage() {
               )}
             </section>
 
-            <div className="import-draft-column-headings" aria-hidden="true">
-              <span>Date</span>
-              <span>Amount</span>
-              <span>Description</span>
-              <span>Category</span>
-              <span>Subcategory</span>
+            <div className="import-row-toolbar">
+              <label>
+                <span>Show rows</span>
+                <select value={rowFilter} onChange={event => {
+                  setRowFilter(event.target.value as DraftRowFilter)
+                  setDraftPage(1)
+                }}>
+                  <option value="all">All rows</option>
+                  <option value="pending">Pending</option>
+                  <option value="uncategorized">Uncategorized</option>
+                  <option value="parentOnly">Parent category only</option>
+                  <option value="categorized">Has category</option>
+                  <option value="possibleDuplicates">Possible duplicates</option>
+                  <option value="invalid">Invalid</option>
+                  <option value="approved">Approved</option>
+                  <option value="excluded">Excluded</option>
+                </select>
+              </label>
+              <span>
+                Showing <strong>{filteredDrafts.length}</strong> of {detail.totalRows} rows
+              </span>
             </div>
-            <div className="import-draft-list">
-              {visibleDrafts.map(draft => (
-                <DraftRow
-                  key={`${draft.id}-${draft.reviewDecision}-${draft.validationStatus}-${draft.duplicateStatus}`}
-                  householdId={currentHousehold.id}
-                  importFileId={detail.id}
-                  draft={draft}
-                  categories={categories}
-                  pendingUpdate={dirtyDraftUpdates.get(draft.id) ?? null}
-                  canEdit={detail.canEdit}
-                  isCompleted={detail.status === 'Completed'}
-                  onChanged={refreshDetail}
-                  onDirtyChange={handleDirtyChange}
-                  onRemove={handleRemoveDraft}
-                  onError={error => setErrors(getErrorMessages(error))}
-                />
-              ))}
-            </div>
+            {filteredDrafts.length === 0 ? (
+              <p className="empty-state">No rows match this filter.</p>
+            ) : <>
+              <div className="import-draft-column-headings" aria-hidden="true">
+                <span>Date</span>
+                <span>Amount</span>
+                <span>Description</span>
+                <span>Category</span>
+                <span>Subcategory</span>
+              </div>
+              <div className="import-draft-list">
+                {visibleDrafts.map(draft => (
+                  <DraftRow
+                    key={`${draft.id}-${draft.reviewDecision}-${draft.validationStatus}-${draft.duplicateStatus}`}
+                    householdId={currentHousehold.id}
+                    importFileId={detail.id}
+                    draft={draft}
+                    categories={categories}
+                    pendingUpdate={dirtyDraftUpdates.get(draft.id) ?? null}
+                    canEdit={detail.canEdit}
+                    isCompleted={detail.status === 'Completed'}
+                    onChanged={refreshDetail}
+                    onDirtyChange={handleDirtyChange}
+                    onRemove={handleRemoveDraft}
+                    onError={error => setErrors(getErrorMessages(error))}
+                  />
+                ))}
+              </div>
+            </>}
 
             {draftPageCount > 1 && (
               <nav className="import-pagination" aria-label="Import rows">

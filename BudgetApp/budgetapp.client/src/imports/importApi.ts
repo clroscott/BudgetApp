@@ -20,8 +20,7 @@ export interface ImportListItem {
   validRows: number
   invalidRows: number
   approvedRows: number
-  rejectedRows: number
-  skippedRows: number
+  excludedRows: number
   duplicateRows: number
   uploadedAtUtc: string
   canEdit: boolean
@@ -54,8 +53,7 @@ export interface CompleteImportResult {
   importFileId: string
   createdTransactionCount: number
   approvedRows: number
-  rejectedRows: number
-  skippedRows: number
+  excludedRows: number
   status: string
 }
 
@@ -110,10 +108,30 @@ export function checkImportDuplicates(
 export function applyImportCategorizationRules(
   householdId: string,
   importFileId: string,
-): Promise<{ appliedRows: number }> {
-  return apiPost<{ appliedRows: number }>(
+  replaceExistingCategories: boolean,
+): Promise<{ matchedRows: number; changedRows: number; unchangedRows: number }> {
+  return apiPost<{
+    matchedRows: number
+    changedRows: number
+    unchangedRows: number
+  }>(
     `/api/households/${householdId}/imports/${importFileId}/apply-categorization-rules`,
-    {},
+    { replaceExistingCategories },
+  )
+}
+
+export interface CategorizationRuleApplicationPreview {
+  fillChangedRows: number
+  reapplyChangedRows: number
+  reapplyUnchangedRows: number
+}
+
+export function getImportCategorizationRulePreview(
+  householdId: string,
+  importFileId: string,
+): Promise<CategorizationRuleApplicationPreview> {
+  return apiGet(
+    `/api/households/${householdId}/imports/${importFileId}/categorization-rule-application-preview`,
   )
 }
 
@@ -149,7 +167,7 @@ export function reviewImportDraft(
   householdId: string,
   importFileId: string,
   draftId: string,
-  decision: 'Approved' | 'Rejected' | 'Skipped',
+  decision: 'Approved' | 'Excluded' | 'Pending',
   acknowledgePossibleDuplicate: boolean,
 ): Promise<void> {
   return apiPost(
@@ -161,7 +179,7 @@ export function reviewImportDraft(
 export function bulkReviewImportDrafts(
   householdId: string,
   importFileId: string,
-  decision: 'Approved' | 'Rejected' | 'Skipped',
+  decision: 'Approved' | 'Excluded' | 'Pending',
 ): Promise<void> {
   return apiPost(
     `/api/households/${householdId}/imports/${importFileId}/decisions`,

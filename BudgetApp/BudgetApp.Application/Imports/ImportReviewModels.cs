@@ -16,8 +16,7 @@ public sealed record ImportListItem(
     int ValidRows,
     int InvalidRows,
     int ApprovedRows,
-    int RejectedRows,
-    int SkippedRows,
+    int ExcludedRows,
     int DuplicateRows,
     DateTimeOffset UploadedAtUtc,
     bool CanEdit);
@@ -49,8 +48,7 @@ public sealed record ImportReviewDetail(
     int ValidRows,
     int InvalidRows,
     int ApprovedRows,
-    int RejectedRows,
-    int SkippedRows,
+    int ExcludedRows,
     int DuplicateRows,
     bool CanEdit,
     IReadOnlyList<ImportDraftItem> Drafts);
@@ -59,6 +57,15 @@ public sealed record CompleteImportResult(
     Guid ImportFileId,
     int CreatedTransactionCount,
     int ApprovedRows,
-    int RejectedRows,
-    int SkippedRows,
+    int ExcludedRows,
     string Status);
+
+public sealed record ApplyCategorizationRulesResult(
+    int MatchedRows,
+    int ChangedRows,
+    int UnchangedRows);
+
+public sealed record CategorizationRuleApplicationPreview(
+    int FillChangedRows,
+    int ReapplyChangedRows,
+    int ReapplyUnchangedRows);

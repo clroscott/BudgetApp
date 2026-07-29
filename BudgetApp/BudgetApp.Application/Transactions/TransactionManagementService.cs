@@ -21,6 +21,7 @@ public sealed class TransactionManagementService(
         DateOnly? toDate,
         string? categoryType,
         Guid? categoryId,
+        bool uncategorizedOnly,
         string? descriptionSearch,
         int page,
         CancellationToken cancellationToken)
@@ -69,6 +70,7 @@ public sealed class TransactionManagementService(
             toDate,
             parsedCategoryType,
             categoryId,
+            uncategorizedOnly,
             normalizedDescriptionSearch,
             (page - 1) * PageSize,
             PageSize,

@@ -138,18 +138,46 @@ public sealed class ImportsController(
     public async Task<IActionResult> ApplyCategorizationRules(
         Guid householdId,
         Guid importFileId,
+        ApplyCategorizationRulesRequest request,
         CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
         try
         {
-            var appliedRows = await importReviewService.ApplyCategorizationRulesAsync(
+            var result = await importReviewService.ApplyCategorizationRulesAsync(
+                householdId,
+                userId,
+                importFileId,
+                request.ReplaceExistingCategories,
+                cancellationToken);
+            return Ok(new ApplyCategorizationRulesResponse(
+                result.MatchedRows,
+                result.ChangedRows,
+                result.UnchangedRows));
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
+    [HttpGet("{importFileId:guid}/categorization-rule-application-preview")]
+    public async Task<IActionResult> PreviewCategorizationRules(
+        Guid householdId,
+        Guid importFileId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+
+        try
+        {
+            var preview = await importReviewService.PreviewCategorizationRulesAsync(
                 householdId,
                 userId,
                 importFileId,
                 cancellationToken);
-            return Ok(new ApplyCategorizationRulesResponse(appliedRows));
+            return Ok(preview);
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -422,4 +450,8 @@ public sealed record ReviewImportDraftRequest(
 public sealed record BulkReviewImportRequest(
     [param: Required] string Decision);
 
-public sealed record ApplyCategorizationRulesResponse(int AppliedRows);
+public sealed record ApplyCategorizationRulesResponse(
+    int MatchedRows,
+    int ChangedRows,
+    int UnchangedRows);
+public sealed record ApplyCategorizationRulesRequest(bool ReplaceExistingCategories);

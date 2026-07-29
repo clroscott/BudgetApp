@@ -1615,17 +1615,35 @@ a {
   margin-bottom: 1rem;
 }
 
-.import-selector-row,
-.import-control-groups {
+.import-selector-row {
   display: grid;
   grid-template-columns: minmax(10rem, 0.6fr) minmax(16rem, 1.4fr);
   gap: 1rem;
 }
 
 .import-control-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
   margin-top: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
+}
+
+.import-control-group {
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--page-bg);
+}
+
+.import-control-group > strong {
+  color: var(--heading);
+}
+
+.import-control-danger {
+  border-color: #e3b2aa;
+  background: #fff8f6;
 }
 
 .import-control-actions {
@@ -1637,6 +1655,21 @@ a {
 
 .import-control-actions button {
   margin-top: 0.65rem;
+}
+
+.import-control-undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.import-control-undo span {
+  color: var(--muted-text);
+  font-size: 0.78rem;
 }
 
 .import-review-summary,
@@ -1656,6 +1689,35 @@ a {
 .import-draft-list {
   display: grid;
   gap: 0.3rem;
+}
+
+.import-row-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--surface);
+}
+
+.import-row-toolbar label {
+  display: grid;
+  gap: 0.3rem;
+  min-width: min(18rem, 100%);
+}
+
+.import-row-toolbar label span {
+  color: var(--heading);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.import-row-toolbar > span {
+  color: var(--muted-text);
+  font-size: 0.82rem;
 }
 
 .import-draft-column-headings,
@@ -1686,8 +1748,7 @@ a {
   border-left-color: var(--accent);
 }
 
-.import-decision-rejected,
-.import-decision-skipped {
+.import-decision-excluded {
   opacity: 0.72;
 }
 
@@ -1754,6 +1815,21 @@ a {
 .import-row-actions {
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.import-row-preparation-actions,
+.import-row-decision-actions,
+.import-row-destructive-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.import-row-destructive-actions {
+  margin-left: 0.15rem;
+  padding-left: 0.55rem;
+  border-left: 1px solid var(--border);
 }
 
 .import-row-actions button,
@@ -2640,6 +2716,17 @@ a {
   .import-selector-row,
   .import-control-groups {
     grid-template-columns: 1fr;
+  }
+
+  .import-row-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .import-row-destructive-actions {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: 0;
   }
 
   .import-description-field {

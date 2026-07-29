@@ -117,6 +117,51 @@ public sealed class ImportTransactionDraftTests
     }
 
     [Fact]
+    public void MarkPending_PreservesCorrectedValuesAndClearsReviewMetadata()
+    {
+        var draft = CreateValidDraft();
+        var categoryId = Guid.NewGuid();
+        draft.CorrectParsedValues(
+            draft.TransactionDate,
+            -30m,
+            "Corrected",
+            categoryId,
+            DateTimeOffset.UtcNow);
+        draft.SetDuplicateResult(
+            ImportDraftDuplicateStatus.PossibleDuplicate,
+            Guid.NewGuid(),
+            DateTimeOffset.UtcNow);
+        draft.Approve(Guid.NewGuid(), true, DateTimeOffset.UtcNow);
+
+        draft.MarkPending(DateTimeOffset.UtcNow.AddMinutes(1));
+
+        Assert.Equal(ImportDraftReviewDecision.Pending, draft.ReviewDecision);
+        Assert.False(draft.IsDuplicateAcknowledged);
+        Assert.Null(draft.ReviewedByUserId);
+        Assert.Null(draft.ReviewedAtUtc);
+        Assert.Equal(-30m, draft.Amount);
+        Assert.Equal("Corrected", draft.Description);
+        Assert.Equal(categoryId, draft.SelectedCategoryId);
+        Assert.Equal(
+            ImportDraftDuplicateStatus.PossibleDuplicate,
+            draft.DuplicateStatus);
+    }
+
+    [Fact]
+    public void Exclude_SetsOneClearNonImportDecision()
+    {
+        var draft = CreateValidDraft();
+        var reviewerId = Guid.NewGuid();
+
+        draft.Exclude(reviewerId, DateTimeOffset.UtcNow);
+
+        Assert.Equal(ImportDraftReviewDecision.Excluded, draft.ReviewDecision);
+        Assert.Equal(reviewerId, draft.ReviewedByUserId);
+        Assert.NotNull(draft.ReviewedAtUtc);
+        Assert.False(draft.IsDuplicateAcknowledged);
+    }
+
+    [Fact]
     public void LinkApprovedTransaction_IsIdempotentAndLocksDraft()
     {
         var importFileId = Guid.NewGuid();

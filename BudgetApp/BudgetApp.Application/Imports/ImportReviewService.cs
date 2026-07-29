@@ -35,8 +35,7 @@ public sealed class ImportReviewService(
                 record.ValidRows,
                 record.InvalidRows,
                 record.ApprovedRows,
-                record.RejectedRows,
-                record.SkippedRows,
+                record.ExcludedRows,
                 record.DuplicateRows,
                 record.UploadedAtUtc,
                 CanEdit(record.IsPersonalAccount, record.AccountOwnerUserId, role, userId)))
@@ -73,10 +72,11 @@ public sealed class ImportReviewService(
         await importRepository.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<int> ApplyCategorizationRulesAsync(
+    public async Task<ApplyCategorizationRulesResult> ApplyCategorizationRulesAsync(
         Guid householdId,
         Guid userId,
         Guid importFileId,
+        bool replaceExistingCategories,
         CancellationToken cancellationToken)
     {
         var (access, role) = await GetAuthorized(
@@ -97,30 +97,29 @@ public sealed class ImportReviewService(
             .ToList();
         if (rules.Count == 0)
         {
-            return 0;
+            return new ApplyCategorizationRulesResult(0, 0, 0);
         }
 
-        var activeCategoryIds = (await categoryRepository.ListAsync(
+        var activeCategories = (await categoryRepository.ListAsync(
                 householdId,
                 cancellationToken))
             .Where(category => category.IsActive)
-            .Select(category => category.Id)
-            .ToHashSet();
+            .ToDictionary(category => category.Id);
         var drafts = await importRepository.ListDraftsAsync(
             importFileId,
             forUpdate: true,
             cancellationToken);
         var now = timeProvider.GetUtcNow();
-        var appliedRows = 0;
+        var changedRows = 0;
+        var unchangedRows = 0;
 
         foreach (var draft in drafts.Where(draft =>
-                     (draft.ReviewDecision is ImportDraftReviewDecision.Pending or
-                         ImportDraftReviewDecision.Approved) &&
-                     !draft.SelectedCategoryId.HasValue))
+                     draft.ReviewDecision is ImportDraftReviewDecision.Pending or
+                         ImportDraftReviewDecision.Approved))
         {
             var targetCategoryId = rules
                 .FirstOrDefault(rule =>
-                    activeCategoryIds.Contains(rule.TargetCategoryId) &&
+                    activeCategories.ContainsKey(rule.TargetCategoryId) &&
                     rule.Matches(access.ImportFile.AccountId, draft.Description))
                 ?.TargetCategoryId;
             if (!targetCategoryId.HasValue)
@@ -128,13 +127,107 @@ public sealed class ImportReviewService(
                 continue;
             }
 
+            var targetCategory = activeCategories[targetCategoryId.Value];
+            var canFillWithoutReplacing =
+                !draft.SelectedCategoryId.HasValue ||
+                targetCategory.ParentCategoryId == draft.SelectedCategoryId;
+            if (!replaceExistingCategories && !canFillWithoutReplacing)
+            {
+                continue;
+            }
+
+            if (draft.SelectedCategoryId == targetCategoryId)
+            {
+                unchangedRows++;
+                continue;
+            }
+
             draft.SetSuggestedCategory(targetCategoryId, now);
             draft.SelectCategory(targetCategoryId, now);
-            appliedRows++;
+            changedRows++;
         }
 
         await importRepository.SaveChangesAsync(cancellationToken);
-        return appliedRows;
+        return new ApplyCategorizationRulesResult(
+            changedRows + unchangedRows,
+            changedRows,
+            unchangedRows);
+    }
+
+    public async Task<CategorizationRuleApplicationPreview>
+        PreviewCategorizationRulesAsync(
+            Guid householdId,
+            Guid userId,
+            Guid importFileId,
+            CancellationToken cancellationToken)
+    {
+        var (access, role) = await GetAuthorized(
+            householdId,
+            userId,
+            importFileId,
+            forUpdate: false,
+            cancellationToken);
+        RequireEdit(access, role, userId);
+        RequireReviewable(access.ImportFile);
+
+        var rules = (await categorizationRuleRepository.ListAsync(
+                householdId,
+                forUpdate: false,
+                cancellationToken))
+            .Where(rule => rule.IsActive)
+            .OrderBy(rule => rule.Priority)
+            .ToList();
+        if (rules.Count == 0)
+        {
+            return new CategorizationRuleApplicationPreview(0, 0, 0);
+        }
+
+        var activeCategories = (await categoryRepository.ListAsync(
+                householdId,
+                cancellationToken))
+            .Where(category => category.IsActive)
+            .ToDictionary(category => category.Id);
+        var drafts = await importRepository.ListDraftsAsync(
+            importFileId,
+            forUpdate: false,
+            cancellationToken);
+        var fillChangedRows = 0;
+        var reapplyChangedRows = 0;
+        var reapplyUnchangedRows = 0;
+
+        foreach (var draft in drafts.Where(draft =>
+                     draft.ReviewDecision is ImportDraftReviewDecision.Pending or
+                         ImportDraftReviewDecision.Approved))
+        {
+            var targetCategoryId = rules
+                .FirstOrDefault(rule =>
+                    activeCategories.ContainsKey(rule.TargetCategoryId) &&
+                    rule.Matches(access.ImportFile.AccountId, draft.Description))
+                ?.TargetCategoryId;
+            if (!targetCategoryId.HasValue)
+            {
+                continue;
+            }
+
+            if (draft.SelectedCategoryId == targetCategoryId)
+            {
+                reapplyUnchangedRows++;
+                continue;
+            }
+
+            reapplyChangedRows++;
+            var targetCategory = activeCategories[targetCategoryId.Value];
+            if (!draft.SelectedCategoryId.HasValue ||
+                targetCategory.ParentCategoryId == draft.SelectedCategoryId)
+            {
+                fillChangedRows++;
+            }
+        }
+
+        return new CategorizationRuleApplicationPreview(
+            fillChangedRows,
+            reapplyChangedRows,
+            reapplyUnchangedRows);
     }
 
     public async Task UpdateDraftAsync(
@@ -279,11 +372,11 @@ public sealed class ImportReviewService(
             case "approved":
                 draft.Approve(userId, acknowledgePossibleDuplicate, now);
                 break;
-            case "rejected":
-                draft.Reject(userId, now);
+            case "excluded":
+                draft.Exclude(userId, now);
                 break;
-            case "skipped":
-                draft.Skip(userId, now);
+            case "pending":
+                draft.MarkPending(now);
                 break;
             default:
                 throw new ArgumentException("Review decision is not supported.", nameof(decision));
@@ -325,16 +418,17 @@ public sealed class ImportReviewService(
                     draft.Approve(userId, acknowledgePossibleDuplicate: true, now);
                 }
                 break;
-            case "rejected":
+            case "excluded":
                 foreach (var draft in pendingDrafts)
                 {
-                    draft.Reject(userId, now);
+                    draft.Exclude(userId, now);
                 }
                 break;
-            case "skipped":
-                foreach (var draft in pendingDrafts)
+            case "pending":
+                foreach (var draft in drafts.Where(draft =>
+                             draft.ReviewDecision != ImportDraftReviewDecision.Pending))
                 {
-                    draft.Skip(userId, now);
+                    draft.MarkPending(now);
                 }
                 break;
             default:
@@ -393,7 +487,7 @@ public sealed class ImportReviewService(
         {
             return new CompleteImportResult(
                 importFile.Id, 0, importFile.ApprovedRowCount,
-                importFile.RejectedRowCount, importFile.SkippedRowCount,
+                importFile.ExcludedRowCount,
                 importFile.Status.ToString());
         }
 
@@ -402,7 +496,7 @@ public sealed class ImportReviewService(
         if (statistics.PendingRows != 0)
         {
             throw new InvalidOperationException(
-                "Every row must be approved, rejected, or skipped before completing the import.");
+                "Every row must be approved or excluded before completing the import.");
         }
 
         var now = timeProvider.GetUtcNow();
@@ -440,7 +534,7 @@ public sealed class ImportReviewService(
         await importRepository.SaveChangesAsync(cancellationToken);
         return new CompleteImportResult(
             importFile.Id, transactions.Count, importFile.ApprovedRowCount,
-            importFile.RejectedRowCount, importFile.SkippedRowCount,
+            importFile.ExcludedRowCount,
             importFile.Status.ToString());
     }
 
@@ -558,8 +652,7 @@ public sealed class ImportReviewService(
             drafts.Count(draft => draft.ValidationStatus == ImportDraftValidationStatus.Valid),
             drafts.Count(draft => draft.ValidationStatus == ImportDraftValidationStatus.Invalid),
             drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Approved),
-            drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Rejected),
-            drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Skipped),
+            drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Excluded),
             drafts.Count(draft => draft.DuplicateStatus == ImportDraftDuplicateStatus.PossibleDuplicate));
 
     private static ImportReviewDetail ToDetail(
@@ -572,8 +665,8 @@ public sealed class ImportReviewService(
         return new ImportReviewDetail(
             file.Id, file.OriginalFileName, access.AccountName, access.Currency,
             file.Status.ToString(), file.TotalRowCount, file.ValidRowCount,
-            file.InvalidRowCount, file.ApprovedRowCount, file.RejectedRowCount,
-            file.SkippedRowCount, file.DuplicateRowCount,
+            file.InvalidRowCount, file.ApprovedRowCount, file.ExcludedRowCount,
+            file.DuplicateRowCount,
             CanEdit(access.IsPersonalAccount, access.AccountOwnerUserId, role, userId),
             drafts.Select(ToDraftItem).ToList());
     }

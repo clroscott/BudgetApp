@@ -102,8 +102,7 @@ public sealed class CsvImportService(
             validRows,
             invalidRows,
             approvedRows: 0,
-            rejectedRows: 0,
-            skippedRows: 0,
+            excludedRows: 0,
             duplicateRows: drafts.Count(draft =>
                 draft.DuplicateStatus == ImportDraftDuplicateStatus.PossibleDuplicate));
 
