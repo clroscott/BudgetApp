@@ -18,10 +18,10 @@ Set the local database connection string:
 dotnet user-secrets set "ConnectionStrings:BudgetApp" "<your-local-connection-string>" --project BudgetApp/BudgetApp.Server/BudgetApp.Server.csproj
 ```
 
-For example, Windows LocalDB can use a local-only development value:
+For the standard SQL Server development database:
 
 ```powershell
-dotnet user-secrets set "ConnectionStrings:BudgetApp" "Server=(localdb)\MSSQLLocalDB;Database=BudgetAppDb;Trusted_Connection=True;TrustServerCertificate=True" --project BudgetApp/BudgetApp.Server/BudgetApp.Server.csproj
+dotnet user-secrets set "ConnectionStrings:BudgetApp" "Server=<sql-server-instance>;Database=BudgetAppDb_DEV;Integrated Security=True;TrustServerCertificate=True;" --project BudgetApp/BudgetApp.Server/BudgetApp.Server.csproj
 ```
 
 List the configured keys:
@@ -56,7 +56,7 @@ Environment variables can also override nested configuration keys by replacing `
 ConnectionStrings__BudgetApp
 ```
 
-Production configuration is intentionally deferred. No production connection string belongs in source control.
+Production uses process-scoped configuration, and Scratch uses temporary explicit configuration. See [Database environments](database-environments.md) for the database roles, safety checks, and PowerShell commands. No production connection string belongs in source control.
 
 ## EF Core Migrations
 
@@ -72,13 +72,22 @@ Create a migration after changing the EF Core model:
 dotnet tool run dotnet-ef migrations add <MigrationName> --project BudgetApp/BudgetApp.Infrastructure/BudgetApp.Infrastructure.csproj --startup-project BudgetApp/BudgetApp.Server/BudgetApp.Server.csproj --output-dir Data/Migrations
 ```
 
-Apply pending migrations to the configured local database:
+Apply pending migrations only after explicitly selecting the target environment and database. See [Database environments](database-environments.md) for Development and Scratch commands.
+
+The Infrastructure project owns the `BudgetAppDbContext` and migrations. The Server project is the startup project and supplies environment-specific configuration.
+
+For a normal Development update:
 
 ```powershell
-dotnet tool run dotnet-ef database update --project BudgetApp/BudgetApp.Infrastructure/BudgetApp.Infrastructure.csproj --startup-project BudgetApp/BudgetApp.Server/BudgetApp.Server.csproj
-```
+$env:ASPNETCORE_ENVIRONMENT = "Development"
 
-The Infrastructure project owns the `BudgetAppDbContext` and migrations. The Server project is the startup project and supplies local configuration such as the connection string.
+dotnet tool run dotnet-ef database update `
+    --project BudgetApp/BudgetApp.Infrastructure/BudgetApp.Infrastructure.csproj `
+    --startup-project BudgetApp/BudgetApp.Server/BudgetApp.Server.csproj `
+    --connection "Server=<sql-server-instance>;Database=BudgetAppDb_DEV;Integrated Security=True;TrustServerCertificate=True;"
+
+Remove-Item Env:ASPNETCORE_ENVIRONMENT
+```
 
 ## Frontend Environment Files
 

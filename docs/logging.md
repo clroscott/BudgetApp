@@ -61,6 +61,8 @@ The base configuration logs BudgetApp events at `Information` and keeps framewor
 
 Development enables BudgetApp `Debug` events and EF Core SQL commands at `Information`. EF Core sensitive-data logging is not enabled, so SQL parameter values remain hidden.
 
+At startup, the Server logs the environment name, SQL Server name, and database name after the environment/database safety check succeeds. It never logs the connection string. Use this event to confirm that Visual Studio is using `BudgetAppDb_DEV`, the published app is using `BudgetAppDb`, and disposable testing is using `BudgetAppDb_Scratch`.
+
 ## Error Files
 
 Persistent error files use the name `budgetapp-errors-YYYYMMDD.log` under the Server project's `logs` directory. Files roll daily or when they reach 10 MB, whichever comes first. Files older than 14 days are removed, and the file count is capped at 31 as an additional disk-usage safeguard.

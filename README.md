@@ -32,5 +32,6 @@ Backend foundations for configuration, EF Core, SQL Server, technical logging, a
 - [Core data model](docs/core-data-model.md)
 - [Principal workflows](docs/workflows.md)
 - [Local development and secrets](docs/local-development.md)
+- [Database environments](docs/database-environments.md)
 - [Technical logging](docs/logging.md)
 - [Authentication](docs/authentication.md)
