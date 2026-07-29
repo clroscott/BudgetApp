@@ -70,7 +70,7 @@ public sealed class DashboardLayoutTests(BudgetAppWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task Save_WithUnsupportedPanel_IsRejected()
+    public async Task Save_WithInvalidPanelIdentifier_IsRejected()
     {
         using var client = factory.CreateAuthenticatedTestClient();
         await Register(client);
@@ -83,11 +83,35 @@ public sealed class DashboardLayoutTests(BudgetAppWebApplicationFactory factory)
             new
             {
                 preferredColumnCount = 3,
-                visiblePanelKeys = new[] { "unknown-panel" }
+                visiblePanelKeys = new[] { "unknown panel!" }
             },
             await GetAntiforgeryToken(client));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Save_WithNewWellFormedPanelIdentifier_IsAccepted()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        await Register(client);
+        var householdId = await CreateHousehold(client);
+
+        var response = await SendWithAntiforgery(
+            client,
+            HttpMethod.Put,
+            $"/api/households/{householdId}/dashboard-layout",
+            new
+            {
+                preferredColumnCount = 3,
+                visiblePanelKeys = new[] { "future-forecast-page" }
+            },
+            await GetAntiforgeryToken(client));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var saved =
+            await response.Content.ReadFromJsonAsync<DashboardLayoutResponse>();
+        Assert.Equal(["future-forecast-page"], saved!.VisiblePanelKeys);
     }
 
     private static async Task Register(HttpClient client)

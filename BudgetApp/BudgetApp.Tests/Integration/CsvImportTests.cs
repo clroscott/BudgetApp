@@ -14,6 +14,192 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
     : IClassFixture<BudgetAppWebApplicationFactory>
 {
     [Fact]
+    public async Task Upload_AppliesFirstMatchingRuleWithoutOverwritingCsvCategory()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        await Register(client);
+        var householdId = await CreateHousehold(client);
+        var accountId = await CreateAccount(client, householdId);
+
+        Guid groceriesId;
+        Guid paychequeId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+            groceriesId = await dbContext.Categories
+                .Where(category => category.HouseholdId == householdId)
+                .Where(category => category.Name == "Groceries")
+                .Select(category => category.Id)
+                .SingleAsync();
+            paychequeId = await dbContext.Categories
+                .Where(category => category.HouseholdId == householdId)
+                .Where(category => category.Name == "Paycheque")
+                .Select(category => category.Id)
+                .SingleAsync();
+        }
+
+        var token = await GetAntiforgeryToken(client);
+        var createRule = await PostJson(
+            client,
+            $"/api/households/{householdId}/categorization-rules",
+            new
+            {
+                name = "Netflix to groceries",
+                matchField = "Description",
+                matchOperator = "Contains",
+                matchValue = "Netflix",
+                accountId = (Guid?)null,
+                targetCategoryId = groceriesId
+            },
+            token);
+        Assert.Equal(HttpStatusCode.Created, createRule.StatusCode);
+
+        var upload = await Upload(
+            client,
+            householdId,
+            accountId,
+            "Date,Description,Amount,Category,Subcategory\n" +
+            "2026-07-20,NETFLIX.COM,-20,,\n" +
+            "2026-07-21,Netflix payroll,1000,Income,Paycheque\n",
+            token);
+
+        Assert.Equal(HttpStatusCode.Created, upload.StatusCode);
+        var imported = await upload.Content.ReadFromJsonAsync<CsvImportResponse>();
+        var review = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{imported!.ImportFileId}");
+        var rows = review!.Drafts.OrderBy(row => row.SourceRowNumber).ToList();
+
+        Assert.Equal(groceriesId, rows[0].SelectedCategoryId);
+        Assert.Equal(paychequeId, rows[1].SelectedCategoryId);
+    }
+
+    [Fact]
+    public async Task ApplyCategorizationRules_FillsExistingUncategorizedDraft()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        await Register(client);
+        var householdId = await CreateHousehold(client);
+        var accountId = await CreateAccount(client, householdId);
+        var token = await GetAntiforgeryToken(client);
+
+        var upload = await Upload(
+            client,
+            householdId,
+            accountId,
+            "Date,Description,Amount\n2026-07-20,NETFLIX.COM,-20\n",
+            token);
+        var imported = await upload.Content.ReadFromJsonAsync<CsvImportResponse>();
+        var initialReview = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{imported!.ImportFileId}");
+        var approve = await PostJson(
+            client,
+            DecisionPath(
+                householdId,
+                imported.ImportFileId,
+                Assert.Single(initialReview!.Drafts).Id),
+            new
+            {
+                decision = "Approved",
+                acknowledgePossibleDuplicate = false
+            },
+            token);
+        Assert.Equal(HttpStatusCode.NoContent, approve.StatusCode);
+
+        Guid subscriptionsId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+            subscriptionsId = await dbContext.Categories
+                .Where(category => category.HouseholdId == householdId)
+                .Where(category => category.Name == "Subscriptions")
+                .Select(category => category.Id)
+                .SingleAsync();
+        }
+
+        var createRule = await PostJson(
+            client,
+            $"/api/households/{householdId}/categorization-rules",
+            new
+            {
+                name = "Netflix subscription",
+                matchField = "Description",
+                matchOperator = "Contains",
+                matchValue = "Netflix",
+                accountId = (Guid?)null,
+                targetCategoryId = subscriptionsId
+            },
+            token);
+        Assert.Equal(HttpStatusCode.Created, createRule.StatusCode);
+
+        var applyRules = await PostJson(
+            client,
+            $"/api/households/{householdId}/imports/{imported.ImportFileId}/apply-categorization-rules",
+            new { },
+            token);
+
+        Assert.Equal(HttpStatusCode.OK, applyRules.StatusCode);
+        var applyResult =
+            await applyRules.Content.ReadFromJsonAsync<ApplyRulesResponse>();
+        Assert.Equal(1, applyResult!.AppliedRows);
+        var review = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{imported.ImportFileId}");
+        var categorizedDraft = Assert.Single(review!.Drafts);
+        Assert.Equal("Approved", categorizedDraft.ReviewDecision);
+        Assert.Equal(subscriptionsId, categorizedDraft.SelectedCategoryId);
+    }
+
+    [Fact]
+    public async Task BulkUpdateDrafts_SavesMultipleCorrectionsInOneRequest()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        await Register(client);
+        var householdId = await CreateHousehold(client);
+        var accountId = await CreateAccount(client, householdId);
+        var token = await GetAntiforgeryToken(client);
+        var upload = await Upload(
+            client,
+            householdId,
+            accountId,
+            "Date,Description,Amount\n" +
+            "2026-07-20,Store one,-20\n" +
+            "2026-07-21,Store two,-30\n",
+            token);
+        var imported = await upload.Content.ReadFromJsonAsync<CsvImportResponse>();
+        var initialReview = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{imported!.ImportFileId}");
+        var rows = initialReview!.Drafts.OrderBy(row => row.SourceRowNumber).ToList();
+
+        var save = await PutJson(
+            client,
+            $"/api/households/{householdId}/imports/{imported.ImportFileId}/drafts",
+            new
+            {
+                drafts = rows.Select((row, index) => new
+                {
+                    draftId = row.Id,
+                    transactionDate = index == 0 ? "2026-07-22" : "2026-07-23",
+                    amount = index == 0 ? 25m : 35m,
+                    description = index == 0 ? "Corrected one" : "Corrected two",
+                    selectedCategoryId = (Guid?)null
+                })
+            },
+            token);
+
+        Assert.Equal(HttpStatusCode.OK, save.StatusCode);
+        var result = await save.Content.ReadFromJsonAsync<BulkSaveResponse>();
+        Assert.Equal(2, result!.SavedRows);
+        var updatedReview = await client.GetFromJsonAsync<ImportReviewResponse>(
+            $"/api/households/{householdId}/imports/{imported.ImportFileId}");
+        var updatedRows = updatedReview!.Drafts
+            .OrderBy(row => row.SourceRowNumber)
+            .ToList();
+        Assert.Equal("Corrected one", updatedRows[0].Description);
+        Assert.Equal(25m, updatedRows[0].Amount);
+        Assert.Equal("Corrected two", updatedRows[1].Description);
+        Assert.Equal(35m, updatedRows[1].Amount);
+    }
+
+    [Fact]
     public async Task CustomProfile_CanBeSavedAndUsedForFutureUploads()
     {
         using var client = factory.CreateAuthenticatedTestClient();
@@ -606,4 +792,6 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
     private sealed record CompleteImportResponse(
         int CreatedTransactionCount,
         string Status);
+    private sealed record ApplyRulesResponse(int AppliedRows);
+    private sealed record BulkSaveResponse(int SavedRows);
 }

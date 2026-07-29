@@ -1,7 +1,9 @@
 using BudgetApp.Application.Accounts;
 using BudgetApp.Application.Categories;
+using BudgetApp.Application.CategorizationRules;
 using BudgetApp.Application.Households;
 using BudgetApp.Domain.Accounts;
+using BudgetApp.Domain.CategorizationRules;
 using BudgetApp.Domain.Households;
 using BudgetApp.Domain.Imports;
 
@@ -10,6 +12,7 @@ namespace BudgetApp.Application.Imports;
 public sealed class CsvImportService(
     IAccountRepository accountRepository,
     ICategoryRepository categoryRepository,
+    ICategorizationRuleRepository categorizationRuleRepository,
     IImportRepository importRepository,
     ICsvImportReader csvImportReader,
     ImportProfileService importProfileService,
@@ -71,8 +74,21 @@ public sealed class CsvImportService(
         var categories = await categoryRepository.ListAsync(
             householdId,
             cancellationToken);
+        var categorizationRules = (await categorizationRuleRepository.ListAsync(
+                householdId,
+                forUpdate: false,
+                cancellationToken))
+            .Where(rule => rule.IsActive)
+            .OrderBy(rule => rule.Priority)
+            .ToList();
         var drafts = readResult.Rows
-            .Select(row => CreateDraft(row, categories, importFile.Id, now))
+            .Select(row => CreateDraft(
+                row,
+                categories,
+                categorizationRules,
+                account.Id,
+                importFile.Id,
+                now))
             .ToList();
         var validRows = drafts.Count(draft =>
             draft.ValidationStatus == ImportDraftValidationStatus.Valid);
@@ -109,6 +125,8 @@ public sealed class CsvImportService(
     private static ImportTransactionDraft CreateDraft(
         CsvImportRow row,
         IReadOnlyList<CategoryRecord> categories,
+        IReadOnlyList<CategorizationRule> categorizationRules,
+        Guid accountId,
         Guid importFileId,
         DateTimeOffset now)
     {
@@ -122,6 +140,11 @@ public sealed class CsvImportService(
             row.ValidationMessage,
             now);
         var match = FindCategoryMatch(row, categories);
+        match ??= FindRuleMatch(
+            row,
+            categories,
+            categorizationRules,
+            accountId);
         if (match is not null)
         {
             draft.SetSuggestedCategory(match.Id, now);
@@ -129,6 +152,22 @@ public sealed class CsvImportService(
         }
 
         return draft;
+    }
+
+    private static CategoryRecord? FindRuleMatch(
+        CsvImportRow row,
+        IReadOnlyList<CategoryRecord> categories,
+        IReadOnlyList<CategorizationRule> rules,
+        Guid accountId)
+    {
+        var targetId = rules
+            .FirstOrDefault(rule => rule.Matches(accountId, row.Description))
+            ?.TargetCategoryId;
+        return targetId.HasValue
+            ? categories.FirstOrDefault(category =>
+                category.Id == targetId.Value &&
+                category.IsActive)
+            : null;
     }
 
     private static CategoryRecord? FindCategoryMatch(

@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { getCategories, type CategoryItem } from '../categories/categoryApi'
+import {
+  createCategorizationRule,
+  type CategorizationRuleMatchOperator,
+} from '../categorizationRules/categorizationRuleApi'
 import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import {
+  applyImportCategorizationRules,
+  bulkUpdateImportDrafts,
   bulkReviewImportDrafts,
   checkImportDuplicates,
   completeImport,
@@ -15,6 +21,7 @@ import {
   reviewImportDraft,
   updateImportDraft,
   type ImportDraftItem,
+  type ImportDraftUpdate,
   type ImportListItem,
   type ImportReviewDetail,
 } from '../imports/importApi'
@@ -42,17 +49,38 @@ function selectedImportFromUrl() {
   return new URLSearchParams(window.location.search).get('importId') ?? ''
 }
 
+function generatedRuleName(
+  operator: CategorizationRuleMatchOperator,
+  matchValue: string,
+) {
+  const operatorLabel = {
+    Contains: 'Contains',
+    StartsWith: 'Starts with',
+    EndsWith: 'Ends with',
+    Exact: 'Exactly matches',
+  }[operator]
+  return `${operatorLabel} ${matchValue.trim()}`.slice(0, 100)
+}
+
 interface DraftRowProps {
   householdId: string
   importFileId: string
   draft: ImportDraftItem
   categories: CategoryItem[]
+  pendingUpdate: PendingDraftUpdate | null
   canEdit: boolean
   isCompleted: boolean
   onChanged: () => Promise<void>
-  onDirtyChange: (draftId: string, isDirty: boolean) => void
+  onDirtyChange: (draftId: string, update: PendingDraftUpdate | null) => void
   onRemove: (draftId: string, sourceRowNumber: number) => Promise<void>
   onError: (error: unknown) => void
+}
+
+interface PendingDraftUpdate {
+  transactionDate: string
+  amount: string
+  description: string
+  selectedCategoryId: string | null
 }
 
 function DraftRow({
@@ -60,6 +88,7 @@ function DraftRow({
   importFileId,
   draft,
   categories,
+  pendingUpdate,
   canEdit,
   isCompleted,
   onChanged,
@@ -68,12 +97,25 @@ function DraftRow({
   onError,
 }: DraftRowProps) {
   const savedCategorySelection = findCategorySelection(categories, draft.selectedCategoryId)
-  const [transactionDate, setTransactionDate] = useState(draft.transactionDate ?? '')
-  const [amount, setAmount] = useState(draft.amount?.toString() ?? '')
-  const [description, setDescription] = useState(draft.description ?? '')
-  const [categoryId, setCategoryId] = useState(savedCategorySelection.categoryId)
-  const [subcategoryId, setSubcategoryId] = useState(savedCategorySelection.subcategoryId)
+  const initialCategorySelection = findCategorySelection(
+    categories,
+    pendingUpdate?.selectedCategoryId ?? draft.selectedCategoryId,
+  )
+  const [transactionDate, setTransactionDate] = useState(
+    pendingUpdate?.transactionDate ?? draft.transactionDate ?? '')
+  const [amount, setAmount] = useState(
+    pendingUpdate?.amount ?? draft.amount?.toString() ?? '')
+  const [description, setDescription] = useState(
+    pendingUpdate?.description ?? draft.description ?? '')
+  const [categoryId, setCategoryId] = useState(initialCategorySelection.categoryId)
+  const [subcategoryId, setSubcategoryId] = useState(initialCategorySelection.subcategoryId)
   const [isBusy, setIsBusy] = useState(false)
+  const [isRuleEditorOpen, setIsRuleEditorOpen] = useState(false)
+  const [isCreatingRule, setIsCreatingRule] = useState(false)
+  const [ruleCreated, setRuleCreated] = useState(false)
+  const [ruleMatchOperator, setRuleMatchOperator] =
+    useState<CategorizationRuleMatchOperator>('Contains')
+  const [ruleMatchValue, setRuleMatchValue] = useState('')
   const editable = canEdit && !isCompleted && !draft.approvedTransactionId
   const selectedCategoryId = subcategoryId || categoryId || null
   const subcategories = categories.find(category => category.id === categoryId)?.children ?? []
@@ -84,12 +126,21 @@ function DraftRow({
     selectedCategoryId !== draft.selectedCategoryId
 
   useEffect(() => {
-    onDirtyChange(draft.id, isDirty)
-  }, [draft.id, isDirty, onDirtyChange])
-
-  useEffect(() => () => {
-    onDirtyChange(draft.id, false)
-  }, [draft.id, onDirtyChange])
+    onDirtyChange(draft.id, isDirty ? {
+      transactionDate,
+      amount,
+      description,
+      selectedCategoryId,
+    } : null)
+  }, [
+    amount,
+    description,
+    draft.id,
+    isDirty,
+    onDirtyChange,
+    selectedCategoryId,
+    transactionDate,
+  ])
 
   const resetChanges = () => {
     const savedSelection = findCategorySelection(categories, draft.selectedCategoryId)
@@ -98,6 +149,49 @@ function DraftRow({
     setDescription(draft.description ?? '')
     setCategoryId(savedSelection.categoryId)
     setSubcategoryId(savedSelection.subcategoryId)
+  }
+
+  const openRuleEditor = async () => {
+    setIsBusy(true)
+    try {
+      if (isDirty) {
+        await persistVisibleValues()
+        await onChanged()
+      }
+
+      const currentDescription = description.trim()
+      setRuleMatchOperator('Contains')
+      setRuleMatchValue(currentDescription)
+      setRuleCreated(false)
+      setIsRuleEditorOpen(true)
+    } catch (error) {
+      onError(error)
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  const createFutureRule = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!selectedCategoryId) return
+
+    setIsCreatingRule(true)
+    try {
+      await createCategorizationRule(householdId, {
+        name: generatedRuleName(ruleMatchOperator, ruleMatchValue),
+        matchField: 'Description',
+        matchOperator: ruleMatchOperator,
+        matchValue: ruleMatchValue,
+        accountId: null,
+        targetCategoryId: selectedCategoryId,
+      })
+      setRuleCreated(true)
+      setIsRuleEditorOpen(false)
+    } catch (error) {
+      onError(error)
+    } finally {
+      setIsCreatingRule(false)
+    }
   }
 
   const persistVisibleValues = async () => {
@@ -228,6 +322,16 @@ function DraftRow({
                 Refresh
               </button>
             </>}
+            {selectedCategoryId && description.trim() && (
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={isBusy}
+                title="Save this category choice and create a rule for future imports."
+                onClick={() => void openRuleEditor()}>
+                {isDirty ? 'Save & create rule' : 'Create rule'}
+              </button>
+            )}
             <button className="primary-button" type="button" disabled={
               isBusy ||
               draft.validationStatus !== 'Valid' ||
@@ -250,6 +354,63 @@ function DraftRow({
           </div>}
         </div>
       </form>
+      {ruleCreated && (
+        <p className="rule-created-message" role="status">
+          Rule created. Future matching imports will use it.
+        </p>
+      )}
+      {isRuleEditorOpen && selectedCategoryId && (
+        <form
+          className="import-rule-editor"
+          onSubmit={event => void createFutureRule(event)}
+        >
+          <div className="import-rule-editor-heading">
+            <div>
+              <strong>Create a rule for future imports</strong>
+              <p>
+                This rule will apply across accounts and will not change existing rows.
+              </p>
+            </div>
+            <button
+              className="text-button"
+              type="button"
+              disabled={isCreatingRule}
+              onClick={() => setIsRuleEditorOpen(false)}>
+              Cancel
+            </button>
+          </div>
+          <label>
+            <span>When the description</span>
+            <select
+              value={ruleMatchOperator}
+              disabled={isCreatingRule}
+              onChange={event => setRuleMatchOperator(
+                event.target.value as CategorizationRuleMatchOperator)}
+            >
+              <option value="Contains">contains</option>
+              <option value="StartsWith">starts with</option>
+              <option value="EndsWith">ends with</option>
+              <option value="Exact">exactly matches</option>
+            </select>
+          </label>
+          <label>
+            <span>Match text</span>
+            <input
+              value={ruleMatchValue}
+              maxLength={200}
+              required
+              disabled={isCreatingRule}
+              onChange={event => setRuleMatchValue(event.target.value)}
+            />
+          </label>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={isCreatingRule}>
+            {isCreatingRule ? 'Creating...' : 'Create rule'}
+          </button>
+        </form>
+      )}
     </article>
   )
 }
@@ -267,10 +428,15 @@ export function ImportReviewPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isCompleting, setIsCompleting] = useState(false)
   const [isDiscarding, setIsDiscarding] = useState(false)
+  const [isApplyingRules, setIsApplyingRules] = useState(false)
+  const [ruleApplicationMessage, setRuleApplicationMessage] = useState('')
+  const [isSavingAll, setIsSavingAll] = useState(false)
+  const [bulkSaveMessage, setBulkSaveMessage] = useState('')
   const [bulkDecision, setBulkDecision] = useState<
     'Approved' | 'Rejected' | 'Skipped' | null
   >(null)
-  const [dirtyDraftIds, setDirtyDraftIds] = useState<Set<string>>(new Set())
+  const [dirtyDraftUpdates, setDirtyDraftUpdates] =
+    useState<Map<string, PendingDraftUpdate>>(new Map())
   const [errors, setErrors] = useState<string[]>([])
 
   const filteredImports = useMemo(() => imports.filter(item => {
@@ -279,14 +445,15 @@ export function ImportReviewPage() {
     return item.status === 'ReadyForReview'
   }), [importFilter, imports])
 
-  const handleDirtyChange = useCallback((draftId: string, isDirty: boolean) => {
-    setDirtyDraftIds(current => {
-      const updated = new Set(current)
-      if (isDirty) updated.add(draftId)
+  const handleDirtyChange = useCallback((
+    draftId: string,
+    update: PendingDraftUpdate | null,
+  ) => {
+    setDirtyDraftUpdates(current => {
+      const updated = new Map(current)
+      if (update) updated.set(draftId, update)
       else updated.delete(draftId)
-      return updated.size === current.size && [...updated].every(id => current.has(id))
-        ? current
-        : updated
+      return updated
     })
   }, [])
 
@@ -346,7 +513,8 @@ export function ImportReviewPage() {
       return
     }
     let isCurrent = true
-    setDirtyDraftIds(new Set())
+    setDirtyDraftUpdates(new Map())
+    setBulkSaveMessage('')
     setIsLoading(true)
     setErrors([])
     void getImport(currentHousehold.id, selectedImportId)
@@ -366,7 +534,13 @@ export function ImportReviewPage() {
   const pendingPossibleDuplicates = pendingDrafts.filter(draft =>
     draft.validationStatus === 'Valid' &&
     draft.duplicateStatus === 'PossibleDuplicate').length
-  const hasUnsavedRows = dirtyDraftIds.size > 0
+  const uncategorizedRuleEligibleRows = detail?.drafts.filter(
+    draft =>
+      (draft.reviewDecision === 'Pending' ||
+        draft.reviewDecision === 'Approved') &&
+      !draft.selectedCategoryId,
+  ).length ?? 0
+  const hasUnsavedRows = dirtyDraftUpdates.size > 0
   const hasUncheckedDuplicates = detail?.drafts.some(
     draft => draft.duplicateStatus === 'NotChecked') ?? false
   const draftPageCount = detail
@@ -387,6 +561,73 @@ export function ImportReviewPage() {
       await refreshDetail()
     } catch (error) {
       setErrors(getErrorMessages(error))
+    }
+  }
+
+  const handleApplyCategorizationRules = async () => {
+    if (!detail || hasUnsavedRows) return
+    setIsApplyingRules(true)
+    setErrors([])
+    setRuleApplicationMessage('')
+    try {
+      const result = await applyImportCategorizationRules(
+        currentHousehold.id,
+        detail.id,
+      )
+      await refreshDetail()
+      setRuleApplicationMessage(result.appliedRows === 0
+        ? 'No uncategorized rows matched an active rule.'
+        : `${result.appliedRows} ${result.appliedRows === 1 ? 'row was' : 'rows were'} categorized.`)
+    } catch (error) {
+      setErrors(getErrorMessages(error))
+    } finally {
+      setIsApplyingRules(false)
+    }
+  }
+
+  const handleSaveAllCorrections = async () => {
+    if (!detail || dirtyDraftUpdates.size === 0) return
+
+    const updates: ImportDraftUpdate[] = []
+    for (const [draftId, update] of dirtyDraftUpdates) {
+      const parsedAmount = update.amount.trim() === ''
+        ? null
+        : Number(update.amount)
+      if (parsedAmount !== null && !Number.isFinite(parsedAmount)) {
+        const row = detail.drafts.find(draft => draft.id === draftId)
+        setErrors([
+          `CSV row ${row?.sourceRowNumber ?? ''} has an invalid amount.`.trim(),
+        ])
+        return
+      }
+
+      updates.push({
+        draftId,
+        transactionDate: update.transactionDate || null,
+        amount: parsedAmount,
+        description: update.description.trim() || null,
+        selectedCategoryId: update.selectedCategoryId,
+      })
+    }
+
+    setIsSavingAll(true)
+    setErrors([])
+    setBulkSaveMessage('')
+    try {
+      const result = await bulkUpdateImportDrafts(
+        currentHousehold.id,
+        detail.id,
+        updates,
+      )
+      setDirtyDraftUpdates(new Map())
+      await refreshDetail()
+      setBulkSaveMessage(
+        `${result.savedRows} ${result.savedRows === 1 ? 'correction was' : 'corrections were'} saved.`,
+      )
+    } catch (error) {
+      setErrors(getErrorMessages(error))
+    } finally {
+      setIsSavingAll(false)
     }
   }
 
@@ -445,6 +686,11 @@ export function ImportReviewPage() {
     setErrors([])
     try {
       await removeImportDraft(currentHousehold.id, detail.id, draftId)
+      setDirtyDraftUpdates(current => {
+        const updated = new Map(current)
+        updated.delete(draftId)
+        return updated
+      })
       await refreshDetail()
     } catch (error) {
       setErrors(getErrorMessages(error))
@@ -562,6 +808,26 @@ export function ImportReviewPage() {
                   <div>
                     <strong>Review remaining</strong>
                     <div className="import-control-actions">
+                      <button
+                        className="primary-button"
+                        type="button"
+                        disabled={!hasUnsavedRows || isSavingAll}
+                        onClick={() => void handleSaveAllCorrections()}>
+                        {isSavingAll
+                          ? 'Saving corrections...'
+                          : `Save all corrections (${dirtyDraftUpdates.size})`}
+                      </button>
+                      <button className="secondary-button" type="button"
+                        disabled={
+                          uncategorizedRuleEligibleRows === 0 ||
+                          hasUnsavedRows ||
+                          isApplyingRules
+                        }
+                        onClick={() => void handleApplyCategorizationRules()}>
+                        {isApplyingRules
+                          ? 'Applying rules...'
+                          : 'Apply rules'}
+                      </button>
                       <button className="primary-button" type="button"
                         disabled={validPendingRows === 0 || hasUnsavedRows || bulkDecision !== null}
                         onClick={() => void handleBulkDecision('Approved')}>
@@ -579,7 +845,21 @@ export function ImportReviewPage() {
                       </button>
                     </div>
                     {hasUnsavedRows && (
-                      <p className="field-help">Save or refresh edited rows before using bulk actions.</p>
+                      <p className="field-help">
+                        Save all corrections before approving or applying rules.
+                      </p>
+                    )}
+                    {bulkSaveMessage && (
+                      <p className="field-help" role="status">{bulkSaveMessage}</p>
+                    )}
+                    {!hasUnsavedRows && uncategorizedRuleEligibleRows > 0 && (
+                      <p className="field-help">
+                        Check {uncategorizedRuleEligibleRows} uncategorized pending or approved
+                        {uncategorizedRuleEligibleRows === 1 ? ' row' : ' rows'}.
+                      </p>
+                    )}
+                    {ruleApplicationMessage && (
+                      <p className="field-help" role="status">{ruleApplicationMessage}</p>
                     )}
                   </div>
                   <div>
@@ -624,6 +904,7 @@ export function ImportReviewPage() {
                   importFileId={detail.id}
                   draft={draft}
                   categories={categories}
+                  pendingUpdate={dirtyDraftUpdates.get(draft.id) ?? null}
                   canEdit={detail.canEdit}
                   isCompleted={detail.status === 'Completed'}
                   onChanged={refreshDetail}

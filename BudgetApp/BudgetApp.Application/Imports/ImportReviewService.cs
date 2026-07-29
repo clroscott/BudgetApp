@@ -1,5 +1,6 @@
 using System.Text.Json;
 using BudgetApp.Application.Categories;
+using BudgetApp.Application.CategorizationRules;
 using BudgetApp.Application.Households;
 using BudgetApp.Domain.Households;
 using BudgetApp.Domain.Imports;
@@ -10,6 +11,7 @@ namespace BudgetApp.Application.Imports;
 public sealed class ImportReviewService(
     IImportRepository importRepository,
     ICategoryRepository categoryRepository,
+    ICategorizationRuleRepository categorizationRuleRepository,
     HouseholdAuthorizationService authorizationService,
     TimeProvider timeProvider)
 {
@@ -71,6 +73,70 @@ public sealed class ImportReviewService(
         await importRepository.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<int> ApplyCategorizationRulesAsync(
+        Guid householdId,
+        Guid userId,
+        Guid importFileId,
+        CancellationToken cancellationToken)
+    {
+        var (access, role) = await GetAuthorized(
+            householdId,
+            userId,
+            importFileId,
+            forUpdate: true,
+            cancellationToken);
+        RequireEdit(access, role, userId);
+        RequireReviewable(access.ImportFile);
+
+        var rules = (await categorizationRuleRepository.ListAsync(
+                householdId,
+                forUpdate: false,
+                cancellationToken))
+            .Where(rule => rule.IsActive)
+            .OrderBy(rule => rule.Priority)
+            .ToList();
+        if (rules.Count == 0)
+        {
+            return 0;
+        }
+
+        var activeCategoryIds = (await categoryRepository.ListAsync(
+                householdId,
+                cancellationToken))
+            .Where(category => category.IsActive)
+            .Select(category => category.Id)
+            .ToHashSet();
+        var drafts = await importRepository.ListDraftsAsync(
+            importFileId,
+            forUpdate: true,
+            cancellationToken);
+        var now = timeProvider.GetUtcNow();
+        var appliedRows = 0;
+
+        foreach (var draft in drafts.Where(draft =>
+                     (draft.ReviewDecision is ImportDraftReviewDecision.Pending or
+                         ImportDraftReviewDecision.Approved) &&
+                     !draft.SelectedCategoryId.HasValue))
+        {
+            var targetCategoryId = rules
+                .FirstOrDefault(rule =>
+                    activeCategoryIds.Contains(rule.TargetCategoryId) &&
+                    rule.Matches(access.ImportFile.AccountId, draft.Description))
+                ?.TargetCategoryId;
+            if (!targetCategoryId.HasValue)
+            {
+                continue;
+            }
+
+            draft.SetSuggestedCategory(targetCategoryId, now);
+            draft.SelectCategory(targetCategoryId, now);
+            appliedRows++;
+        }
+
+        await importRepository.SaveChangesAsync(cancellationToken);
+        return appliedRows;
+    }
+
     public async Task UpdateDraftAsync(
         Guid householdId,
         Guid userId,
@@ -108,6 +174,85 @@ public sealed class ImportReviewService(
         await ApplyDuplicateResults(access.ImportFile.AccountId, [draft], cancellationToken);
         access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), now);
         await importRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<int> BulkUpdateDraftsAsync(
+        Guid householdId,
+        Guid userId,
+        Guid importFileId,
+        IReadOnlyList<ImportDraftUpdateInput> updates,
+        CancellationToken cancellationToken)
+    {
+        if (updates.Count == 0 ||
+            updates.Select(update => update.DraftId).Distinct().Count() != updates.Count)
+        {
+            throw new ArgumentException(
+                "Provide one update for each changed import row.",
+                nameof(updates));
+        }
+
+        var (access, role) = await GetAuthorized(
+            householdId,
+            userId,
+            importFileId,
+            forUpdate: true,
+            cancellationToken);
+        RequireEdit(access, role, userId);
+        RequireReviewable(access.ImportFile);
+
+        var drafts = await importRepository.ListDraftsAsync(
+            importFileId,
+            forUpdate: true,
+            cancellationToken);
+        var draftsById = drafts.ToDictionary(draft => draft.Id);
+        if (updates.Any(update => !draftsById.ContainsKey(update.DraftId)))
+        {
+            throw new ImportDraftNotFoundException();
+        }
+
+        var categories = (await categoryRepository.ListAsync(
+                householdId,
+                cancellationToken))
+            .ToDictionary(category => category.Id);
+        var now = timeProvider.GetUtcNow();
+        var updatedDrafts = new List<ImportTransactionDraft>(updates.Count);
+
+        foreach (var update in updates)
+        {
+            var draft = draftsById[update.DraftId];
+            if (update.SelectedCategoryId.HasValue)
+            {
+                if (!categories.TryGetValue(
+                        update.SelectedCategoryId.Value,
+                        out var category))
+                {
+                    throw new CategoryNotFoundException();
+                }
+
+                if (!category.IsActive &&
+                    draft.SelectedCategoryId != category.Id)
+                {
+                    throw new InvalidOperationException(
+                        "A deactivated category cannot be assigned.");
+                }
+            }
+
+            draft.CorrectParsedValues(
+                update.TransactionDate,
+                update.Amount,
+                update.Description,
+                update.SelectedCategoryId,
+                now);
+            updatedDrafts.Add(draft);
+        }
+
+        await ApplyDuplicateResults(
+            access.ImportFile.AccountId,
+            updatedDrafts,
+            cancellationToken);
+        access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), now);
+        await importRepository.SaveChangesAsync(cancellationToken);
+        return updatedDrafts.Count;
     }
 
     public async Task SetDecisionAsync(

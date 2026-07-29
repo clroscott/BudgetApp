@@ -314,6 +314,123 @@ a {
   gap: 1.5rem;
 }
 
+.rule-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.rule-form-heading,
+.rule-form-actions {
+  grid-column: 1 / -1;
+}
+
+.rule-form-heading p,
+.rule-row p,
+.rule-row small {
+  color: var(--muted-text);
+}
+
+.rule-form label {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.rule-form label small {
+  font-weight: 400;
+}
+
+.rule-form-actions,
+.rule-heading,
+.rule-section-heading,
+.rule-main {
+  display: flex;
+  align-items: center;
+}
+
+.rule-form-actions,
+.rule-heading,
+.rule-main {
+  gap: 0.65rem;
+}
+
+.rule-form-actions button {
+  margin-top: 0;
+}
+
+.rule-sections {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.rule-section {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.inactive-rule-section {
+  background: var(--surface-soft);
+}
+
+.rule-section-heading {
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.rule-section-heading h2 {
+  margin: 0.2rem 0 0;
+  font-size: 1.1rem;
+}
+
+.rule-section > .empty-state {
+  margin: 1.25rem;
+}
+
+.rule-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.rule-row + .rule-row {
+  border-top: 1px solid var(--border);
+}
+
+.rule-row p {
+  margin: 0.25rem 0;
+}
+
+.rule-row code {
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.3rem;
+  background: var(--surface-soft);
+  color: var(--heading);
+}
+
+.rule-row-dragging {
+  opacity: 0.45;
+}
+
+.inactive-row {
+  opacity: 0.78;
+}
+
 .category-section {
   padding: 1.25rem;
   border: 1px solid var(--border);
@@ -1294,6 +1411,36 @@ a {
   max-width: 80rem;
 }
 
+.import-mapping-panel {
+  margin-top: 1.5rem;
+}
+
+.import-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+.import-profile-grid label {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+  min-width: 0;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.import-profile-grid input,
+.import-profile-grid select {
+  width: 100%;
+}
+
+.import-mapping-profile-name {
+  grid-column: 1 / -1;
+  max-width: 28rem;
+}
+
 .import-profile-form,
 .import-mapping-panel {
   margin-bottom: 1.5rem;
@@ -1614,6 +1761,58 @@ a {
   margin-top: 0;
   padding: 0.35rem 0.55rem;
   font-size: 0.76rem;
+}
+
+.import-rule-editor {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.65fr) minmax(14rem, 1fr) auto;
+  align-items: end;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+  padding: 0.75rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.55rem;
+  background: var(--accent-soft);
+}
+
+.import-rule-editor-heading {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.import-rule-editor-heading p {
+  margin: 0.15rem 0 0;
+  color: var(--muted-text);
+  font-size: 0.78rem;
+}
+
+.import-rule-editor label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.import-rule-editor input,
+.import-rule-editor select {
+  min-height: 2.25rem;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.82rem;
+}
+
+.import-rule-editor .primary-button {
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+.rule-created-message {
+  margin: 0.55rem 0 0;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .complete-import-panel {
@@ -2124,6 +2323,10 @@ a {
 }
 
 @media (max-width: 55rem) {
+  .import-profile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .app-shell {
     display: block;
   }
@@ -2294,6 +2497,10 @@ a {
     justify-content: flex-start;
   }
 
+  .import-rule-editor {
+    grid-template-columns: 1fr;
+  }
+
   .import-description-field {
     grid-column: 1 / -1;
   }
@@ -2338,6 +2545,15 @@ a {
   .import-profile-details-grid {
     grid-template-columns: 1fr;
   }
+
+  .import-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .import-mapping-profile-name {
+    max-width: none;
+  }
+
   .import-profile-column-heading {
     align-items: stretch;
     flex-direction: column;
@@ -2384,6 +2600,16 @@ a {
 
   .add-category-form {
     grid-template-columns: 1fr;
+  }
+
+  .rule-form {
+    grid-template-columns: 1fr;
+  }
+
+  .rule-row,
+  .rule-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .account-form-grid {

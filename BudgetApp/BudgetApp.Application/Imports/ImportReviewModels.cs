@@ -1,5 +1,12 @@
 namespace BudgetApp.Application.Imports;
 
+public sealed record ImportDraftUpdateInput(
+    Guid DraftId,
+    DateOnly? TransactionDate,
+    decimal? Amount,
+    string? Description,
+    Guid? SelectedCategoryId);
+
 public sealed record ImportListItem(
     Guid Id,
     string OriginalFileName,

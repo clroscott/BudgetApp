@@ -59,6 +59,14 @@ export interface CompleteImportResult {
   status: string
 }
 
+export interface ImportDraftUpdate {
+  draftId: string
+  transactionDate: string | null
+  amount: number | null
+  description: string | null
+  selectedCategoryId: string | null
+}
+
 export function uploadCsvImport(
   householdId: string,
   accountId: string,
@@ -99,6 +107,16 @@ export function checkImportDuplicates(
   )
 }
 
+export function applyImportCategorizationRules(
+  householdId: string,
+  importFileId: string,
+): Promise<{ appliedRows: number }> {
+  return apiPost<{ appliedRows: number }>(
+    `/api/households/${householdId}/imports/${importFileId}/apply-categorization-rules`,
+    {},
+  )
+}
+
 export function updateImportDraft(
   householdId: string,
   importFileId: string,
@@ -113,6 +131,17 @@ export function updateImportDraft(
   return apiPut(
     `/api/households/${householdId}/imports/${importFileId}/drafts/${draftId}`,
     request,
+  )
+}
+
+export function bulkUpdateImportDrafts(
+  householdId: string,
+  importFileId: string,
+  drafts: ImportDraftUpdate[],
+): Promise<{ savedRows: number }> {
+  return apiPut<{ savedRows: number }>(
+    `/api/households/${householdId}/imports/${importFileId}/drafts`,
+    { drafts },
   )
 }
 

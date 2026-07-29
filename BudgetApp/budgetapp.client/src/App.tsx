@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { Suspense, useEffect, type ReactNode } from 'react'
 import './App.css'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
@@ -7,18 +7,7 @@ import { AppShell } from './components/AppShell'
 import { BrandMark } from './components/Brand'
 import { HouseholdProvider } from './households/HouseholdProvider'
 import { useHouseholds } from './households/useHouseholds'
-import { AccountManagementPage } from './pages/AccountManagementPage'
-import { BudgetManagementPage } from './pages/BudgetManagementPage'
-import { DashboardPage } from './pages/DashboardPage'
-import { CategoryManagementPage } from './pages/CategoryManagementPage'
-import { CsvImportPage } from './pages/CsvImportPage'
-import { HouseholdSetupPage } from './pages/HouseholdSetupPage'
-import { ImportReviewPage } from './pages/ImportReviewPage'
-import { ImportProfileManagementPage } from './pages/ImportProfileManagementPage'
-import { LoginPage } from './pages/LoginPage'
-import { RegisterPage } from './pages/RegisterPage'
-import { RecurringExpenseManagementPage } from './pages/RecurringExpenseManagementPage'
-import { TransactionManagementPage } from './pages/TransactionManagementPage'
+import { appPages } from './routing/pageRegistry'
 import { RouterProvider } from './routing/RouterProvider'
 import { useRouter } from './routing/useRouter'
 
@@ -130,104 +119,39 @@ function AppRoutes() {
     return <StatusError message={initializationError} onRetry={() => void refresh()} />
   }
 
-  switch (path) {
-    case '/':
-      return <Redirect to="/dashboard" />
-    case '/login':
-      return (
-        <AnonymousOnlyRoute>
-          <LoginPage />
-        </AnonymousOnlyRoute>
-      )
-    case '/register':
-      return (
-        <AnonymousOnlyRoute>
-          <RegisterPage />
-        </AnonymousOnlyRoute>
-      )
-    case '/dashboard':
-      return (
-        <ProtectedRoute>
-          <HouseholdRequiredRoute>
-            <DashboardPage />
-          </HouseholdRequiredRoute>
-        </ProtectedRoute>
-      )
-    case '/accounts':
-      return (
-        <ProtectedRoute>
-          <HouseholdRequiredRoute>
-            <AccountManagementPage />
-          </HouseholdRequiredRoute>
-        </ProtectedRoute>
-      )
-    case '/budgeting':
-      return (
-        <ProtectedRoute>
-          <HouseholdRequiredRoute>
-            <BudgetManagementPage />
-          </HouseholdRequiredRoute>
-        </ProtectedRoute>
-      )
-    case '/budgeting/recurring-expenses':
-      return (
-        <ProtectedRoute>
-          <HouseholdRequiredRoute>
-            <RecurringExpenseManagementPage />
-          </HouseholdRequiredRoute>
-        </ProtectedRoute>
-      )
-    case '/import':
-      return (
-        <ProtectedRoute>
-          <HouseholdRequiredRoute>
-            <CsvImportPage />
-          </HouseholdRequiredRoute>
-        </ProtectedRoute>
-      )
-    case '/imports/review':
-      return (
-        <ProtectedRoute>
-          <HouseholdRequiredRoute>
-            <ImportReviewPage />
-          </HouseholdRequiredRoute>
-        </ProtectedRoute>
-      )
-    case '/settings/import-profiles':
-      return (
-        <ProtectedRoute>
-          <HouseholdRequiredRoute>
-            <ImportProfileManagementPage />
-          </HouseholdRequiredRoute>
-        </ProtectedRoute>
-      )
-    case '/transactions':
-      return (
-        <ProtectedRoute>
-          <HouseholdRequiredRoute>
-            <TransactionManagementPage />
-          </HouseholdRequiredRoute>
-        </ProtectedRoute>
-      )
-    case '/household/setup':
-      return (
-        <ProtectedRoute>
-          <HouseholdSetupRoute>
-            <HouseholdSetupPage />
-          </HouseholdSetupRoute>
-        </ProtectedRoute>
-      )
-    case '/settings/categories':
-      return (
-        <ProtectedRoute>
-          <HouseholdRequiredRoute>
-            <CategoryManagementPage />
-          </HouseholdRequiredRoute>
-        </ProtectedRoute>
-      )
-    default:
-      return <Redirect to="/dashboard" />
+  if (path === '/') {
+    return <Redirect to="/dashboard" />
   }
+
+  const page = appPages.find(candidate => candidate.path === path)
+  if (!page) {
+    return <Redirect to="/dashboard" />
+  }
+
+  const PageComponent = page.component
+  const content = (
+    <Suspense fallback={<LoadingScreen message={`Loading ${page.label}...`} />}>
+      <PageComponent />
+    </Suspense>
+  )
+
+  if (page.access === 'anonymous') {
+    return <AnonymousOnlyRoute>{content}</AnonymousOnlyRoute>
+  }
+
+  if (page.access === 'household-setup') {
+    return (
+      <ProtectedRoute>
+        <HouseholdSetupRoute>{content}</HouseholdSetupRoute>
+      </ProtectedRoute>
+    )
+  }
+
+  return (
+    <ProtectedRoute>
+      <HouseholdRequiredRoute>{content}</HouseholdRequiredRoute>
+    </ProtectedRoute>
+  )
 }
 
 function App() {

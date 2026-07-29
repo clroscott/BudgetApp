@@ -17,6 +17,25 @@ import {
 import { AppLink } from '../routing/AppLink'
 
 const maxFileSizeBytes = 10 * 1024 * 1024
+const standardCsvHeaders = new Set([
+  'date',
+  'description',
+  'amount',
+  'debit',
+  'credit',
+  'category',
+  'subcategory',
+])
+
+function isStandardCsvStructure(headers: string[]) {
+  const normalized = headers.map(header => header.trim().toLowerCase())
+  return normalized.includes('date') &&
+    normalized.includes('description') &&
+    (normalized.includes('amount') ||
+      normalized.includes('debit') ||
+      normalized.includes('credit')) &&
+    normalized.every(header => standardCsvHeaders.has(header))
+}
 
 export function CsvImportPage() {
   const { currentHousehold } = useHouseholds()
@@ -110,6 +129,18 @@ export function CsvImportPage() {
         const inspected = await inspectImportFile(
           currentHousehold.id, selectedAccountId, selectedFile)
         if (!inspected.matchedProfile) {
+          if (isStandardCsvStructure(inspected.headers)) {
+            setInspection(null)
+            setMapping(null)
+            setResult(await uploadCsvImport(
+              currentHousehold.id,
+              selectedAccountId,
+              selectedFile,
+              allowDuplicateFile,
+            ))
+            return
+          }
+
           setInspection(inspected)
           setMapping({
             name: inspected.suggestedProfile.name,
@@ -223,7 +254,7 @@ export function CsvImportPage() {
               <span>CSV profile</span>
               <select value={selectedProfileId}
                 onChange={event => setSelectedProfileId(event.target.value)}>
-                <option value="">Detect automatically</option>
+                <option value="">Standard format / detect automatically</option>
                 {profiles.map(profile => <option key={profile.id} value={profile.id}>
                   {profile.name}
                 </option>)}
@@ -273,7 +304,8 @@ export function CsvImportPage() {
               <p>Save this mapping and future files with the same headers will be detected automatically.</p>
             </div>
             <div className="import-profile-grid">
-              <label><span>Profile name</span><input value={mapping.name}
+              <label className="import-mapping-profile-name">
+                <span>Profile name</span><input value={mapping.name}
                 onChange={event => setMappingField('name', event.target.value)} /></label>
               {(['dateColumn', 'descriptionColumn', 'amountColumn', 'debitColumn',
                 'creditColumn', 'categoryColumn', 'subcategoryColumn'] as const).map(field => (

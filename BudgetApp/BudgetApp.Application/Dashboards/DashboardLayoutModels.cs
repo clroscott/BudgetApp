@@ -22,6 +22,20 @@ public static class DashboardPanelCatalog
         "household"
     ];
 
-    public static readonly IReadOnlySet<string> SupportedPanelKeys =
-        DefaultPanelKeys.ToHashSet(StringComparer.Ordinal);
+    public static bool IsValidPanelKey(string? panelKey)
+    {
+        if (string.IsNullOrWhiteSpace(panelKey))
+        {
+            return false;
+        }
+
+        var normalized = panelKey.Trim().ToLowerInvariant();
+        return normalized.Length <=
+                BudgetApp.Domain.Dashboards.DashboardPanelPreference.PanelKeyMaxLength &&
+            normalized[0] != '-' &&
+            normalized[^1] != '-' &&
+            !normalized.Contains("--", StringComparison.Ordinal) &&
+            normalized.All(character =>
+                char.IsAsciiLetterOrDigit(character) || character == '-');
+    }
 }

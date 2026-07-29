@@ -3,50 +3,29 @@ import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
+import { navigationPages } from '../routing/pageRegistry'
 import { useRouter } from '../routing/useRouter'
-import { AppIcon, type AppIconName } from './AppIcon'
+import { AppIcon } from './AppIcon'
 import { BrandLockup } from './Brand'
 
-interface NavigationItem {
-  icon: AppIconName
-  label: string
-  to: string
-}
-
-const primaryNavigation: NavigationItem[] = [
-  { icon: 'dashboard', label: 'Dashboard', to: '/dashboard' },
-  { icon: 'transactions', label: 'Transactions', to: '/transactions' },
-  { icon: 'import', label: 'Import transactions', to: '/import' },
-  { icon: 'review', label: 'Review imports', to: '/imports/review' },
-  { icon: 'budget', label: 'Monthly budget', to: '/budgeting' },
-  {
-    icon: 'recurring',
-    label: 'Recurring expenses',
-    to: '/budgeting/recurring-expenses',
-  },
-  { icon: 'accounts', label: 'Accounts', to: '/accounts' },
-]
-
-const settingsNavigation: NavigationItem[] = [
-  { icon: 'categories', label: 'Categories', to: '/settings/categories' },
-  { icon: 'profiles', label: 'CSV profiles', to: '/settings/import-profiles' },
-]
+const primaryNavigation = navigationPages('primary')
+const settingsNavigation = navigationPages('settings')
 
 function NavigationLinks({
   items,
   currentPath,
 }: {
-  items: NavigationItem[]
+  items: ReturnType<typeof navigationPages>
   currentPath: string
 }) {
   return items.map(item => (
     <AppLink
-      className={currentPath === item.to ? 'active' : undefined}
-      key={item.to}
-      to={item.to}
+      className={currentPath === item.path ? 'active' : undefined}
+      key={item.path}
+      to={item.path}
       title={item.label}
     >
-      <AppIcon className="sidebar-navigation-icon" name={item.icon} />
+      <AppIcon className="sidebar-navigation-icon" name={item.icon!} />
       <span className="sidebar-label">{item.label}</span>
     </AppLink>
   ))

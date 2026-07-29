@@ -6,6 +6,7 @@ export type AppIconName =
   | 'household'
   | 'import'
   | 'profiles'
+  | 'rules'
   | 'recurring'
   | 'review'
   | 'transactions'
@@ -18,6 +19,7 @@ const paths: Record<AppIconName, string[]> = {
   household: ['M3 11l9-8 9 8', 'M5 10v11h14V10', 'M9 21v-6h6v6'],
   import: ['M12 3v12', 'M7 10l5 5 5-5', 'M4 20h16'],
   profiles: ['M4 6h10', 'M18 6h2', 'M4 12h2', 'M10 12h10', 'M4 18h7', 'M15 18h5', 'M14 4v4', 'M8 10v4', 'M13 16v4'],
+  rules: ['M4 5h10', 'M18 5h2', 'M4 12h4', 'M12 12h8', 'M4 19h8', 'M16 19h4', 'M14 3v4', 'M10 10v4', 'M14 17v4'],
   recurring: ['M17 2l3 3-3 3', 'M20 5H9a6 6 0 0 0-6 6', 'M7 22l-3-3 3-3', 'M4 19h11a6 6 0 0 0 6-6'],
   review: ['M5 3h14v18H5z', 'M8 10l2 2 5-5', 'M8 16h8'],
   transactions: ['M6 3h12v18l-3-2-3 2-3-2-3 2z', 'M9 8h6', 'M9 12h6'],
