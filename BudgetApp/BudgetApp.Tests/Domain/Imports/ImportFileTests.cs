@@ -50,8 +50,7 @@ public sealed class ImportFileTests
             validRows: 2,
             invalidRows: 1,
             approvedRows: 0,
-            rejectedRows: 0,
-            skippedRows: 0,
+            excludedRows: 0,
             duplicateRows: 1);
         importFile.MarkReadyForReview(
             parsedStatistics,
@@ -67,8 +66,7 @@ public sealed class ImportFileTests
             validRows: 2,
             invalidRows: 1,
             approvedRows: 2,
-            rejectedRows: 1,
-            skippedRows: 0,
+            excludedRows: 1,
             duplicateRows: 1);
         importFile.Complete(
             completedStatistics,
@@ -76,7 +74,7 @@ public sealed class ImportFileTests
 
         Assert.Equal(ImportFileStatus.Completed, importFile.Status);
         Assert.Equal(2, importFile.ApprovedRowCount);
-        Assert.Equal(1, importFile.RejectedRowCount);
+        Assert.Equal(1, importFile.ExcludedRowCount);
     }
 
     [Fact]
@@ -84,12 +82,12 @@ public sealed class ImportFileTests
     {
         var importFile = CreateImportFile();
         importFile.StartProcessing(DateTimeOffset.UtcNow);
-        var statistics = new ImportStatistics(2, 2, 0, 0, 0, 0, 0);
+        var statistics = new ImportStatistics(2, 2, 0, 0, 0, 0);
         importFile.MarkReadyForReview(statistics, DateTimeOffset.UtcNow);
 
         Assert.Throws<InvalidOperationException>(() =>
             importFile.Complete(
-                new ImportStatistics(2, 2, 0, 1, 0, 0, 0),
+                new ImportStatistics(2, 2, 0, 1, 0, 0),
                 DateTimeOffset.UtcNow));
 
         Assert.Equal(ImportFileStatus.ReadyForReview, importFile.Status);
@@ -127,16 +125,15 @@ public sealed class ImportFileTests
     }
 
     [Theory]
-    [InlineData(1, 1, 1, 0, 0, 0, 0)]
-    [InlineData(2, 1, 1, 2, 0, 0, 0)]
-    [InlineData(1, 1, 0, 0, 0, 0, 2)]
+    [InlineData(1, 1, 1, 0, 0, 0)]
+    [InlineData(2, 1, 1, 2, 0, 0)]
+    [InlineData(1, 1, 0, 0, 0, 2)]
     public void Statistics_WithInconsistentCounts_AreRejected(
         int total,
         int valid,
         int invalid,
         int approved,
-        int rejected,
-        int skipped,
+        int excluded,
         int duplicate)
     {
         Assert.Throws<ArgumentException>(() => new ImportStatistics(
@@ -144,8 +141,7 @@ public sealed class ImportFileTests
             valid,
             invalid,
             approved,
-            rejected,
-            skipped,
+            excluded,
             duplicate));
     }
 

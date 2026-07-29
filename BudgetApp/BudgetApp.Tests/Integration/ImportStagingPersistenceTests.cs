@@ -34,7 +34,7 @@ public sealed class ImportStagingPersistenceTests
             now);
         importFile.StartProcessing(now.AddMinutes(1));
         importFile.MarkReadyForReview(
-            new ImportStatistics(1, 1, 0, 0, 0, 0, 0),
+            new ImportStatistics(1, 1, 0, 0, 0, 0),
             now.AddMinutes(2));
 
         var draft = ImportTransactionDraft.Create(
@@ -76,7 +76,7 @@ public sealed class ImportStagingPersistenceTests
             now.AddMinutes(3));
         draft.LinkApprovedTransaction(transaction, now.AddMinutes(3));
         importFile.Complete(
-            new ImportStatistics(1, 1, 0, 1, 0, 0, 0),
+            new ImportStatistics(1, 1, 0, 1, 0, 0),
             now.AddMinutes(3));
 
         context.ImportFiles.Add(importFile);

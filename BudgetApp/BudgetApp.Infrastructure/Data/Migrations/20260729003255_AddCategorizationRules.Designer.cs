@@ -4,6 +4,7 @@ using BudgetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BudgetApp.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BudgetAppDbContext))]
-    partial class BudgetAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260729003255_AddCategorizationRules")]
+    partial class AddCategorizationRules
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -486,9 +489,6 @@ namespace BudgetApp.Infrastructure.Data.Migrations
                     b.Property<int>("DuplicateRowCount")
                         .HasColumnType("int");
 
-                    b.Property<int>("ExcludedRowCount")
-                        .HasColumnType("int");
-
                     b.Property<string>("FailureSummary")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
@@ -507,12 +507,18 @@ namespace BudgetApp.Infrastructure.Data.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("nvarchar(255)");
 
+                    b.Property<int>("RejectedRowCount")
+                        .HasColumnType("int");
+
                     b.Property<string>("Sha256Hash")
                         .IsRequired()
                         .HasMaxLength(64)
                         .IsUnicode(false)
                         .HasColumnType("char(64)")
                         .IsFixedLength();
+
+                    b.Property<int>("SkippedRowCount")
+                        .HasColumnType("int");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -550,7 +556,7 @@ namespace BudgetApp.Infrastructure.Data.Migrations
                         {
                             t.HasCheckConstraint("CK_ImportFiles_FileSize_Positive", "[FileSizeBytes] > 0");
 
-                            t.HasCheckConstraint("CK_ImportFiles_RowCounts", "[TotalRowCount] >= 0 AND [ValidRowCount] >= 0 AND [InvalidRowCount] >= 0 AND [ApprovedRowCount] >= 0 AND [ExcludedRowCount] >= 0 AND [DuplicateRowCount] >= 0 AND [ValidRowCount] + [InvalidRowCount] = [TotalRowCount] AND [ApprovedRowCount] <= [ValidRowCount] AND [ApprovedRowCount] + [ExcludedRowCount] <= [TotalRowCount] AND [DuplicateRowCount] <= [TotalRowCount]");
+                            t.HasCheckConstraint("CK_ImportFiles_RowCounts", "[TotalRowCount] >= 0 AND [ValidRowCount] >= 0 AND [InvalidRowCount] >= 0 AND [ApprovedRowCount] >= 0 AND [RejectedRowCount] >= 0 AND [SkippedRowCount] >= 0 AND [DuplicateRowCount] >= 0 AND [ValidRowCount] + [InvalidRowCount] = [TotalRowCount] AND [ApprovedRowCount] <= [ValidRowCount] AND [ApprovedRowCount] + [RejectedRowCount] + [SkippedRowCount] <= [TotalRowCount] AND [DuplicateRowCount] <= [TotalRowCount]");
 
                             t.HasCheckConstraint("CK_ImportFiles_Status_FailureSummary", "([Status] = 'Failed' AND [FailureSummary] IS NOT NULL) OR ([Status] <> 'Failed' AND [FailureSummary] IS NULL)");
                         });

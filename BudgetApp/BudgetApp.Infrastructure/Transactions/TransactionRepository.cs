@@ -17,6 +17,7 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
         DateOnly? toDate,
         CategoryType? categoryType,
         Guid? categoryId,
+        bool uncategorizedOnly,
         string? descriptionSearch,
         int skip,
         int take,
@@ -39,6 +40,7 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
                   (!categoryId.HasValue ||
                       transaction.CategoryId == categoryId.Value ||
                       (category != null && category.ParentCategoryId == categoryId.Value)) &&
+                  (!uncategorizedOnly || !transaction.CategoryId.HasValue) &&
                   (descriptionSearch == null ||
                       transaction.Description.ToUpper().Contains(descriptionSearch.ToUpper()))
             orderby transaction.TransactionDate descending,

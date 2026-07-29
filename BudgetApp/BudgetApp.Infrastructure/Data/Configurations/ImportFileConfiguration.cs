@@ -20,11 +20,11 @@ internal sealed class ImportFileConfiguration : IEntityTypeConfiguration<ImportF
                 "CK_ImportFiles_RowCounts",
                 "[TotalRowCount] >= 0 AND [ValidRowCount] >= 0 AND " +
                 "[InvalidRowCount] >= 0 AND [ApprovedRowCount] >= 0 AND " +
-                "[RejectedRowCount] >= 0 AND [SkippedRowCount] >= 0 AND " +
+                "[ExcludedRowCount] >= 0 AND " +
                 "[DuplicateRowCount] >= 0 AND " +
                 "[ValidRowCount] + [InvalidRowCount] = [TotalRowCount] AND " +
                 "[ApprovedRowCount] <= [ValidRowCount] AND " +
-                "[ApprovedRowCount] + [RejectedRowCount] + [SkippedRowCount] " +
+                "[ApprovedRowCount] + [ExcludedRowCount] " +
                 "<= [TotalRowCount] AND [DuplicateRowCount] <= [TotalRowCount]");
             table.HasCheckConstraint(
                 "CK_ImportFiles_Status_FailureSummary",

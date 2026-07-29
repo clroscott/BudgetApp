@@ -24,6 +24,7 @@ public sealed class TransactionsController(
         [FromQuery] DateOnly? toDate,
         [FromQuery] string? categoryType,
         [FromQuery] Guid? categoryId,
+        [FromQuery] bool uncategorizedOnly,
         [FromQuery] string? description,
         CancellationToken cancellationToken,
         [FromQuery] int page = 1)
@@ -43,6 +44,7 @@ public sealed class TransactionsController(
                 toDate,
                 categoryType,
                 categoryId,
+                uncategorizedOnly,
                 description,
                 page,
                 cancellationToken));

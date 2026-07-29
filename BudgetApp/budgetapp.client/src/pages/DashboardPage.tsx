@@ -9,7 +9,7 @@ import { flushSync } from 'react-dom'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { ErrorSummary } from '../components/ErrorSummary'
-import { AppIcon, type AppIconName } from '../components/AppIcon'
+import { AppIcon } from '../components/AppIcon'
 import {
   getDashboardLayout,
   resetDashboardLayout,
@@ -18,82 +18,21 @@ import {
 } from '../dashboard/dashboardLayoutApi'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
-
-interface DashboardPanelDefinition {
-  icon: AppIconName
-  key: string
-  label: string
-  title: string
-  description: string
-  links: Array<{ label: string, to: string }>
-}
-
-const dashboardPanels: DashboardPanelDefinition[] = [
-  {
-    icon: 'budget',
-    key: 'monthly-budget',
-    label: 'Monthly Budget',
-    title: 'Plan this month',
-    description: 'Review household or personal spending plans by category.',
-    links: [{ label: 'Manage budget', to: '/budgeting' }],
-  },
-  {
-    icon: 'transactions',
-    key: 'transactions',
-    label: 'Transactions',
-    title: 'Official activity',
-    description: 'Search and correct approved household and personal transactions.',
-    links: [{ label: 'View transactions', to: '/transactions' }],
-  },
-  {
-    icon: 'import',
-    key: 'import-review',
-    label: 'Import & Review',
-    title: 'Bank transactions',
-    description: 'Upload CSV activity, then review it before creating transactions.',
-    links: [
-      { label: 'Import a CSV', to: '/import' },
-      { label: 'Review imports', to: '/imports/review' },
-    ],
-  },
-  {
-    icon: 'recurring',
-    key: 'recurring-expenses',
-    label: 'Recurring Expenses',
-    title: 'Monthly expectations',
-    description: 'Maintain predictable expenses used to prepare future budgets.',
-    links: [{
-      label: 'Manage recurring expenses',
-      to: '/budgeting/recurring-expenses',
-    }],
-  },
-  {
-    icon: 'accounts',
-    key: 'accounts',
-    label: 'Accounts',
-    title: 'Financial accounts',
-    description: 'Manage shared and personal transaction sources.',
-    links: [{ label: 'Manage accounts', to: '/accounts' }],
-  },
-  {
-    icon: 'categories',
-    key: 'categories',
-    label: 'Categories',
-    title: 'Household categories',
-    description: 'Organize transactions and budget lines.',
-    links: [{ label: 'Manage categories', to: '/settings/categories' }],
-  },
-  {
-    icon: 'household',
-    key: 'household',
-    label: 'Household',
-    title: 'Household details',
-    description: 'See the household currently used for budgeting.',
-    links: [],
-  },
-]
+import {
+  dashboardPanels,
+  defaultDashboardPanelKeys,
+} from '../routing/pageRegistry'
 
 const panelByKey = new Map(dashboardPanels.map(panel => [panel.key, panel]))
+
+function withClientDefaults(layout: DashboardLayout): DashboardLayout {
+  return {
+    ...layout,
+    visiblePanelKeys: layout.isDefault
+      ? defaultDashboardPanelKeys
+      : layout.visiblePanelKeys.filter(key => panelByKey.has(key)),
+  }
+}
 
 export function DashboardPage() {
   const { user } = useAuth()
@@ -121,9 +60,10 @@ export function DashboardPage() {
     void getDashboardLayout(currentHousehold.id)
       .then(result => {
         if (cancelled) return
-        setLayout(result)
-        setDraftPanelKeys(result.visiblePanelKeys)
-        setDraftColumnCount(result.preferredColumnCount)
+        const normalized = withClientDefaults(result)
+        setLayout(normalized)
+        setDraftPanelKeys(normalized.visiblePanelKeys)
+        setDraftColumnCount(normalized.preferredColumnCount)
       })
       .catch(error => {
         if (!cancelled) setErrors(getErrorMessages(error))
@@ -182,7 +122,8 @@ export function DashboardPage() {
     setIsSaving(true)
     setErrors([])
     try {
-      const defaults = await resetDashboardLayout(currentHousehold.id)
+      const defaults = withClientDefaults(
+        await resetDashboardLayout(currentHousehold.id))
       setLayout(defaults)
       setDraftPanelKeys(defaults.visiblePanelKeys)
       setDraftColumnCount(defaults.preferredColumnCount)

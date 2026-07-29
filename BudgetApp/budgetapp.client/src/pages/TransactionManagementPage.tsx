@@ -15,6 +15,7 @@ import {
 } from '../transactions/transactionApi'
 
 type DateFilterMode = 'pastDays' | 'specificDate' | 'specificMonth' | 'range' | 'all'
+const uncategorizedFilterValue = '__uncategorized__'
 
 interface TransactionFilters {
   accountId: string
@@ -71,7 +72,10 @@ function buildTransactionQuery(filters: TransactionFilters, page: number): Trans
   const query: TransactionQuery = {
     accountId: filters.accountId || undefined,
     categoryType: filters.categoryType || undefined,
-    categoryId: filters.subcategoryId || filters.categoryId || undefined,
+    categoryId: filters.categoryId === uncategorizedFilterValue
+      ? undefined
+      : filters.subcategoryId || filters.categoryId || undefined,
+    uncategorizedOnly: filters.categoryId === uncategorizedFilterValue || undefined,
     description: filters.description.trim() || undefined,
     page,
   }
@@ -413,8 +417,12 @@ export function TransactionManagementPage() {
                 ...filters,
                 categoryId: event.target.value,
                 subcategoryId: '',
+                categoryType: event.target.value === uncategorizedFilterValue
+                  ? ''
+                  : filters.categoryType,
               })}>
                 <option value="">All categories</option>
+                <option value={uncategorizedFilterValue}>Uncategorized only</option>
                 {filterCategories.map(category => (
                   <option key={category.id} value={category.id}>
                     {category.name}{category.isActive ? '' : ' (deactivated)'}
@@ -424,7 +432,10 @@ export function TransactionManagementPage() {
             </label>
             <label>
               <span>Subcategory</span>
-              <select value={filters.subcategoryId} disabled={!filters.categoryId}
+              <select value={filters.subcategoryId} disabled={
+                !filters.categoryId ||
+                filters.categoryId === uncategorizedFilterValue
+              }
                 onChange={event => setFilters({ ...filters, subcategoryId: event.target.value })}>
                 <option value="">All subcategories</option>
                 {filterSubcategories.map(category => (

@@ -108,12 +108,10 @@ public sealed class DashboardLayoutService(
         }
 
         if (visiblePanelKeys.Any(key =>
-                string.IsNullOrWhiteSpace(key) ||
-                !DashboardPanelCatalog.SupportedPanelKeys.Contains(
-                    key.Trim().ToLowerInvariant())))
+                !DashboardPanelCatalog.IsValidPanelKey(key)))
         {
             throw new ArgumentException(
-                "The dashboard contains an unsupported panel.",
+                "The dashboard contains an invalid panel identifier.",
                 nameof(visiblePanelKeys));
         }
     }

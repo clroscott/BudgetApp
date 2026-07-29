@@ -35,6 +35,7 @@ export interface TransactionQuery {
   toDate?: string
   categoryType?: string
   categoryId?: string
+  uncategorizedOnly?: boolean
   description?: string
   page: number
 }
@@ -60,6 +61,7 @@ export function getTransactions(
   if (query.toDate) parameters.set('toDate', query.toDate)
   if (query.categoryType) parameters.set('categoryType', query.categoryType)
   if (query.categoryId) parameters.set('categoryId', query.categoryId)
+  if (query.uncategorizedOnly) parameters.set('uncategorizedOnly', 'true')
   if (query.description) parameters.set('description', query.description)
   parameters.set('page', query.page.toString())
   return apiGet(`/api/households/${householdId}/transactions?${parameters}`)

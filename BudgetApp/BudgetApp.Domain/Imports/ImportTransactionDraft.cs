@@ -261,22 +261,20 @@ public sealed class ImportTransactionDraft
             DuplicateStatus == ImportDraftDuplicateStatus.PossibleDuplicate;
     }
 
-    public void Reject(Guid reviewedByUserId, DateTimeOffset reviewedAtUtc)
+    public void Exclude(Guid reviewedByUserId, DateTimeOffset reviewedAtUtc)
     {
         EnsureNotLinked();
         SetReviewDecision(
-            ImportDraftReviewDecision.Rejected,
+            ImportDraftReviewDecision.Excluded,
             reviewedByUserId,
             reviewedAtUtc);
     }
 
-    public void Skip(Guid reviewedByUserId, DateTimeOffset reviewedAtUtc)
+    public void MarkPending(DateTimeOffset updatedAtUtc)
     {
         EnsureNotLinked();
-        SetReviewDecision(
-            ImportDraftReviewDecision.Skipped,
-            reviewedByUserId,
-            reviewedAtUtc);
+        ResetReview();
+        UpdatedAtUtc = updatedAtUtc;
     }
 
     public void LinkApprovedTransaction(

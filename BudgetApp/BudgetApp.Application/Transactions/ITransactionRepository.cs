@@ -12,6 +12,7 @@ public interface ITransactionRepository
         DateOnly? toDate,
         BudgetApp.Domain.Categories.CategoryType? categoryType,
         Guid? categoryId,
+        bool uncategorizedOnly,
         string? descriptionSearch,
         int skip,
         int take,

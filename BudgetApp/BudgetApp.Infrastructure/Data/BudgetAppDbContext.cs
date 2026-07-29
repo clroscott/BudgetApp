@@ -1,5 +1,6 @@
 using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Budgeting;
+using BudgetApp.Domain.CategorizationRules;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Dashboards;
 using BudgetApp.Domain.Households;
@@ -22,6 +23,9 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
     public DbSet<BudgetMonth> BudgetMonths => Set<BudgetMonth>();
 
     public DbSet<Category> Categories => Set<Category>();
+
+    public DbSet<CategorizationRule> CategorizationRules =>
+        Set<CategorizationRule>();
 
     public DbSet<DashboardLayout> DashboardLayouts => Set<DashboardLayout>();
 

@@ -7,16 +7,14 @@ public readonly record struct ImportStatistics
         int validRows,
         int invalidRows,
         int approvedRows,
-        int rejectedRows,
-        int skippedRows,
+        int excludedRows,
         int duplicateRows)
     {
         ValidateNonNegative(totalRows, nameof(totalRows));
         ValidateNonNegative(validRows, nameof(validRows));
         ValidateNonNegative(invalidRows, nameof(invalidRows));
         ValidateNonNegative(approvedRows, nameof(approvedRows));
-        ValidateNonNegative(rejectedRows, nameof(rejectedRows));
-        ValidateNonNegative(skippedRows, nameof(skippedRows));
+        ValidateNonNegative(excludedRows, nameof(excludedRows));
         ValidateNonNegative(duplicateRows, nameof(duplicateRows));
 
         if ((long)validRows + invalidRows != totalRows)
@@ -32,7 +30,7 @@ public readonly record struct ImportStatistics
                 nameof(approvedRows));
         }
 
-        if ((long)approvedRows + rejectedRows + skippedRows > totalRows)
+        if ((long)approvedRows + excludedRows > totalRows)
         {
             throw new ArgumentException(
                 "Reviewed row counts cannot exceed total row count.");
@@ -49,8 +47,7 @@ public readonly record struct ImportStatistics
         ValidRows = validRows;
         InvalidRows = invalidRows;
         ApprovedRows = approvedRows;
-        RejectedRows = rejectedRows;
-        SkippedRows = skippedRows;
+        ExcludedRows = excludedRows;
         DuplicateRows = duplicateRows;
     }
 
@@ -62,13 +59,11 @@ public readonly record struct ImportStatistics
 
     public int ApprovedRows { get; }
 
-    public int RejectedRows { get; }
-
-    public int SkippedRows { get; }
+    public int ExcludedRows { get; }
 
     public int DuplicateRows { get; }
 
-    public int PendingRows => TotalRows - ApprovedRows - RejectedRows - SkippedRows;
+    public int PendingRows => TotalRows - ApprovedRows - ExcludedRows;
 
     private static void ValidateNonNegative(int value, string parameterName)
     {

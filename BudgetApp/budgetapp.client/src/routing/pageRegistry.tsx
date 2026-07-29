@@ -1,0 +1,316 @@
+import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
+import type { AppIconName } from '../components/AppIcon'
+
+export type PageAccess = 'anonymous' | 'household-setup' | 'household'
+export type NavigationSection = 'primary' | 'settings'
+
+interface PageNavigation {
+  section: NavigationSection
+  order: number
+}
+
+interface PageDashboardShortcut {
+  panelKey: string
+  panelLabel: string
+  panelTitle: string
+  panelDescription: string
+  linkLabel: string
+  defaultOrder?: number
+}
+
+export interface AppPageDefinition {
+  id: string
+  path: string
+  label: string
+  icon?: AppIconName
+  access: PageAccess
+  component: LazyExoticComponent<ComponentType>
+  navigation?: PageNavigation
+  dashboard?: PageDashboardShortcut
+}
+
+export interface DashboardPanelDefinition {
+  icon: AppIconName
+  key: string
+  label: string
+  title: string
+  description: string
+  defaultOrder?: number
+  links: Array<{ label: string, to: string }>
+}
+
+function page(loader: () => Promise<Record<string, unknown>>, exportName: string) {
+  return lazy(async () => {
+    const module = await loader()
+    return { default: module[exportName] as ComponentType }
+  })
+}
+
+export const appPages: AppPageDefinition[] = [
+  {
+    id: 'login',
+    path: '/login',
+    label: 'Log in',
+    access: 'anonymous',
+    component: page(() => import('../pages/LoginPage'), 'LoginPage'),
+  },
+  {
+    id: 'register',
+    path: '/register',
+    label: 'Register',
+    access: 'anonymous',
+    component: page(() => import('../pages/RegisterPage'), 'RegisterPage'),
+  },
+  {
+    id: 'household-setup',
+    path: '/household/setup',
+    label: 'Household setup',
+    access: 'household-setup',
+    component: page(() => import('../pages/HouseholdSetupPage'), 'HouseholdSetupPage'),
+  },
+  {
+    id: 'dashboard',
+    path: '/dashboard',
+    label: 'Dashboard',
+    icon: 'dashboard',
+    access: 'household',
+    navigation: { section: 'primary', order: 0 },
+    component: page(() => import('../pages/DashboardPage'), 'DashboardPage'),
+  },
+  {
+    id: 'transactions',
+    path: '/transactions',
+    label: 'Transactions',
+    icon: 'transactions',
+    access: 'household',
+    navigation: { section: 'primary', order: 10 },
+    dashboard: {
+      panelKey: 'transactions',
+      panelLabel: 'Transactions',
+      panelTitle: 'Official activity',
+      panelDescription:
+        'Search and correct approved household and personal transactions.',
+      linkLabel: 'View transactions',
+      defaultOrder: 10,
+    },
+    component: page(
+      () => import('../pages/TransactionManagementPage'),
+      'TransactionManagementPage',
+    ),
+  },
+  {
+    id: 'import',
+    path: '/import',
+    label: 'Import transactions',
+    icon: 'import',
+    access: 'household',
+    navigation: { section: 'primary', order: 20 },
+    dashboard: {
+      panelKey: 'import-review',
+      panelLabel: 'Import & Review',
+      panelTitle: 'Bank transactions',
+      panelDescription:
+        'Upload CSV activity, then review it before creating transactions.',
+      linkLabel: 'Import a CSV',
+      defaultOrder: 20,
+    },
+    component: page(() => import('../pages/CsvImportPage'), 'CsvImportPage'),
+  },
+  {
+    id: 'import-review',
+    path: '/imports/review',
+    label: 'Review imports',
+    icon: 'review',
+    access: 'household',
+    navigation: { section: 'primary', order: 30 },
+    dashboard: {
+      panelKey: 'import-review',
+      panelLabel: 'Import & Review',
+      panelTitle: 'Bank transactions',
+      panelDescription:
+        'Upload CSV activity, then review it before creating transactions.',
+      linkLabel: 'Review imports',
+      defaultOrder: 20,
+    },
+    component: page(() => import('../pages/ImportReviewPage'), 'ImportReviewPage'),
+  },
+  {
+    id: 'monthly-budget',
+    path: '/budgeting',
+    label: 'Monthly budget',
+    icon: 'budget',
+    access: 'household',
+    navigation: { section: 'primary', order: 40 },
+    dashboard: {
+      panelKey: 'monthly-budget',
+      panelLabel: 'Monthly Budget',
+      panelTitle: 'Plan this month',
+      panelDescription:
+        'Review household or personal spending plans by category.',
+      linkLabel: 'Manage budget',
+      defaultOrder: 0,
+    },
+    component: page(
+      () => import('../pages/BudgetManagementPage'),
+      'BudgetManagementPage',
+    ),
+  },
+  {
+    id: 'recurring-expenses',
+    path: '/budgeting/recurring-expenses',
+    label: 'Recurring expenses',
+    icon: 'recurring',
+    access: 'household',
+    navigation: { section: 'primary', order: 50 },
+    dashboard: {
+      panelKey: 'recurring-expenses',
+      panelLabel: 'Recurring Expenses',
+      panelTitle: 'Monthly expectations',
+      panelDescription:
+        'Maintain predictable expenses used to prepare future budgets.',
+      linkLabel: 'Manage recurring expenses',
+      defaultOrder: 30,
+    },
+    component: page(
+      () => import('../pages/RecurringExpenseManagementPage'),
+      'RecurringExpenseManagementPage',
+    ),
+  },
+  {
+    id: 'accounts',
+    path: '/accounts',
+    label: 'Accounts',
+    icon: 'accounts',
+    access: 'household',
+    navigation: { section: 'primary', order: 60 },
+    dashboard: {
+      panelKey: 'accounts',
+      panelLabel: 'Accounts',
+      panelTitle: 'Financial accounts',
+      panelDescription: 'Manage shared and personal transaction sources.',
+      linkLabel: 'Manage accounts',
+      defaultOrder: 40,
+    },
+    component: page(
+      () => import('../pages/AccountManagementPage'),
+      'AccountManagementPage',
+    ),
+  },
+  {
+    id: 'categories',
+    path: '/settings/categories',
+    label: 'Categories',
+    icon: 'categories',
+    access: 'household',
+    navigation: { section: 'settings', order: 10 },
+    dashboard: {
+      panelKey: 'categories',
+      panelLabel: 'Categories',
+      panelTitle: 'Household categories',
+      panelDescription: 'Organize transactions and budget lines.',
+      linkLabel: 'Manage categories',
+      defaultOrder: 50,
+    },
+    component: page(
+      () => import('../pages/CategoryManagementPage'),
+      'CategoryManagementPage',
+    ),
+  },
+  {
+    id: 'categorization-rules',
+    path: '/settings/categorization-rules',
+    label: 'Categorization rules',
+    icon: 'rules',
+    access: 'household',
+    navigation: { section: 'settings', order: 20 },
+    dashboard: {
+      panelKey: 'categorization-rules',
+      panelLabel: 'Categorization Rules',
+      panelTitle: 'Automatic categorization',
+      panelDescription:
+        'Manage predictable description rules used during import review.',
+      linkLabel: 'Manage categorization rules',
+    },
+    component: page(
+      () => import('../pages/CategorizationRuleManagementPage'),
+      'CategorizationRuleManagementPage',
+    ),
+  },
+  {
+    id: 'import-profiles',
+    path: '/settings/import-profiles',
+    label: 'CSV profiles',
+    icon: 'profiles',
+    access: 'household',
+    navigation: { section: 'settings', order: 30 },
+    dashboard: {
+      panelKey: 'import-profiles',
+      panelLabel: 'CSV Profiles',
+      panelTitle: 'Saved import structures',
+      panelDescription:
+        'Reuse mappings for bank and custom transaction file formats.',
+      linkLabel: 'Manage CSV profiles',
+    },
+    component: page(
+      () => import('../pages/ImportProfileManagementPage'),
+      'ImportProfileManagementPage',
+    ),
+  },
+]
+
+export function navigationPages(section: NavigationSection) {
+  return appPages
+    .filter(pageDefinition =>
+      pageDefinition.navigation?.section === section &&
+      pageDefinition.icon)
+    .sort((left, right) =>
+      (left.navigation?.order ?? 0) - (right.navigation?.order ?? 0))
+}
+
+const pageDashboardPanels = new Map<string, DashboardPanelDefinition>()
+for (const pageDefinition of appPages) {
+  const shortcut = pageDefinition.dashboard
+  if (!shortcut || !pageDefinition.icon) continue
+
+  const existing = pageDashboardPanels.get(shortcut.panelKey)
+  if (existing) {
+    existing.links.push({
+      label: shortcut.linkLabel,
+      to: pageDefinition.path,
+    })
+    continue
+  }
+
+  pageDashboardPanels.set(shortcut.panelKey, {
+    icon: pageDefinition.icon,
+    key: shortcut.panelKey,
+    label: shortcut.panelLabel,
+    title: shortcut.panelTitle,
+    description: shortcut.panelDescription,
+    defaultOrder: shortcut.defaultOrder,
+    links: [{
+      label: shortcut.linkLabel,
+      to: pageDefinition.path,
+    }],
+  })
+}
+
+pageDashboardPanels.set('household', {
+  icon: 'household',
+  key: 'household',
+  label: 'Household',
+  title: 'Household details',
+  description: 'See the household currently used for budgeting.',
+  defaultOrder: 60,
+  links: [],
+})
+
+export const dashboardPanels = [...pageDashboardPanels.values()]
+  .sort((left, right) =>
+    (left.defaultOrder ?? Number.MAX_SAFE_INTEGER) -
+      (right.defaultOrder ?? Number.MAX_SAFE_INTEGER) ||
+    left.label.localeCompare(right.label))
+
+export const defaultDashboardPanelKeys = dashboardPanels
+  .filter(panel => panel.defaultOrder !== undefined)
+  .map(panel => panel.key)
