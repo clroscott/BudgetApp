@@ -1,4 +1,5 @@
 using BudgetApp.Infrastructure;
+using BudgetApp.Server.Configuration;
 using BudgetApp.Server.Middleware;
 using BudgetApp.Server.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -90,17 +91,26 @@ try
     });
     // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
     builder.Services.AddOpenApi();
-    builder.Services.AddInfrastructure(
+    var connectionString =
         builder.Configuration.GetConnectionString("BudgetApp")
-            ?? throw new InvalidOperationException(
-                "Connection string 'BudgetApp' is not configured."))
+        ?? throw new InvalidOperationException(
+            "Connection string 'BudgetApp' is not configured.");
+    var databaseEnvironment = DatabaseEnvironmentGuard.Validate(
+        builder.Environment.EnvironmentName,
+        connectionString,
+        builder.Configuration["DatabaseSafety:ExpectedDatabase"]);
+
+    builder.Services.AddInfrastructure(connectionString)
         .AddSignInManager();
 
     var app = builder.Build();
 
     app.Logger.LogInformation(
-        "Starting BudgetApp.Server in {EnvironmentName}",
-        app.Environment.EnvironmentName);
+        "Starting BudgetApp.Server in {EnvironmentName}, configured for SQL Server " +
+        "{DatabaseServer} and database {DatabaseName}",
+        app.Environment.EnvironmentName,
+        databaseEnvironment.ServerName,
+        databaseEnvironment.DatabaseName);
 
     app.UseWhen(
         context => context.Request.Path.StartsWithSegments("/api"),
