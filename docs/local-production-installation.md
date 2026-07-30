@@ -276,6 +276,7 @@ Stop the app. Inspect `dbo.__EFMigrationsHistory` in `BudgetAppDb`. Do not impro
 
 ## Related Documentation
 
+- [Local Production deployment checklist](local-production-deployment-checklist.md)
 - [Clean development machine setup](development-setup.md)
 - [Database environments](database-environments.md)
 - [Local development and secrets](local-development.md)

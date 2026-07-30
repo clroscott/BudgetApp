@@ -264,6 +264,7 @@ The human-readable transaction CSV export is implemented and documented in
 
 ## Related Documentation
 
+- [Local Production deployment checklist](local-production-deployment-checklist.md)
 - [Database environments](database-environments.md)
 - [Initial local Production installation](local-production-installation.md)
 - [Clean development machine setup](development-setup.md)
