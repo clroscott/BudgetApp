@@ -8,10 +8,10 @@ BudgetApp keeps real household data separate from development and disposable tes
 | --- | --- | --- | --- |
 | Production | `BudgetAppDb` | Real data used by the published local app | Real household data |
 | Development | `BudgetAppDb_DEV` | Visual Studio, debugging, and normal feature work | Fictional development data only |
-| Scratch | `BudgetAppDb_Scratch` | Risky migration, import, backup, and restore exercises | Disposable fictional data |
+| Scratch | `BudgetAppDb_Scratch` | Risky migration, import, backup, and restore exercises | Disposable fictional data; may temporarily hold a protected Production restore during a controlled restore drill |
 | Testing | In-memory SQLite | Automated integration tests | Created and discarded by the test suite |
 
-The Scratch database may be empty until a test requires it. It must never be treated as a backup.
+The Scratch database may be empty until a test requires it. It must never be treated as a backup. If Production is temporarily restored into Scratch for a restore drill, Scratch becomes Production-sensitive and must be cleaned immediately after reconciliation.
 
 ## Built-in Safety Checks
 

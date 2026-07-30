@@ -1,4 +1,4 @@
-import { apiGet, apiPut } from '../api/apiClient'
+import { apiDownload, apiGet, apiPut } from '../api/apiClient'
 
 export interface TransactionItem {
   id: string
@@ -55,6 +55,12 @@ export function getTransactions(
   householdId: string,
   query: TransactionQuery,
 ): Promise<TransactionListResult> {
+  const parameters = buildTransactionParameters(query)
+  parameters.set('page', query.page.toString())
+  return apiGet(`/api/households/${householdId}/transactions?${parameters}`)
+}
+
+function buildTransactionParameters(query: TransactionQuery): URLSearchParams {
   const parameters = new URLSearchParams()
   if (query.accountId) parameters.set('accountId', query.accountId)
   if (query.fromDate) parameters.set('fromDate', query.fromDate)
@@ -63,8 +69,7 @@ export function getTransactions(
   if (query.categoryId) parameters.set('categoryId', query.categoryId)
   if (query.uncategorizedOnly) parameters.set('uncategorizedOnly', 'true')
   if (query.description) parameters.set('description', query.description)
-  parameters.set('page', query.page.toString())
-  return apiGet(`/api/households/${householdId}/transactions?${parameters}`)
+  return parameters
 }
 
 export function updateTransaction(
@@ -76,4 +81,22 @@ export function updateTransaction(
     `/api/households/${householdId}/transactions/${transactionId}`,
     request,
   )
+}
+
+export async function downloadTransactionsCsv(
+  householdId: string,
+  query: TransactionQuery,
+): Promise<void> {
+  const parameters = buildTransactionParameters(query)
+  const download = await apiDownload(
+    `/api/households/${householdId}/transactions/export.csv?${parameters}`,
+  )
+  const objectUrl = URL.createObjectURL(download.blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = download.fileName ?? 'budgetapp-transactions.csv'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0)
 }

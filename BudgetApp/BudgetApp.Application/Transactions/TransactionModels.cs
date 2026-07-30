@@ -50,3 +50,19 @@ public sealed record TransactionListResult(
 public sealed record TransactionQueryResult(
     IReadOnlyList<TransactionRecord> Items,
     int TotalCount);
+
+public sealed record TransactionExportRecord(
+    string AccountName,
+    string Currency,
+    string? CategoryName,
+    string? SubcategoryName,
+    DateOnly TransactionDate,
+    decimal Amount,
+    string Description,
+    string? Notes,
+    bool IsExcludedFromBudget);
+
+public sealed record TransactionCsvExport(
+    byte[] Content,
+    string FileName,
+    int TransactionCount);

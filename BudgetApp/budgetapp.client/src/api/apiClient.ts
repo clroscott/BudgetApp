@@ -89,6 +89,33 @@ export async function apiGet<TResponse>(path: string): Promise<TResponse> {
   return await response.json() as TResponse
 }
 
+export interface ApiDownload {
+  blob: Blob
+  fileName: string | null
+}
+
+export async function apiDownload(path: string): Promise<ApiDownload> {
+  const response = await fetchWithCredentials(path, {
+    headers: { Accept: 'text/csv' },
+  })
+
+  if (!response.ok) {
+    throw await readApiError(response)
+  }
+
+  const disposition = response.headers.get('Content-Disposition')
+  const encodedName = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+  const quotedName = disposition?.match(/filename="([^"]+)"/i)?.[1]
+  const plainName = disposition?.match(/filename=([^;]+)/i)?.[1]?.trim()
+
+  return {
+    blob: await response.blob(),
+    fileName: encodedName
+      ? decodeURIComponent(encodedName)
+      : quotedName ?? plainName ?? null,
+  }
+}
+
 export async function apiPost<TResponse>(
   path: string,
   body: unknown,

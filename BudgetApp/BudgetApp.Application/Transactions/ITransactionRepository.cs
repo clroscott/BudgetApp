@@ -18,6 +18,12 @@ public interface ITransactionRepository
         int take,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<TransactionExportRecord>> ListVisibleForExportAsync(
+        Guid householdId,
+        Guid userId,
+        TransactionSearchCriteria criteria,
+        CancellationToken cancellationToken);
+
     Task<TransactionAccessRecord?> GetForUpdateAsync(
         Guid householdId,
         Guid transactionId,
