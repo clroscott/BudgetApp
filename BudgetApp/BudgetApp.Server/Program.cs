@@ -1,4 +1,5 @@
 using BudgetApp.Infrastructure;
+using BudgetApp.Infrastructure.Email;
 using BudgetApp.Server.Configuration;
 using BudgetApp.Server.Middleware;
 using BudgetApp.Server.Security;
@@ -99,8 +100,18 @@ try
         builder.Environment.EnvironmentName,
         connectionString,
         builder.Configuration["DatabaseSafety:ExpectedDatabase"]);
+    var emailOptions =
+        builder.Configuration.GetSection("Email").Get<EmailOptions>()
+        ?? new EmailOptions();
+    var applicationUrlOptions =
+        builder.Configuration.GetSection("Application").Get<ApplicationUrlOptions>()
+        ?? new ApplicationUrlOptions();
 
-    builder.Services.AddInfrastructure(connectionString)
+    builder.Services.AddInfrastructure(
+            connectionString,
+            emailOptions,
+            applicationUrlOptions,
+            builder.Environment.IsDevelopment())
         .AddSignInManager();
 
     var app = builder.Build();

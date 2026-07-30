@@ -4,6 +4,7 @@ using BudgetApp.Application.Categories;
 using BudgetApp.Application.CategorizationRules;
 using BudgetApp.Application.Dashboards;
 using BudgetApp.Application.Budgets;
+using BudgetApp.Application.Email;
 using BudgetApp.Application.Households;
 using BudgetApp.Application.Imports;
 using BudgetApp.Application.RecurringExpenses;
@@ -15,6 +16,7 @@ using BudgetApp.Infrastructure.CategorizationRules;
 using BudgetApp.Infrastructure.Dashboards;
 using BudgetApp.Infrastructure.Budgets;
 using BudgetApp.Infrastructure.Data;
+using BudgetApp.Infrastructure.Email;
 using BudgetApp.Infrastructure.Households;
 using BudgetApp.Infrastructure.Identity;
 using BudgetApp.Infrastructure.Imports;
@@ -30,9 +32,14 @@ public static class DependencyInjection
 {
     public static IdentityBuilder AddInfrastructure(
         this IServiceCollection services,
-        string connectionString)
+        string connectionString,
+        EmailOptions emailOptions,
+        ApplicationUrlOptions applicationUrlOptions,
+        bool allowDevelopmentFileEmail)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        ArgumentNullException.ThrowIfNull(emailOptions);
+        ArgumentNullException.ThrowIfNull(applicationUrlOptions);
 
         services.AddDbContext<BudgetAppDbContext>(options =>
             options.UseSqlServer(connectionString));
@@ -65,6 +72,11 @@ public static class DependencyInjection
         services.AddScoped<TransactionManagementService>();
         services.AddScoped<TransactionCsvExportService>();
         services.AddSingleton(TimeProvider.System);
+        AddEmailInfrastructure(
+            services,
+            emailOptions,
+            applicationUrlOptions,
+            allowDevelopmentFileEmail);
 
         return services
             .AddIdentityCore<ApplicationUser>(options =>
@@ -83,5 +95,42 @@ public static class DependencyInjection
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
             })
             .AddEntityFrameworkStores<BudgetAppDbContext>();
+    }
+
+    private static void AddEmailInfrastructure(
+        IServiceCollection services,
+        EmailOptions emailOptions,
+        ApplicationUrlOptions applicationUrlOptions,
+        bool allowDevelopmentFileEmail)
+    {
+        var mode = emailOptions.DeliveryMode.Trim();
+        if (!mode.Equals(EmailOptions.DisabledMode, StringComparison.OrdinalIgnoreCase) &&
+            !mode.Equals(EmailOptions.FileMode, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Email:DeliveryMode must be 'Disabled' or 'File'.");
+        }
+
+        if (mode.Equals(EmailOptions.FileMode, StringComparison.OrdinalIgnoreCase) &&
+            !allowDevelopmentFileEmail)
+        {
+            throw new InvalidOperationException(
+                "File email delivery is permitted only in the Development environment.");
+        }
+
+        services.AddSingleton(emailOptions);
+        services.AddSingleton(applicationUrlOptions);
+        services.AddSingleton<IApplicationEmailLinkBuilder, ApplicationEmailLinkBuilder>();
+        services.AddSingleton<EmailTemplateFactory>();
+        services.AddSingleton<EmailDispatchService>();
+
+        if (mode.Equals(EmailOptions.FileMode, StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IEmailSender, FileEmailSender>();
+        }
+        else
+        {
+            services.AddSingleton<IEmailSender, DisabledEmailSender>();
+        }
     }
 }
