@@ -175,3 +175,9 @@ If BudgetApp reports that the configured database does not match the environment
 6. Confirm that the browser URL belongs to the intended app instance.
 
 Installing the frontend as a browser app does not create a separate backend. The installed app continues using the server URL from which it was installed.
+
+## Related Documentation
+
+- [Local Production deployment checklist](local-production-deployment-checklist.md)
+- [Manual Production database backup and restore](database-backup-restore.md)
+- [Initial local Production installation](local-production-installation.md)
