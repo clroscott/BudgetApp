@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using BudgetApp.Domain.Auditing;
 using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Transactions;
 using BudgetApp.Infrastructure.Data;
@@ -72,6 +73,13 @@ public sealed class TransactionManagementTests(BudgetAppWebApplicationFactory fa
         Assert.Equal("Receipt checked", updated.Notes);
         Assert.True(updated.IsExcludedFromBudget);
         Assert.Equal(userId, updated.LastModifiedByUserId);
+        var auditEvent = await dbContext.AuditEvents.AsNoTracking().SingleAsync(
+            entry =>
+                entry.EntityId == seeded.HouseholdTransactionId &&
+                entry.Action == "Updated");
+        Assert.Equal(AuditVisibility.Household, auditEvent.Visibility);
+        Assert.Equal(userId, auditEvent.ActorUserId);
+        Assert.Contains("Corrected groceries", auditEvent.Summary);
     }
 
     [Fact]

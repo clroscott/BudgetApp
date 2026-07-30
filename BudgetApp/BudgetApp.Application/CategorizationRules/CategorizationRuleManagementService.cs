@@ -1,7 +1,9 @@
 using BudgetApp.Application.Accounts;
+using BudgetApp.Application.Auditing;
 using BudgetApp.Application.Categories;
 using BudgetApp.Application.Households;
 using BudgetApp.Domain.Accounts;
+using BudgetApp.Domain.Auditing;
 using BudgetApp.Domain.CategorizationRules;
 
 namespace BudgetApp.Application.CategorizationRules;
@@ -11,7 +13,8 @@ public sealed class CategorizationRuleManagementService(
     ICategoryRepository categoryRepository,
     IAccountRepository accountRepository,
     HouseholdAuthorizationService authorizationService,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    AuditWriter? auditWriter = null)
 {
     public async Task<IReadOnlyList<CategorizationRuleItem>> ListAsync(
         Guid householdId,
@@ -74,6 +77,11 @@ public sealed class CategorizationRuleManagementService(
             timeProvider.GetUtcNow());
 
         await ruleRepository.AddAsync(rule, cancellationToken);
+        RecordRuleEvent(
+            rule,
+            userId,
+            AuditActions.Created,
+            $"Created categorization rule '{rule.Name}'.");
         await ruleRepository.SaveChangesAsync(cancellationToken);
         return rule.Id;
     }
@@ -95,6 +103,7 @@ public sealed class CategorizationRuleManagementService(
             userId,
             cancellationToken);
         var rule = await GetRule(householdId, ruleId, cancellationToken);
+        var previousName = rule.Name;
         await ValidateDefinition(
             householdId,
             name,
@@ -111,6 +120,16 @@ public sealed class CategorizationRuleManagementService(
             accountId,
             targetCategoryId,
             timeProvider.GetUtcNow());
+        RecordRuleEvent(
+            rule,
+            userId,
+            AuditActions.Updated,
+            $"Updated categorization rule '{rule.Name}'.",
+            new Dictionary<string, string?>
+            {
+                ["Name"] = $"{previousName} → {rule.Name}",
+                ["Match"] = $"{rule.MatchField} {rule.MatchOperator} {rule.MatchValue}"
+            });
         await ruleRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -143,6 +162,12 @@ public sealed class CategorizationRuleManagementService(
             rule.Deactivate(timeProvider.GetUtcNow());
         }
 
+        RecordRuleEvent(
+            rule,
+            userId,
+            isActive ? AuditActions.Activated : AuditActions.Deactivated,
+            $"{(isActive ? "Activated" : "Deactivated")} categorization rule " +
+            $"'{rule.Name}'.");
         await ruleRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -183,6 +208,19 @@ public sealed class CategorizationRuleManagementService(
             byId[orderedRuleIds[index]].SetPriority(index, now);
         }
 
+        auditWriter?.Record(new AuditEventInput(
+            householdId,
+            userId,
+            AuditVisibility.Household,
+            null,
+            AuditActions.Updated,
+            AuditEntityTypes.CategorizationRule,
+            orderedRuleIds[0],
+            "Reordered categorization rules.",
+            new Dictionary<string, string?>
+            {
+                ["Rules reordered"] = orderedRuleIds.Count.ToString()
+            }));
         await ruleRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -197,6 +235,11 @@ public sealed class CategorizationRuleManagementService(
             userId,
             cancellationToken);
         var rule = await GetRule(householdId, ruleId, cancellationToken);
+        RecordRuleEvent(
+            rule,
+            userId,
+            AuditActions.Deleted,
+            $"Deleted categorization rule '{rule.Name}'.");
         ruleRepository.Remove(rule);
 
         var remainingRules = await ruleRepository.ListAsync(
@@ -213,6 +256,25 @@ public sealed class CategorizationRuleManagementService(
         }
 
         await ruleRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    private void RecordRuleEvent(
+        CategorizationRule rule,
+        Guid actorUserId,
+        string action,
+        string summary,
+        IReadOnlyDictionary<string, string?>? details = null)
+    {
+        auditWriter?.Record(new AuditEventInput(
+            rule.HouseholdId,
+            actorUserId,
+            AuditVisibility.Household,
+            null,
+            action,
+            AuditEntityTypes.CategorizationRule,
+            rule.Id,
+            summary,
+            details));
     }
 
     private async Task ValidateDefinition(

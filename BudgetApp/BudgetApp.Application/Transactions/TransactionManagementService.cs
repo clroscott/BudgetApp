@@ -1,5 +1,8 @@
+using System.Globalization;
+using BudgetApp.Application.Auditing;
 using BudgetApp.Application.Categories;
 using BudgetApp.Application.Households;
+using BudgetApp.Domain.Auditing;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
 
@@ -9,7 +12,8 @@ public sealed class TransactionManagementService(
     ITransactionRepository transactionRepository,
     ICategoryRepository categoryRepository,
     HouseholdAuthorizationService authorizationService,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    AuditWriter? auditWriter = null)
 {
     private const int PageSize = 100;
 
@@ -94,6 +98,13 @@ public sealed class TransactionManagementService(
             cancellationToken) ?? throw new TransactionNotFoundException();
 
         RequireEditPermission(access, role, userId);
+        var transaction = access.Transaction;
+        var previousCategoryId = transaction.CategoryId;
+        var previousDate = transaction.TransactionDate;
+        var previousAmount = transaction.Amount;
+        var previousDescription = transaction.Description;
+        var previousNotes = transaction.Notes;
+        var previousBudgetTreatment = transaction.IsExcludedFromBudget;
 
         if (categoryId.HasValue)
         {
@@ -101,13 +112,13 @@ public sealed class TransactionManagementService(
                 householdId,
                 categoryId.Value,
                 cancellationToken) ?? throw new CategoryNotFoundException();
-            if (!category.IsActive && access.Transaction.CategoryId != category.Id)
+            if (!category.IsActive && transaction.CategoryId != category.Id)
             {
                 throw new InvalidOperationException("A deactivated category cannot be assigned.");
             }
         }
 
-        access.Transaction.UpdateDetails(
+        transaction.UpdateDetails(
             categoryId,
             transactionDate,
             postedDate,
@@ -118,8 +129,75 @@ public sealed class TransactionManagementService(
             isExcludedFromBudget,
             userId,
             timeProvider.GetUtcNow());
+
+        var details = new Dictionary<string, string?>();
+        AddChange(
+            details,
+            "Date",
+            previousDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            transaction.TransactionDate.ToString(
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture));
+        AddChange(
+            details,
+            "Amount",
+            previousAmount.ToString("0.####", CultureInfo.InvariantCulture),
+            transaction.Amount.ToString("0.####", CultureInfo.InvariantCulture));
+        AddChange(
+            details,
+            "Description",
+            previousDescription,
+            transaction.Description);
+        AddChange(details, "Notes", previousNotes, transaction.Notes);
+        AddChange(
+            details,
+            "Budget treatment",
+            previousBudgetTreatment ? "Excluded" : "Included",
+            transaction.IsExcludedFromBudget ? "Excluded" : "Included");
+        if (previousCategoryId != transaction.CategoryId)
+        {
+            var categories = await categoryRepository.ListAsync(
+                householdId,
+                cancellationToken);
+            details["Category"] =
+                $"{CategoryName(categories, previousCategoryId)} → " +
+                CategoryName(categories, transaction.CategoryId);
+        }
+
+        auditWriter?.Record(new AuditEventInput(
+            householdId,
+            userId,
+            access.IsPersonalAccount
+                ? AuditVisibility.Personal
+                : AuditVisibility.Household,
+            access.IsPersonalAccount ? access.AccountOwnerUserId : null,
+            AuditActions.Updated,
+            AuditEntityTypes.Transaction,
+            transaction.Id,
+            $"Updated transaction '{transaction.Description}'.",
+            details));
         await transactionRepository.SaveChangesAsync(cancellationToken);
     }
+
+    private static void AddChange(
+        IDictionary<string, string?> details,
+        string label,
+        string? before,
+        string? after)
+    {
+        if (!string.Equals(before, after, StringComparison.Ordinal))
+        {
+            details[label] = $"{before ?? "(none)"} → {after ?? "(none)"}";
+        }
+    }
+
+    private static string CategoryName(
+        IReadOnlyList<CategoryRecord> categories,
+        Guid? categoryId) =>
+        categoryId.HasValue
+            ? categories.FirstOrDefault(category => category.Id == categoryId)?.Name
+                ?? "Unavailable category"
+            : "Uncategorized";
 
     private static void RequireEditPermission(
         TransactionAccessRecord access,

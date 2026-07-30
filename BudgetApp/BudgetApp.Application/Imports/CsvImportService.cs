@@ -1,8 +1,10 @@
 using BudgetApp.Application.Accounts;
+using BudgetApp.Application.Auditing;
 using BudgetApp.Application.Categories;
 using BudgetApp.Application.CategorizationRules;
 using BudgetApp.Application.Households;
 using BudgetApp.Domain.Accounts;
+using BudgetApp.Domain.Auditing;
 using BudgetApp.Domain.CategorizationRules;
 using BudgetApp.Domain.Households;
 using BudgetApp.Domain.Imports;
@@ -18,7 +20,8 @@ public sealed class CsvImportService(
     ImportProfileService importProfileService,
     ImportReviewService importReviewService,
     HouseholdAuthorizationService authorizationService,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    AuditWriter? auditWriter = null)
 {
     public async Task<CsvImportResult> UploadAsync(
         Guid householdId,
@@ -108,6 +111,26 @@ public sealed class CsvImportService(
 
         importFile.MarkReadyForReview(statistics, now);
         await importRepository.AddAsync(importFile, drafts, cancellationToken);
+        auditWriter?.Record(new AuditEventInput(
+            householdId,
+            userId,
+            account.Scope == AccountScope.Personal
+                ? AuditVisibility.Personal
+                : AuditVisibility.Household,
+            account.Scope == AccountScope.Personal ? account.OwnerUserId : null,
+            AuditActions.Imported,
+            AuditEntityTypes.Import,
+            importFile.Id,
+            $"Uploaded transaction file for '{account.Name}'.",
+            new Dictionary<string, string?>
+            {
+                ["File name"] = importFile.OriginalFileName,
+                ["Account"] = account.Name,
+                ["Rows staged"] = importFile.TotalRowCount.ToString(),
+                ["Valid rows"] = importFile.ValidRowCount.ToString(),
+                ["Invalid rows"] = importFile.InvalidRowCount.ToString(),
+                ["Possible duplicates"] = importFile.DuplicateRowCount.ToString()
+            }));
         await importRepository.SaveChangesAsync(cancellationToken);
 
         return new CsvImportResult(

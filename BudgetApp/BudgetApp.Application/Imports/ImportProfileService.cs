@@ -1,5 +1,7 @@
 using BudgetApp.Application.Accounts;
+using BudgetApp.Application.Auditing;
 using BudgetApp.Application.Households;
+using BudgetApp.Domain.Auditing;
 using BudgetApp.Domain.Imports;
 
 namespace BudgetApp.Application.Imports;
@@ -9,7 +11,8 @@ public sealed class ImportProfileService(
     IAccountRepository accountRepository,
     ICsvImportReader csvReader,
     HouseholdAuthorizationService authorizationService,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    AuditWriter? auditWriter = null)
 {
     public async Task<IReadOnlyList<ImportProfileModel>> ListAsync(
         Guid householdId,
@@ -37,6 +40,11 @@ public sealed class ImportProfileService(
             await repository.ClearDefaultAccountAsync(
                 householdId, profile.DefaultAccountId.Value, profile.Id, cancellationToken);
         await repository.AddAsync(profile, cancellationToken);
+        RecordProfileEvent(
+            profile,
+            userId,
+            AuditActions.Created,
+            $"Created CSV import profile '{profile.Name}'.");
         await repository.SaveChangesAsync(cancellationToken);
         return ToModel(profile);
     }
@@ -52,6 +60,7 @@ public sealed class ImportProfileService(
         var profile = await repository.GetAsync(
             householdId, profileId, forUpdate: true, cancellationToken)
             ?? throw new ImportProfileNotFoundException();
+        var previousName = profile.Name;
         await ValidateDefaultAccount(
             householdId, userId, input.DefaultAccountId, cancellationToken);
         profile.Update(
@@ -63,6 +72,16 @@ public sealed class ImportProfileService(
         if (profile.DefaultAccountId.HasValue)
             await repository.ClearDefaultAccountAsync(
                 householdId, profile.DefaultAccountId.Value, profile.Id, cancellationToken);
+        RecordProfileEvent(
+            profile,
+            userId,
+            AuditActions.Updated,
+            $"Updated CSV import profile '{profile.Name}'.",
+            new Dictionary<string, string?>
+            {
+                ["Name"] = $"{previousName} → {profile.Name}",
+                ["Mapped columns"] = profile.GetHeaders().Count.ToString()
+            });
         await repository.SaveChangesAsync(cancellationToken);
         return ToModel(profile);
     }
@@ -80,6 +99,12 @@ public sealed class ImportProfileService(
             ?? throw new ImportProfileNotFoundException();
         if (isActive) profile.Reactivate(timeProvider.GetUtcNow());
         else profile.Deactivate(timeProvider.GetUtcNow());
+        RecordProfileEvent(
+            profile,
+            userId,
+            isActive ? AuditActions.Activated : AuditActions.Deactivated,
+            $"{(isActive ? "Activated" : "Deactivated")} CSV import profile " +
+            $"'{profile.Name}'.");
         await repository.SaveChangesAsync(cancellationToken);
     }
 
@@ -96,8 +121,32 @@ public sealed class ImportProfileService(
         if (profile.IsActive)
             throw new InvalidOperationException(
                 "Deactivate the import profile before deleting it permanently.");
+        RecordProfileEvent(
+            profile,
+            userId,
+            AuditActions.Deleted,
+            $"Deleted CSV import profile '{profile.Name}'.");
         repository.Remove(profile);
         await repository.SaveChangesAsync(cancellationToken);
+    }
+
+    private void RecordProfileEvent(
+        ImportProfile profile,
+        Guid actorUserId,
+        string action,
+        string summary,
+        IReadOnlyDictionary<string, string?>? details = null)
+    {
+        auditWriter?.Record(new AuditEventInput(
+            profile.HouseholdId,
+            actorUserId,
+            AuditVisibility.Household,
+            null,
+            action,
+            AuditEntityTypes.ImportProfile,
+            profile.Id,
+            summary,
+            details));
     }
 
     public async Task<ImportProfileInspectionModel> InspectAsync(

@@ -1,4 +1,5 @@
 using BudgetApp.Domain.Accounts;
+using BudgetApp.Domain.Auditing;
 using BudgetApp.Domain.Budgeting;
 using BudgetApp.Domain.CategorizationRules;
 using BudgetApp.Domain.Categories;
@@ -17,6 +18,8 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
     : IdentityUserContext<ApplicationUser, Guid>(options)
 {
     public DbSet<Account> Accounts => Set<Account>();
+
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     public DbSet<BudgetLine> BudgetLines => Set<BudgetLine>();
 

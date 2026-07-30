@@ -1,8 +1,10 @@
 using BudgetApp.Application.Accounts;
+using BudgetApp.Application.Auditing;
 using BudgetApp.Application.Categories;
 using BudgetApp.Application.Finance;
 using BudgetApp.Application.Households;
 using BudgetApp.Domain.Accounts;
+using BudgetApp.Domain.Auditing;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
 using BudgetApp.Domain.RecurringExpenses;
@@ -14,7 +16,8 @@ public sealed class RecurringExpenseManagementService(
     ICategoryRepository categoryRepository,
     IAccountRepository accountRepository,
     HouseholdAuthorizationService authorizationService,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    AuditWriter? auditWriter = null)
 {
     public async Task<IReadOnlyList<RecurringExpenseListItem>> ListAsync(
         Guid householdId,
@@ -70,6 +73,11 @@ public sealed class RecurringExpenseManagementService(
                 householdId, name, amount, currency, subcategoryId,
                 accountId, expectedDayOfMonth, startsOn, endsOn, now, parsedBudgetMode);
         await recurringExpenseRepository.AddAsync(expense, cancellationToken);
+        RecordExpenseEvent(
+            expense,
+            userId,
+            AuditActions.Created,
+            $"Created recurring expense '{expense.Name}'.");
         await recurringExpenseRepository.SaveChangesAsync(cancellationToken);
         return expense.Id;
     }
@@ -99,6 +107,8 @@ public sealed class RecurringExpenseManagementService(
             householdId, userId, parsedScope, currency,
             subcategoryId, accountId, cancellationToken);
 
+        var previousName = expense.Name;
+        var previousAmount = expense.Amount;
         expense.Update(
             parsedScope,
             parsedScope == RecurringExpenseScope.Personal ? userId : null,
@@ -112,6 +122,16 @@ public sealed class RecurringExpenseManagementService(
             startsOn,
             endsOn,
             timeProvider.GetUtcNow());
+        RecordExpenseEvent(
+            expense,
+            userId,
+            AuditActions.Updated,
+            $"Updated recurring expense '{expense.Name}'.",
+            new Dictionary<string, string?>
+            {
+                ["Name"] = $"{previousName} → {expense.Name}",
+                ["Amount"] = $"{previousAmount:0.00} → {expense.Amount:0.00}"
+            });
         await recurringExpenseRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -126,7 +146,36 @@ public sealed class RecurringExpenseManagementService(
             householdId, userId, recurringExpenseId, cancellationToken);
         if (isActive) expense.Reactivate(timeProvider.GetUtcNow());
         else expense.Deactivate(timeProvider.GetUtcNow());
+        RecordExpenseEvent(
+            expense,
+            userId,
+            isActive ? AuditActions.Activated : AuditActions.Deactivated,
+            $"{(isActive ? "Activated" : "Deactivated")} recurring expense " +
+            $"'{expense.Name}'.");
         await recurringExpenseRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    private void RecordExpenseEvent(
+        RecurringExpense expense,
+        Guid actorUserId,
+        string action,
+        string summary,
+        IReadOnlyDictionary<string, string?>? details = null)
+    {
+        auditWriter?.Record(new AuditEventInput(
+            expense.HouseholdId,
+            actorUserId,
+            expense.Scope == RecurringExpenseScope.Personal
+                ? AuditVisibility.Personal
+                : AuditVisibility.Household,
+            expense.Scope == RecurringExpenseScope.Personal
+                ? expense.OwnerUserId
+                : null,
+            action,
+            AuditEntityTypes.RecurringExpense,
+            expense.Id,
+            summary,
+            details));
     }
 
     private async Task<(RecurringExpense Expense, HouseholdRole Role)> GetAuthorizedForChange(

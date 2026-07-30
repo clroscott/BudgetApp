@@ -1,4 +1,6 @@
+using BudgetApp.Application.Auditing;
 using BudgetApp.Application.Households;
+using BudgetApp.Domain.Auditing;
 using BudgetApp.Domain.Categories;
 
 namespace BudgetApp.Application.Categories;
@@ -6,7 +8,8 @@ namespace BudgetApp.Application.Categories;
 public sealed class CategoryManagementService(
     ICategoryRepository categoryRepository,
     HouseholdAuthorizationService authorizationService,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    AuditWriter? auditWriter = null)
 {
     public async Task<IReadOnlyList<CategoryTreeItem>> ListAsync(
         Guid householdId,
@@ -107,6 +110,11 @@ public sealed class CategoryManagementService(
         }
 
         await categoryRepository.AddAsync(category, cancellationToken);
+        RecordCategoryEvent(
+            category,
+            userId,
+            AuditActions.Created,
+            $"Created category '{category.Name}'.");
         await categoryRepository.SaveChangesAsync(cancellationToken);
         return category.Id;
     }
@@ -131,7 +139,17 @@ public sealed class CategoryManagementService(
             category.Id,
             cancellationToken);
 
+        var previousName = category.Name;
         category.Rename(name, timeProvider.GetUtcNow());
+        RecordCategoryEvent(
+            category,
+            userId,
+            AuditActions.Updated,
+            $"Renamed category '{previousName}' to '{category.Name}'.",
+            new Dictionary<string, string?>
+            {
+                ["Name"] = $"{previousName} → {category.Name}"
+            });
         await categoryRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -157,6 +175,11 @@ public sealed class CategoryManagementService(
             category.Deactivate(timeProvider.GetUtcNow());
         }
 
+        RecordCategoryEvent(
+            category,
+            userId,
+            isActive ? AuditActions.Activated : AuditActions.Deactivated,
+            $"{(isActive ? "Activated" : "Deactivated")} category '{category.Name}'.");
         await categoryRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -219,7 +242,41 @@ public sealed class CategoryManagementService(
             byId[orderedCategoryIds[index]].SetDisplayOrder(index, updatedAtUtc);
         }
 
+        auditWriter?.Record(new AuditEventInput(
+            householdId,
+            userId,
+            AuditVisibility.Household,
+            null,
+            AuditActions.Updated,
+            AuditEntityTypes.Category,
+            first.ParentCategoryId ?? first.Id,
+            first.ParentCategoryId.HasValue
+                ? "Reordered subcategories."
+                : $"Reordered {first.Type.ToString().ToLowerInvariant()} categories.",
+            new Dictionary<string, string?>
+            {
+                ["Categories reordered"] = orderedCategoryIds.Count.ToString()
+            }));
         await categoryRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    private void RecordCategoryEvent(
+        Category category,
+        Guid actorUserId,
+        string action,
+        string summary,
+        IReadOnlyDictionary<string, string?>? details = null)
+    {
+        auditWriter?.Record(new AuditEventInput(
+            category.HouseholdId,
+            actorUserId,
+            AuditVisibility.Household,
+            null,
+            action,
+            AuditEntityTypes.Category,
+            category.Id,
+            summary,
+            details));
     }
 
     private async Task<Category> GetCategory(

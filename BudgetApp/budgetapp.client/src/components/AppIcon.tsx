@@ -1,5 +1,6 @@
 export type AppIconName =
   | 'accounts'
+  | 'activity'
   | 'budget'
   | 'categories'
   | 'dashboard'
@@ -13,6 +14,7 @@ export type AppIconName =
 
 const paths: Record<AppIconName, string[]> = {
   accounts: ['M4 7h16v12H4z', 'M4 10h16', 'M16 15h1'],
+  activity: ['M12 8v5l3 2', 'M3.1 12a9 9 0 1 0 2.6-6.3', 'M3 4v5h5'],
   budget: ['M12 2v20', 'M17 6.5c-1-1-2.5-1.5-5-1.5-3 0-5 1.5-5 3.5s2 3 5 3.5 5 1.5 5 3.5-2 3.5-5 3.5c-2.5 0-4-.5-5-1.5'],
   categories: ['M3 12l9-9h7v7l-9 9z', 'M16 7h.01'],
   dashboard: ['M4 4h6v6H4z', 'M14 4h6v6h-6z', 'M4 14h6v6H4z', 'M14 14h6v6h-6z'],

@@ -1,6 +1,8 @@
+using BudgetApp.Application.Auditing;
 using BudgetApp.Application.Households;
 using BudgetApp.Application.Finance;
 using BudgetApp.Domain.Accounts;
+using BudgetApp.Domain.Auditing;
 using BudgetApp.Domain.Households;
 
 namespace BudgetApp.Application.Accounts;
@@ -8,7 +10,8 @@ namespace BudgetApp.Application.Accounts;
 public sealed class AccountManagementService(
     IAccountRepository accountRepository,
     HouseholdAuthorizationService authorizationService,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    AuditWriter? auditWriter = null)
 {
     public async Task<IReadOnlyList<AccountListItem>> ListAsync(
         Guid householdId,
@@ -75,6 +78,11 @@ public sealed class AccountManagementService(
                 createdAtUtc);
 
         await accountRepository.AddAsync(account, cancellationToken);
+        RecordAccountEvent(
+            account,
+            userId,
+            AuditActions.Created,
+            $"Created account '{account.Name}'.");
         await accountRepository.SaveChangesAsync(cancellationToken);
         return account.Id;
     }
@@ -96,6 +104,9 @@ public sealed class AccountManagementService(
             userId,
             accountId,
             cancellationToken);
+        var previousName = account.Name;
+        var previousScope = account.Scope;
+        var previousCurrency = account.Currency;
         var targetScope = ParseAccountScope(scope);
         if (targetScope == AccountScope.Household && role == HouseholdRole.Viewer)
         {
@@ -114,6 +125,17 @@ public sealed class AccountManagementService(
             targetScope == AccountScope.Personal ? userId : null,
             CurrencyCatalog.NormalizeSupported(currency),
             updatedAtUtc);
+        RecordAccountEvent(
+            account,
+            userId,
+            AuditActions.Updated,
+            $"Updated account '{account.Name}'.",
+            new Dictionary<string, string?>
+            {
+                ["Name"] = $"{previousName} → {account.Name}",
+                ["Scope"] = $"{previousScope} → {account.Scope}",
+                ["Currency"] = $"{previousCurrency} → {account.Currency}"
+            });
         await accountRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -139,7 +161,35 @@ public sealed class AccountManagementService(
             account.Archive(timeProvider.GetUtcNow());
         }
 
+        RecordAccountEvent(
+            account,
+            userId,
+            isActive ? AuditActions.Activated : AuditActions.Deactivated,
+            $"{(isActive ? "Activated" : "Deactivated")} account '{account.Name}'.");
         await accountRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    private void RecordAccountEvent(
+        Account account,
+        Guid actorUserId,
+        string action,
+        string summary,
+        IReadOnlyDictionary<string, string?>? details = null)
+    {
+        auditWriter?.Record(new AuditEventInput(
+            account.HouseholdId,
+            actorUserId,
+            account.Scope == AccountScope.Personal
+                ? AuditVisibility.Personal
+                : AuditVisibility.Household,
+            account.Scope == AccountScope.Personal
+                ? account.OwnerUserId
+                : null,
+            action,
+            AuditEntityTypes.Account,
+            account.Id,
+            summary,
+            details));
     }
 
     private async Task<(Account Account, HouseholdRole Role)> GetAuthorizedForChange(
