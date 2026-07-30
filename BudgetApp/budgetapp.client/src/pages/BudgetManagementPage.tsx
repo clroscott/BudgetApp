@@ -44,12 +44,31 @@ function snapshot(amounts: Amounts): string {
   return JSON.stringify(Object.entries(amounts).filter(([, value]) => value !== '').sort())
 }
 
+function initialBudgetSelection() {
+  const now = new Date()
+  const search = new URLSearchParams(window.location.search)
+  const requestedYear = Number(search.get('year'))
+  const requestedMonth = Number(search.get('month'))
+  const requestedScope = search.get('scope')
+
+  return {
+    year: Number.isInteger(requestedYear) && requestedYear >= 1 && requestedYear <= 9998
+      ? requestedYear
+      : now.getFullYear(),
+    month: Number.isInteger(requestedMonth) && requestedMonth >= 1 && requestedMonth <= 12
+      ? requestedMonth
+      : now.getMonth() + 1,
+    scope: requestedScope === 'Personal' ? 'Personal' as const : 'Household' as const,
+  }
+}
+
 export function BudgetManagementPage() {
   const { currentHousehold } = useHouseholds()
   const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
-  const [scope, setScope] = useState<BudgetScope>('Household')
+  const [initialSelection] = useState(initialBudgetSelection)
+  const [year, setYear] = useState(initialSelection.year)
+  const [month, setMonth] = useState(initialSelection.month)
+  const [scope, setScope] = useState<BudgetScope>(initialSelection.scope)
   const [budget, setBudget] = useState<BudgetPageData | null>(null)
   const [budgetOptions, setBudgetOptions] = useState<BudgetMonthOption[]>([])
   const [copySource, setCopySource] = useState('')
@@ -191,9 +210,14 @@ export function BudgetManagementPage() {
     }
   }
 
-  const handleStatus = async (action: 'activate' | 'close' | 'reopen') => {
+  const handleStatus = async (
+    action: 'activate' | 'close' | 'return-to-draft' | 'reopen',
+  ) => {
     if (!budget?.id || isDirty) return
     if (action === 'close' && !window.confirm('Close this budget? It will become read-only.')) return
+    if (action === 'return-to-draft' && !window.confirm(
+      'Return this active budget to Draft? It can then be replaced from annual targets or deleted.',
+    )) return
     if (action === 'reopen' && !window.confirm('Reopen this budget and allow changes again?')) return
     setIsSaving(true)
     setErrors([])
@@ -269,7 +293,7 @@ export function BudgetManagementPage() {
 
   const planningMetrics = (category: BudgetPageData['categories'][number]) => (
     <span className="budget-planning-metrics" aria-label={`${category.name} planning history`}>
-      <span><small>Yearly target</small><strong>XX</strong></span>
+      <span><small>Monthly target</small><strong>{category.monthlyTargetAmount === null ? '—' : formatAmount(category.monthlyTargetAmount)}</strong></span>
       <span><small>Avg / month</small><strong>{formatAmount(category.averageMonthlyActualAmount)}</strong></span>
       <span><small>Last budget</small><strong>{category.lastMonthBudgetedAmount === null ? '—' : formatAmount(category.lastMonthBudgetedAmount)}</strong></span>
       <span><small>Last actual</small><strong>{formatAmount(category.lastMonthActualAmount)}</strong></span>
@@ -288,7 +312,7 @@ export function BudgetManagementPage() {
       <div className="budget-page-layout">
       <section className="management-content budget-content">
         <div className="page-title-row">
-          <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time. <AppLink to="/budgeting/recurring-expenses">Manage recurring expenses</AppLink></p></div>
+          <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time. <AppLink to="/budgeting/annual-targets">Manage annual targets</AppLink> or <AppLink to="/budgeting/recurring-expenses">manage recurring expenses</AppLink>.</p></div>
           {budget?.status && <span className={`budget-status budget-status-${budget.status.toLowerCase()}`}>{budget.status}</span>}
         </div>
 
@@ -354,6 +378,7 @@ export function BudgetManagementPage() {
             <span className="budget-back-to-top-host" data-back-to-top-host />
             {budget?.status === 'Draft' && canManage && <button className="danger-button" type="button" disabled={isSaving} onClick={() => void handleDeleteDraft()}>Delete draft</button>}
             {budget?.status === 'Draft' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before activating.' : undefined} onClick={() => void handleStatus('activate')}>Activate</button>}
+            {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before returning to Draft.' : undefined} onClick={() => void handleStatus('return-to-draft')}>Return to draft</button>}
             {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before closing.' : undefined} onClick={() => void handleStatus('close')}>Close budget</button>}
             {budget?.status === 'Closed' && canManage && <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleStatus('reopen')}>Reopen budget</button>}
             {canEdit && <button className="primary-button" type="button" disabled={isSaving || !isDirty} onClick={() => void handleSave()}>{isSaving ? 'Saving...' : 'Save budget'}</button>}

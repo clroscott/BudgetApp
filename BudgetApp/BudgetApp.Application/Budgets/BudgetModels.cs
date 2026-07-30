@@ -19,6 +19,7 @@ public sealed record BudgetCategoryModel(
     decimal? BudgetedAmount,
     decimal ActualAmount,
     decimal DirectActualAmount,
+    decimal? MonthlyTargetAmount,
     decimal AverageMonthlyActualAmount,
     decimal? LastMonthBudgetedAmount,
     decimal LastMonthActualAmount,

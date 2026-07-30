@@ -11,6 +11,7 @@ namespace BudgetApp.Application.Budgets;
 public sealed class BudgetManagementService(
     IBudgetRepository budgetRepository,
     IRecurringExpenseRepository recurringExpenseRepository,
+    IYearlyPlanRepository yearlyPlanRepository,
     HouseholdAuthorizationService authorizationService,
     TimeProvider timeProvider,
     AuditWriter? auditWriter = null)
@@ -360,6 +361,15 @@ public sealed class BudgetManagementService(
         Guid householdId, Guid userId, Guid budgetId, CancellationToken cancellationToken) =>
         ChangeStatusAsync(householdId, userId, budgetId, BudgetStatusChange.Close, cancellationToken);
 
+    public Task<BudgetPageModel> ReturnToDraftAsync(
+        Guid householdId, Guid userId, Guid budgetId, CancellationToken cancellationToken) =>
+        ChangeStatusAsync(
+            householdId,
+            userId,
+            budgetId,
+            BudgetStatusChange.ReturnToDraft,
+            cancellationToken);
+
     public Task<BudgetPageModel> ReopenAsync(
         Guid householdId, Guid userId, Guid budgetId, CancellationToken cancellationToken) =>
         ChangeStatusAsync(householdId, userId, budgetId, BudgetStatusChange.Reopen, cancellationToken);
@@ -382,6 +392,9 @@ public sealed class BudgetManagementService(
             case BudgetStatusChange.Close:
                 budget.Close(now);
                 break;
+            case BudgetStatusChange.ReturnToDraft:
+                budget.ReturnToDraft(now);
+                break;
             case BudgetStatusChange.Reopen:
                 budget.Reopen(now);
                 break;
@@ -394,6 +407,8 @@ public sealed class BudgetManagementService(
                 (AuditActions.Activated, "Activated"),
             BudgetStatusChange.Close =>
                 (AuditActions.Closed, "Closed"),
+            BudgetStatusChange.ReturnToDraft =>
+                (AuditActions.ReturnedToDraft, "Returned to draft"),
             BudgetStatusChange.Reopen =>
                 (AuditActions.Reopened, "Reopened"),
             _ => throw new ArgumentOutOfRangeException(nameof(change))
@@ -526,10 +541,17 @@ public sealed class BudgetManagementService(
         var lastMonthBudgeted = previousBudget?.Lines.ToDictionary(
             line => line.CategoryId, line => (decimal?)line.BudgetedAmount)
             ?? new Dictionary<Guid, decimal?>();
+        var monthlyTargets = await GetMonthlyTargetsAsync(
+            householdId,
+            userId,
+            year,
+            month,
+            scope,
+            cancellationToken);
 
         return BuildModel(
             budget, year, month, scope, currency, categories, actuals,
-            historicalTotals, lastMonthBudgeted, lastMonthActuals);
+            monthlyTargets, historicalTotals, lastMonthBudgeted, lastMonthActuals);
     }
 
     private static BudgetPageModel BuildModel(
@@ -540,6 +562,7 @@ public sealed class BudgetManagementService(
         string currency,
         IReadOnlyList<BudgetCategoryRecord> categories,
         BudgetActualsRecord actuals,
+        IReadOnlyDictionary<Guid, decimal> monthlyTargets,
         IReadOnlyDictionary<Guid, decimal> averageActuals,
         IReadOnlyDictionary<Guid, decimal?> lastMonthBudgeted,
         IReadOnlyDictionary<Guid, decimal> lastMonthActuals)
@@ -555,11 +578,13 @@ public sealed class BudgetManagementService(
             .OrderBy(category => category.DisplayOrder)
             .Select(root => ToModel(
                 root, amounts, actuals.AmountsByCategoryId,
-                averageActuals, lastMonthBudgeted, lastMonthActuals,
+                monthlyTargets, averageActuals, lastMonthBudgeted, lastMonthActuals,
                 children.GetValueOrDefault(root.Id, [])))
-            .Where(root => root.IsActive || root.BudgetedAmount.HasValue || root.ActualAmount != 0 ||
+            .Where(root => root.IsActive || root.BudgetedAmount.HasValue ||
+                root.MonthlyTargetAmount.HasValue || root.ActualAmount != 0 ||
                 root.Children.Any(child =>
-                    child.IsActive || child.BudgetedAmount.HasValue || child.ActualAmount != 0))
+                    child.IsActive || child.BudgetedAmount.HasValue ||
+                    child.MonthlyTargetAmount.HasValue || child.ActualAmount != 0))
             .ToList();
         return new BudgetPageModel(
             budget?.Id, year, month, scope.ToString(), currency,
@@ -571,18 +596,20 @@ public sealed class BudgetManagementService(
         BudgetCategoryRecord category,
         IReadOnlyDictionary<Guid, decimal?> amounts,
         IReadOnlyDictionary<Guid, decimal> actuals,
+        IReadOnlyDictionary<Guid, decimal> monthlyTargets,
         IReadOnlyDictionary<Guid, decimal> averageActuals,
         IReadOnlyDictionary<Guid, decimal?> lastMonthBudgeted,
         IReadOnlyDictionary<Guid, decimal> lastMonthActuals,
         IReadOnlyList<BudgetCategoryRecord> children) =>
         CreateCategoryModel(
-            category, amounts, actuals, averageActuals,
+            category, amounts, actuals, monthlyTargets, averageActuals,
             lastMonthBudgeted, lastMonthActuals, children);
 
     private static BudgetCategoryModel CreateCategoryModel(
         BudgetCategoryRecord category,
         IReadOnlyDictionary<Guid, decimal?> amounts,
         IReadOnlyDictionary<Guid, decimal> actuals,
+        IReadOnlyDictionary<Guid, decimal> monthlyTargets,
         IReadOnlyDictionary<Guid, decimal> averageActuals,
         IReadOnlyDictionary<Guid, decimal?> lastMonthBudgeted,
         IReadOnlyDictionary<Guid, decimal> lastMonthActuals,
@@ -594,15 +621,32 @@ public sealed class BudgetManagementService(
                 amounts.GetValueOrDefault(child.Id),
                 actuals.GetValueOrDefault(child.Id),
                 actuals.GetValueOrDefault(child.Id),
+                monthlyTargets.TryGetValue(child.Id, out var childTarget)
+                    ? childTarget
+                    : null,
                 averageActuals.GetValueOrDefault(child.Id),
                 lastMonthBudgeted.GetValueOrDefault(child.Id),
                 lastMonthActuals.GetValueOrDefault(child.Id), []))
-            .Where(child => child.IsActive || child.BudgetedAmount.HasValue || child.ActualAmount != 0)
+            .Where(child => child.IsActive || child.BudgetedAmount.HasValue ||
+                child.MonthlyTargetAmount.HasValue || child.ActualAmount != 0)
             .ToList();
         var directActual = actuals.GetValueOrDefault(category.Id);
         var directAverageActual = averageActuals.GetValueOrDefault(category.Id);
         var directLastMonthActual = lastMonthActuals.GetValueOrDefault(category.Id);
         var rootLastMonthBudgeted = lastMonthBudgeted.GetValueOrDefault(category.Id);
+        decimal? rootMonthlyTarget = monthlyTargets.TryGetValue(
+            category.Id,
+            out var directMonthlyTarget)
+            ? directMonthlyTarget
+            : null;
+        if (!rootMonthlyTarget.HasValue)
+        {
+            var childTargets = childModels
+                .Where(child => child.MonthlyTargetAmount.HasValue)
+                .Select(child => child.MonthlyTargetAmount!.Value)
+                .ToList();
+            if (childTargets.Count > 0) rootMonthlyTarget = childTargets.Sum();
+        }
         if (!rootLastMonthBudgeted.HasValue)
         {
             var childBudgets = childModels
@@ -616,10 +660,65 @@ public sealed class BudgetManagementService(
             amounts.GetValueOrDefault(category.Id),
             directActual + childModels.Sum(child => child.ActualAmount),
             directActual,
+            rootMonthlyTarget,
             directAverageActual + childModels.Sum(child => child.AverageMonthlyActualAmount),
             rootLastMonthBudgeted,
             directLastMonthActual + childModels.Sum(child => child.LastMonthActualAmount),
             childModels);
+    }
+
+    private async Task<IReadOnlyDictionary<Guid, decimal>> GetMonthlyTargetsAsync(
+        Guid householdId,
+        Guid userId,
+        int year,
+        int month,
+        BudgetScope scope,
+        CancellationToken cancellationToken)
+    {
+        var calendarMonth = new DateOnly(year, month, 1);
+        var candidates = await yearlyPlanRepository.ListCalendarYearCandidatesAsync(
+            householdId,
+            year,
+            scope,
+            scope == BudgetScope.Personal ? userId : null,
+            cancellationToken);
+        var plan = candidates
+            .Select(candidate => new
+            {
+                Plan = candidate,
+                StartsOn = new DateOnly(
+                    candidate.FiscalYearStartYear,
+                    candidate.FiscalYearStartMonth,
+                    1)
+            })
+            .Where(candidate =>
+                candidate.StartsOn <= calendarMonth &&
+                calendarMonth < candidate.StartsOn.AddMonths(12))
+            .OrderByDescending(candidate => candidate.StartsOn)
+            .Select(candidate => candidate.Plan)
+            .FirstOrDefault();
+        if (plan is null)
+            return new Dictionary<Guid, decimal>();
+        var startsOn = new DateOnly(
+            plan.FiscalYearStartYear,
+            plan.FiscalYearStartMonth,
+            1);
+        var ordinal = ((calendarMonth.Year - startsOn.Year) * 12) +
+            calendarMonth.Month - startsOn.Month;
+        return plan.Lines.ToDictionary(
+            line => line.CategoryId,
+            line => AllocateMonthlyTarget(line.AnnualTargetAmount, ordinal));
+    }
+
+    private static decimal AllocateMonthlyTarget(decimal annualAmount, int ordinal)
+    {
+        var totalCents = decimal.ToInt64(decimal.Round(
+            annualAmount * 100m,
+            0,
+            MidpointRounding.AwayFromZero));
+        var baseCents = totalCents / 12;
+        var remainder = totalCents % 12;
+        return (baseCents + (ordinal < remainder ? 1 : 0)) / 100m;
     }
 
     private static BudgetScope ParseScope(string scope) =>
@@ -669,6 +768,7 @@ public sealed class BudgetManagementService(
     {
         Activate,
         Close,
+        ReturnToDraft,
         Reopen
     }
 }

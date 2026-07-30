@@ -10,6 +10,7 @@ export interface BudgetCategory {
   budgetedAmount: number | null
   actualAmount: number
   directActualAmount: number
+  monthlyTargetAmount: number | null
   averageMonthlyActualAmount: number
   lastMonthBudgetedAmount: number | null
   lastMonthActualAmount: number
@@ -107,7 +108,7 @@ export function saveBudget(
 export function changeBudgetStatus(
   householdId: string,
   budgetId: string,
-  action: 'activate' | 'close' | 'reopen',
+  action: 'activate' | 'close' | 'return-to-draft' | 'reopen',
 ): Promise<BudgetPageData> {
   return apiPost(`/api/households/${householdId}/budgets/${budgetId}/${action}`, {})
 }

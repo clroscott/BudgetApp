@@ -316,6 +316,41 @@ Rules:
 - Actual and remaining amounts are calculated values.
 - Copying a prior month creates independent lines; later edits do not modify the source month.
 
+### YearlyPlan
+
+Stores annual planning targets without replacing monthly budgets.
+
+Key data:
+
+- Household ID
+- Fiscal-year starting year and snapshotted starting month
+- Scope: Household or Personal
+- Owner user ID, required only for Personal scope
+- Snapshotted currency
+
+Rules:
+
+- The household fiscal-year start month defaults to January.
+- Fiscal years are named by their starting year and may cross calendar years.
+- Changing the household default does not change an existing plan's date range.
+- Household and Personal uniqueness and privacy match the monthly-budget rules.
+- Annual targets do not continuously synchronize monthly budgets.
+
+### YearlyTargetLine
+
+Stores an optional annual target against a root category or subcategory.
+
+Rules:
+
+- A category appears at most once in a yearly plan.
+- Within a root section, either the root or its subcategories may have targets,
+  but not both.
+- Monthly equivalents are calculated guidance.
+- Allocated cents across all 12 months must reconcile exactly to the annual
+  target.
+- Creating monthly drafts copies values once; subsequent monthly edits are
+  independent.
+
 ### RecurringExpense
 
 Describes a predictable expense or income expectation. Despite the initial name, the model should be capable of representing regular income as well as expenses.

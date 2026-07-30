@@ -23,6 +23,7 @@ public sealed class Household
         Name = name;
         DefaultCurrency = defaultCurrency;
         TimeZoneId = timeZoneId;
+        FiscalYearStartMonth = 1;
         IsActive = true;
         CreatedAtUtc = createdAtUtc;
         UpdatedAtUtc = createdAtUtc;
@@ -35,6 +36,8 @@ public sealed class Household
     public string DefaultCurrency { get; private set; } = string.Empty;
 
     public string TimeZoneId { get; private set; } = string.Empty;
+
+    public int FiscalYearStartMonth { get; private set; }
 
     public bool IsActive { get; private set; }
 
@@ -102,6 +105,21 @@ public sealed class Household
         _members.Add(member);
         UpdatedAtUtc = joinedAtUtc;
         return member;
+    }
+
+    public void ChangeFiscalYearStartMonth(
+        int fiscalYearStartMonth,
+        DateTimeOffset updatedAtUtc)
+    {
+        if (fiscalYearStartMonth is < 1 or > 12)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(fiscalYearStartMonth),
+                "Fiscal year start month must be between 1 and 12.");
+        }
+
+        FiscalYearStartMonth = fiscalYearStartMonth;
+        UpdatedAtUtc = updatedAtUtc;
     }
 
     private static string ValidateRequiredText(

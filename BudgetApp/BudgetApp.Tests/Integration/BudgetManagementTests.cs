@@ -48,6 +48,18 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
         Assert.Equal(HttpStatusCode.OK, (await SendWithAntiforgery(
             client, HttpMethod.Post,
             $"/api/households/{householdId}/budgets/{created.Id}/activate", new { }, token)).StatusCode);
+        var returnToDraft = await SendWithAntiforgery(
+            client, HttpMethod.Post,
+            $"/api/households/{householdId}/budgets/{created.Id}/return-to-draft",
+            new { },
+            token);
+        Assert.Equal(HttpStatusCode.OK, returnToDraft.StatusCode);
+        Assert.Equal(
+            "Draft",
+            (await returnToDraft.Content.ReadFromJsonAsync<BudgetResponse>())!.Status);
+        Assert.Equal(HttpStatusCode.OK, (await SendWithAntiforgery(
+            client, HttpMethod.Post,
+            $"/api/households/{householdId}/budgets/{created.Id}/activate", new { }, token)).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await SendWithAntiforgery(
             client, HttpMethod.Delete,
             $"/api/households/{householdId}/budgets/{created.Id}", new { }, token)).StatusCode);

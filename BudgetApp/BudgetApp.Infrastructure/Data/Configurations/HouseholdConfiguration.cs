@@ -27,6 +27,15 @@ internal sealed class HouseholdConfiguration : IEntityTypeConfiguration<Househol
             .IsUnicode(false)
             .IsRequired();
 
+        builder.Property(household => household.FiscalYearStartMonth)
+            .HasDefaultValue(1)
+            .IsRequired();
+
+        builder.ToTable("Households", table =>
+            table.HasCheckConstraint(
+                "CK_Households_FiscalYearStartMonth",
+                "[FiscalYearStartMonth] >= 1 AND [FiscalYearStartMonth] <= 12"));
+
         builder.Property(household => household.IsActive)
             .IsRequired();
 

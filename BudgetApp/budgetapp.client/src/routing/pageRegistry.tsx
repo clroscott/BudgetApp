@@ -186,6 +186,26 @@ export const appPages: AppPageDefinition[] = [
     ),
   },
   {
+    id: 'annual-targets',
+    path: '/budgeting/annual-targets',
+    label: 'Annual targets',
+    icon: 'budget',
+    access: 'household',
+    navigation: { section: 'primary', order: 45 },
+    dashboard: {
+      panelKey: 'annual-targets',
+      panelLabel: 'Annual Targets',
+      panelTitle: 'Plan the fiscal year',
+      panelDescription:
+        'Set annual category targets and create independent monthly drafts.',
+      linkLabel: 'Manage annual targets',
+    },
+    component: page(
+      () => import('../pages/YearlyPlanManagementPage'),
+      'YearlyPlanManagementPage',
+    ),
+  },
+  {
     id: 'recurring-expenses',
     path: '/budgeting/recurring-expenses',
     label: 'Recurring expenses',

@@ -150,6 +150,18 @@ public sealed class BudgetMonth
         UpdatedAtUtc = updatedAtUtc;
     }
 
+    public void ReturnToDraft(DateTimeOffset updatedAtUtc)
+    {
+        if (Status != BudgetStatus.Active)
+        {
+            throw new InvalidOperationException(
+                "Only an active budget can be returned to draft.");
+        }
+
+        Status = BudgetStatus.Draft;
+        UpdatedAtUtc = updatedAtUtc;
+    }
+
     public void Reopen(DateTimeOffset updatedAtUtc)
     {
         if (Status != BudgetStatus.Closed)

@@ -53,6 +53,10 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
 
+    public DbSet<YearlyPlan> YearlyPlans => Set<YearlyPlan>();
+
+    public DbSet<YearlyTargetLine> YearlyTargetLines => Set<YearlyTargetLine>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
