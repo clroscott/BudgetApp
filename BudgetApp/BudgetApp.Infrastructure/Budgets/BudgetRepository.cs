@@ -67,6 +67,23 @@ internal sealed class BudgetRepository(BudgetAppDbContext dbContext) : IBudgetRe
             budget.Id, budget.Year, budget.Month, budget.Status.ToString()))
         .ToList();
 
+    public async Task<IReadOnlyList<BudgetMonth>> ListYearAsync(
+        Guid householdId,
+        int year,
+        BudgetScope scope,
+        Guid? ownerUserId,
+        CancellationToken cancellationToken) =>
+        await dbContext.BudgetMonths
+            .AsNoTracking()
+            .Include(budget => budget.Lines)
+            .Where(budget =>
+                budget.HouseholdId == householdId &&
+                budget.Year == year &&
+                budget.Scope == scope &&
+                budget.OwnerUserId == ownerUserId)
+            .OrderBy(budget => budget.Month)
+            .ToListAsync(cancellationToken);
+
     public Task<string?> GetHouseholdCurrencyAsync(
         Guid householdId,
         CancellationToken cancellationToken) =>
@@ -189,6 +206,63 @@ internal sealed class BudgetRepository(BudgetAppDbContext dbContext) : IBudgetRe
                 group.Key.Month,
                 group.Sum(transaction => transaction.Amount)))
             .ToList();
+    }
+
+    public async Task<AnnualTransactionActualsRecord> GetAnnualTransactionsAsync(
+        Guid householdId,
+        Guid userId,
+        int year,
+        BudgetScope scope,
+        string currency,
+        CancellationToken cancellationToken)
+    {
+        var fromDate = new DateOnly(year, 1, 1);
+        var toDate = new DateOnly(year, 12, 31);
+        var transactions = await (
+            from transaction in dbContext.Transactions.AsNoTracking()
+            join account in dbContext.Accounts.AsNoTracking()
+                on transaction.AccountId equals account.Id
+            join category in dbContext.Categories.AsNoTracking()
+                on transaction.CategoryId equals category.Id into categories
+            from category in categories.DefaultIfEmpty()
+            where transaction.HouseholdId == householdId &&
+                  transaction.TransactionDate >= fromDate &&
+                  transaction.TransactionDate <= toDate &&
+                  !transaction.IsVoided &&
+                  !transaction.IsExcludedFromBudget &&
+                  (scope == BudgetScope.Household
+                      ? account.Scope == AccountScope.Household
+                      : account.Scope == AccountScope.Personal &&
+                        account.OwnerUserId == userId)
+            select new
+            {
+                transaction.TransactionDate.Month,
+                transaction.CategoryId,
+                CategoryType = category == null
+                    ? (CategoryType?)null
+                    : category.Type,
+                transaction.Amount,
+                account.Currency
+            })
+            .ToListAsync(cancellationToken);
+
+        var matchingCurrency = transactions
+            .Where(transaction => string.Equals(
+                transaction.Currency,
+                currency,
+                StringComparison.OrdinalIgnoreCase))
+            .Select(transaction => new AnnualTransactionRecord(
+                transaction.Month,
+                transaction.CategoryId,
+                transaction.CategoryType,
+                transaction.Amount))
+            .ToList();
+        return new AnnualTransactionActualsRecord(
+            matchingCurrency,
+            transactions.Count(transaction => !string.Equals(
+                transaction.Currency,
+                currency,
+                StringComparison.OrdinalIgnoreCase)));
     }
 
     public async Task AddAsync(BudgetMonth budgetMonth, CancellationToken cancellationToken) =>

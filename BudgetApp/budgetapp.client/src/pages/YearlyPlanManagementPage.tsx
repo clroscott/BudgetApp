@@ -13,6 +13,7 @@ import {
   type YearlyPlanData,
 } from '../budgets/yearlyPlanApi'
 import { BrandLockup } from '../components/Brand'
+import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
@@ -318,12 +319,7 @@ export function YearlyPlanManagementPage() {
   return <div className="page yearly-plan-page">
     <header className="app-header">
       <BrandLockup />
-      <nav className="header-links">
-        <AppLink className="header-link" to="/budgeting">Monthly budget</AppLink>
-        <AppLink className="header-link" to="/budgeting/recurring-expenses">
-          Recurring expenses
-        </AppLink>
-      </nav>
+      <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
     </header>
     <main className="page-content">
       <div className="page-title-row">
@@ -335,6 +331,7 @@ export function YearlyPlanManagementPage() {
           </p>
         </div>
       </div>
+      <BudgetingSectionNav current="annual-targets" />
 
       <ErrorSummary errors={errors} />
       {notice && <p className="success-message">{notice}</p>}

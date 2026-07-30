@@ -25,6 +25,13 @@ public interface IBudgetRepository
         Guid? ownerUserId,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<BudgetMonth>> ListYearAsync(
+        Guid householdId,
+        int year,
+        BudgetScope scope,
+        Guid? ownerUserId,
+        CancellationToken cancellationToken);
+
     Task<string?> GetHouseholdCurrencyAsync(
         Guid householdId,
         CancellationToken cancellationToken);
@@ -47,6 +54,14 @@ public interface IBudgetRepository
         Guid userId,
         DateOnly fromDate,
         DateOnly toDate,
+        BudgetScope scope,
+        string currency,
+        CancellationToken cancellationToken);
+
+    Task<AnnualTransactionActualsRecord> GetAnnualTransactionsAsync(
+        Guid householdId,
+        Guid userId,
+        int year,
         BudgetScope scope,
         string currency,
         CancellationToken cancellationToken);
