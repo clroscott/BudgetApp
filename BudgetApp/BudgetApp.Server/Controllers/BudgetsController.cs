@@ -108,6 +108,12 @@ public sealed class BudgetsController(
         ExecuteWrite(async userId => Ok(await budgetManagementService.CloseAsync(
             householdId, userId, budgetId, cancellationToken)));
 
+    [HttpPost("{budgetId:guid}/return-to-draft")]
+    public Task<ActionResult<BudgetPageModel>> ReturnToDraft(
+        Guid householdId, Guid budgetId, CancellationToken cancellationToken) =>
+        ExecuteWrite(async userId => Ok(await budgetManagementService.ReturnToDraftAsync(
+            householdId, userId, budgetId, cancellationToken)));
+
     [HttpPost("{budgetId:guid}/reopen")]
     public Task<ActionResult<BudgetPageModel>> Reopen(
         Guid householdId, Guid budgetId, CancellationToken cancellationToken) =>

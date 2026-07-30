@@ -2591,6 +2591,279 @@ a {
   font-weight: 700;
 }
 
+.yearly-plan-controls {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.yearly-plan-controls label,
+.yearly-plan-period,
+.yearly-plan-total {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.yearly-plan-controls label small {
+  color: var(--muted-text);
+  line-height: 1.25;
+}
+
+.yearly-plan-controls span,
+.yearly-plan-period span,
+.yearly-plan-total span,
+.yearly-target-row small,
+.yearly-allocation-panel label > span {
+  color: var(--muted-text);
+  font-size: 0.8rem;
+}
+
+.fiscal-default-panel,
+.yearly-allocation-panel {
+  display: flex;
+  align-items: end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.fiscal-default-panel > div:first-child,
+.yearly-allocation-panel > div:first-child {
+  flex: 1;
+}
+
+.fiscal-default-panel h2,
+.yearly-allocation-panel h2 {
+  margin: 0 0 0.25rem;
+}
+
+.fiscal-default-panel p,
+.yearly-allocation-panel p {
+  margin: 0;
+  color: var(--muted-text);
+}
+
+.yearly-target-sections {
+  display: grid;
+  gap: 1rem;
+}
+
+.yearly-target-row {
+  display: grid;
+  grid-template-columns:
+    minmax(12rem, 1fr)
+    minmax(12rem, 0.7fr)
+    minmax(11rem, 0.6fr)
+    minmax(11rem, 0.6fr);
+  gap: 1rem;
+  align-items: center;
+  padding: 0.85rem 1rem;
+}
+
+.yearly-target-row + .yearly-target-row {
+  border-top: 1px solid var(--border);
+}
+
+.yearly-target-row > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.yearly-allocation-panel {
+  display: grid;
+  align-items: stretch;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.yearly-allocation-heading {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.yearly-draft-handling small,
+.yearly-allocation-submit small {
+  color: var(--muted-text);
+}
+
+.yearly-draft-handling {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface-soft);
+}
+
+.yearly-draft-handling > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.yearly-allocation-preview {
+  display: grid;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.yearly-allocation-preview > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.yearly-allocation-preview > div small {
+  color: var(--muted-text);
+}
+
+.yearly-allocation-preview > .yearly-allocation-preview-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+}
+
+.yearly-allocation-preview-heading > div:first-child,
+.yearly-allocation-submit > div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.yearly-month-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.yearly-month-selection-actions > span {
+  color: var(--muted-text);
+  font-size: 0.8rem;
+}
+
+.yearly-allocation-preview ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.yearly-allocation-preview li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-left: 0.25rem solid var(--border-strong);
+  border-radius: 0.7rem;
+  background: var(--surface-soft);
+  transition: opacity 140ms ease;
+}
+
+.yearly-month-checkbox {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  align-self: center;
+  cursor: pointer;
+}
+
+.yearly-month-checkbox input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+}
+
+.yearly-allocation-preview li > div,
+.yearly-allocation-budget-link > div {
+  display: grid;
+  gap: 0.1rem;
+  text-align: right;
+}
+
+.yearly-allocation-budget-link {
+  display: flex;
+  flex: 1;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.yearly-allocation-preview li:has(.yearly-allocation-budget-link) {
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.yearly-allocation-preview li:has(.yearly-allocation-budget-link):hover {
+  border-color: var(--accent);
+  box-shadow: 0 0.35rem 0.8rem rgb(21 82 69 / 10%);
+  transform: translateY(-1px);
+}
+
+.yearly-allocation-budget-link:focus-visible {
+  border-radius: 0.35rem;
+  outline: 0.15rem solid var(--accent);
+  outline-offset: 0.2rem;
+}
+
+.yearly-allocation-preview time,
+.yearly-allocation-preview small {
+  color: var(--muted-text);
+  font-size: 0.78rem;
+}
+
+.yearly-allocation-preview .allocation-impact-create {
+  border-left-color: var(--accent);
+}
+
+.yearly-allocation-preview .allocation-impact-replace {
+  border-left-color: #b7791f;
+}
+
+.yearly-allocation-preview .allocation-impact-protected {
+  opacity: 0.78;
+}
+
+.yearly-allocation-preview .allocation-impact-unselected {
+  opacity: 0.48;
+}
+
+.yearly-allocation-submit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.25rem;
+}
+
+.yearly-save-bar {
+  position: sticky;
+  bottom: 1rem;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  max-width: 52rem;
+  margin: 1rem auto 0;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 0.6rem 1.5rem rgb(15 49 42 / 12%);
+  backdrop-filter: blur(12px);
+}
+
+.yearly-save-bar > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
 .recurring-content {
   max-width: 64rem;
 }
@@ -3155,5 +3428,37 @@ a {
 
   .household-invitation-actions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 800px) {
+  .yearly-plan-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fiscal-default-panel,
+  .yearly-allocation-panel,
+  .yearly-save-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .yearly-target-row {
+    grid-template-columns: 1fr;
+  }
+
+  .yearly-draft-handling {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .yearly-allocation-preview > .yearly-allocation-preview-heading,
+  .yearly-allocation-submit {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .yearly-allocation-preview ul {
+    grid-template-columns: 1fr;
   }
 }

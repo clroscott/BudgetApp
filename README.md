@@ -19,6 +19,7 @@ BudgetApp is a household budgeting application for managing accounts, importing 
 - CSV transaction imports
 - Transaction review and categorization
 - Monthly budget management
+- Annual category targets and fiscal-year allocation
 - Personal and household budget views
 - Categorization rules
 - AI-assisted categorization and spending insights
@@ -42,4 +43,5 @@ Backend foundations for configuration, EF Core, SQL Server, technical logging, a
 - [Email infrastructure and development outbox](docs/email.md)
 - [Household invitations](docs/household-invitations.md)
 - [Household activity and audit history](docs/audit-history.md)
+- [Annual targets and monthly allocation](docs/annual-targets.md)
 - [Authentication](docs/authentication.md)

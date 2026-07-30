@@ -52,6 +52,9 @@ internal sealed class HouseholdLifecycleRepository(
                await dbContext.BudgetMonths.AnyAsync(
                    item => item.HouseholdId == householdId,
                    cancellationToken) ||
+               await dbContext.YearlyPlans.AnyAsync(
+                   item => item.HouseholdId == householdId,
+                   cancellationToken) ||
                await dbContext.RecurringExpenses.AnyAsync(
                    item => item.HouseholdId == householdId,
                    cancellationToken) ||

@@ -72,6 +72,7 @@ public static class AuditActions
     public const string Deactivated = "Deactivated";
     public const string Closed = "Closed";
     public const string Reopened = "Reopened";
+    public const string ReturnedToDraft = "ReturnedToDraft";
     public const string Copied = "Copied";
     public const string Cleared = "Cleared";
     public const string Invited = "Invited";
@@ -86,6 +87,7 @@ public static class AuditEntityTypes
     public const string Transaction = "Transaction";
     public const string Import = "Import";
     public const string Budget = "Budget";
+    public const string YearlyPlan = "YearlyPlan";
     public const string Account = "Account";
     public const string Category = "Category";
     public const string RecurringExpense = "RecurringExpense";
@@ -93,4 +95,5 @@ public static class AuditEntityTypes
     public const string CategorizationRule = "CategorizationRule";
     public const string HouseholdMember = "HouseholdMember";
     public const string HouseholdInvitation = "HouseholdInvitation";
+    public const string Household = "Household";
 }

@@ -442,7 +442,55 @@ Categories, categorization rules, merchant aliases, and import profiles are seco
 
 - The user must be able to read the source budget and create the target budget.
 
-## 11. Create a Recurring Expense
+## 11. Set Annual Targets and Allocate Monthly Drafts
+
+### Starting state
+
+- The user is authenticated with an active household membership.
+- Active expense categories exist.
+- The household has a fiscal-year start month, January by default.
+
+### Main steps
+
+1. The user opens Budgeting > Annual Targets.
+2. The user selects a fiscal starting year and Household or Personal scope.
+3. The application shows the exact 12-month date range.
+4. The user chooses Overall or Detailed planning independently for each root
+   category and saves optional annual targets.
+5. The user selects any combination of fiscal months, with Select all and
+   Select none shortcuts, and creates those monthly drafts.
+6. The application reports created, replaced, and skipped months.
+
+### Validation
+
+- Root and subcategory targets cannot coexist within the same section.
+- Targets use active household expense categories and valid currency precision.
+- Existing budgets are skipped unless the user explicitly chooses to replace a
+  Draft.
+- Active and Closed budgets are never replaced.
+- Remainder cents are distributed so the 12 allocated amounts equal the annual
+  target exactly.
+
+### Records created or updated
+
+- Household fiscal-year default, when explicitly changed
+- YearlyPlan and YearlyTargetLine records
+- Missing Draft BudgetMonth and BudgetLine records
+- Existing Draft lines only after explicit replacement confirmation
+
+### Failure and recovery behavior
+
+- Saving annual targets never edits existing monthly budgets.
+- Allocation returns per-month results and does not silently overwrite a month.
+- Monthly budgets remain independently editable after allocation.
+
+### Permissions
+
+- Household plans follow household financial permissions.
+- Personal plans and their generated budgets belong to the signed-in user.
+- Another member cannot read or allocate a user's personal targets.
+
+## 12. Create a Recurring Expense
 
 ### Starting state
 
@@ -482,7 +530,7 @@ Categories, categorization rules, merchant aliases, and import profiles are seco
 - Authorized roles manage household recurring items.
 - Users manage their own personal recurring items.
 
-## 12. View the Dashboard and Forecast
+## 13. View the Dashboard and Forecast
 
 ### Starting state
 
