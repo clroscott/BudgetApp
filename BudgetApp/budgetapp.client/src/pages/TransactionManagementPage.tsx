@@ -69,6 +69,24 @@ function createDefaultFilters(): TransactionFilters {
   }
 }
 
+function createInitialFilters(): TransactionFilters {
+  const defaults = createDefaultFilters()
+  const search = new URLSearchParams(window.location.search)
+  const fromDate = search.get('fromDate') ?? ''
+  const toDate = search.get('toDate') ?? ''
+  const categoryId = search.get('categoryId') ?? ''
+  const uncategorizedOnly = search.get('uncategorizedOnly') === 'true'
+  if (!fromDate || !toDate) return defaults
+
+  return {
+    ...defaults,
+    dateMode: 'range',
+    fromDate,
+    toDate,
+    categoryId: uncategorizedOnly ? uncategorizedFilterValue : categoryId,
+  }
+}
+
 function buildTransactionQuery(filters: TransactionFilters, page: number): TransactionQuery {
   const query: TransactionQuery = {
     accountId: filters.accountId || undefined,
@@ -151,7 +169,7 @@ function formatAmount(amount: number, currency: string) {
 
 export function TransactionManagementPage() {
   const { currentHousehold } = useHouseholds()
-  const initialFilters = useMemo(createDefaultFilters, [])
+  const initialFilters = useMemo(createInitialFilters, [])
   const [transactions, setTransactions] = useState<TransactionItem[]>([])
   const [accounts, setAccounts] = useState<AccountItem[]>([])
   const [categories, setCategories] = useState<CategoryItem[]>([])
@@ -182,6 +200,14 @@ export function TransactionManagementPage() {
       if (!isCurrent) return
       setAccounts(accountItems)
       setCategories(categoryItems)
+      setFilters(current => {
+        const selectedId = current.subcategoryId || current.categoryId
+        if (!selectedId || selectedId === uncategorizedFilterValue) return current
+        return {
+          ...current,
+          ...findCategorySelection(categoryItems, selectedId),
+        }
+      })
     }).catch(error => {
       if (isCurrent) setErrors(getErrorMessages(error))
     })
@@ -343,7 +369,7 @@ export function TransactionManagementPage() {
     <main className="management-page">
       <header className="app-header">
         <BrandLockup />
-        <AppLink className="header-link" to="/dashboard">Dashboard</AppLink>
+        <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
       </header>
 
       <section className="management-content transaction-content">

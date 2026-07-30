@@ -868,7 +868,7 @@ export function ImportReviewPage() {
     <main className="management-page">
       <header className="app-header">
         <BrandLockup />
-        <AppLink className="header-link" to="/dashboard">Dashboard</AppLink>
+        <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
       </header>
 
       <section className="management-content import-review-content">

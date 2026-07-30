@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { BrandLockup } from '../components/Brand'
+import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import {
   changeBudgetStatus,
   copyBudget,
@@ -306,15 +307,16 @@ export function BudgetManagementPage() {
         <BrandLockup />
         <AppLink className="header-link" to="/dashboard" onClick={event => {
           if (!confirmDiscard()) event.preventDefault()
-        }}>Dashboard</AppLink>
+        }}>Return to dashboard</AppLink>
       </header>
 
       <div className="budget-page-layout">
       <section className="management-content budget-content">
         <div className="page-title-row">
-          <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time. <AppLink to="/budgeting/annual-targets">Manage annual targets</AppLink> or <AppLink to="/budgeting/recurring-expenses">manage recurring expenses</AppLink>.</p></div>
+          <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time.</p></div>
           {budget?.status && <span className={`budget-status budget-status-${budget.status.toLowerCase()}`}>{budget.status}</span>}
         </div>
+        <BudgetingSectionNav current="monthly" />
 
         <section className="budget-period-panel" aria-label="Budget period">
           <button className="secondary-button" type="button" onClick={() => changePeriod(year, month - 1)}>Previous</button>

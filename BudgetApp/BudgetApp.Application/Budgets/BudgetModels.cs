@@ -1,3 +1,5 @@
+using BudgetApp.Domain.Categories;
+
 namespace BudgetApp.Application.Budgets;
 
 public sealed record BudgetPageModel(
@@ -50,3 +52,51 @@ public sealed record BudgetHistoricalActualRecord(
     int Year,
     int Month,
     decimal Amount);
+
+public sealed record AnnualTransactionRecord(
+    int Month,
+    Guid? CategoryId,
+    CategoryType? CategoryType,
+    decimal Amount);
+
+public sealed record AnnualTransactionActualsRecord(
+    IReadOnlyList<AnnualTransactionRecord> Transactions,
+    int CurrencyMismatchTransactionCount);
+
+public sealed record AnnualBudgetOverviewModel(
+    int Year,
+    string Scope,
+    string Currency,
+    int ActualAverageMonthCount,
+    int BudgetedMonthCount,
+    decimal AnnualBudgetedAmount,
+    decimal ActualSpendingAmount,
+    decimal? RemainingAmount,
+    decimal IncomeAmount,
+    decimal NetCashFlowAmount,
+    decimal UncategorizedSpendingAmount,
+    int CurrencyMismatchTransactionCount,
+    IReadOnlyList<AnnualBudgetMonthModel> Months,
+    IReadOnlyList<AnnualBudgetCategoryModel> Categories);
+
+public sealed record AnnualBudgetMonthModel(
+    Guid? BudgetId,
+    int Year,
+    int Month,
+    string? Status,
+    decimal? BudgetedAmount,
+    decimal ActualSpendingAmount,
+    decimal? RemainingAmount,
+    decimal IncomeAmount,
+    decimal NetCashFlowAmount);
+
+public sealed record AnnualBudgetCategoryModel(
+    Guid Id,
+    string Name,
+    bool IsActive,
+    decimal? BudgetedAmount,
+    decimal ActualAmount,
+    decimal? RemainingAmount,
+    decimal AverageActualPerMonth,
+    decimal DirectActualAmount,
+    IReadOnlyList<AnnualBudgetCategoryModel> Children);

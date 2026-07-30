@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<DashboardLayoutService>();
         services.AddScoped<IBudgetRepository, BudgetRepository>();
         services.AddScoped<BudgetManagementService>();
+        services.AddScoped<AnnualBudgetOverviewService>();
         services.AddScoped<IYearlyPlanRepository, YearlyPlanRepository>();
         services.AddScoped<YearlyPlanService>();
         services.AddScoped<IHouseholdRepository, HouseholdRepository>();

@@ -206,6 +206,26 @@ export const appPages: AppPageDefinition[] = [
     ),
   },
   {
+    id: 'annual-overview',
+    path: '/budgeting/annual-overview',
+    label: 'Annual overview',
+    icon: 'activity',
+    access: 'household',
+    navigation: { section: 'primary', order: 47 },
+    dashboard: {
+      panelKey: 'annual-overview',
+      panelLabel: 'Annual Overview',
+      panelTitle: 'Review the year',
+      panelDescription:
+        'Compare monthly budgets, actual spending, income, and cash flow.',
+      linkLabel: 'View annual overview',
+    },
+    component: page(
+      () => import('../pages/AnnualBudgetOverviewPage'),
+      'AnnualBudgetOverviewPage',
+    ),
+  },
+  {
     id: 'recurring-expenses',
     path: '/budgeting/recurring-expenses',
     label: 'Recurring expenses',
