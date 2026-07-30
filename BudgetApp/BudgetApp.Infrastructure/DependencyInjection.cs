@@ -58,6 +58,7 @@ public static class DependencyInjection
         services.AddScoped<RecurringExpenseManagementService>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<TransactionManagementService>();
+        services.AddScoped<TransactionCsvExportService>();
         services.AddSingleton(TimeProvider.System);
 
         return services

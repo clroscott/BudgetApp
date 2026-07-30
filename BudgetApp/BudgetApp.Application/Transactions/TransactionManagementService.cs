@@ -26,37 +26,19 @@ public sealed class TransactionManagementService(
         int page,
         CancellationToken cancellationToken)
     {
-        if (fromDate > toDate)
-        {
-            throw new ArgumentException("From date cannot be after to date.");
-        }
-
         if (page < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(page), "Page must be at least 1.");
         }
 
-        CategoryType? parsedCategoryType = null;
-        if (!string.IsNullOrWhiteSpace(categoryType))
-        {
-            if (!Enum.TryParse<CategoryType>(categoryType.Trim(), ignoreCase: true, out var parsed) ||
-                !Enum.IsDefined(parsed))
-            {
-                throw new ArgumentException("Category type is not supported.", nameof(categoryType));
-            }
-
-            parsedCategoryType = parsed;
-        }
-
-        var normalizedDescriptionSearch = string.IsNullOrWhiteSpace(descriptionSearch)
-            ? null
-            : descriptionSearch.Trim();
-        if (normalizedDescriptionSearch?.Length > 250)
-        {
-            throw new ArgumentException(
-                "Description search cannot exceed 250 characters.",
-                nameof(descriptionSearch));
-        }
+        var criteria = TransactionSearchCriteria.Create(
+            accountId,
+            fromDate,
+            toDate,
+            categoryType,
+            categoryId,
+            uncategorizedOnly,
+            descriptionSearch);
 
         var role = await authorizationService.RequireViewAsync(
             householdId,
@@ -65,13 +47,13 @@ public sealed class TransactionManagementService(
         var result = await transactionRepository.ListVisibleAsync(
             householdId,
             userId,
-            accountId,
-            fromDate,
-            toDate,
-            parsedCategoryType,
-            categoryId,
-            uncategorizedOnly,
-            normalizedDescriptionSearch,
+            criteria.AccountId,
+            criteria.FromDate,
+            criteria.ToDate,
+            criteria.CategoryType,
+            criteria.CategoryId,
+            criteria.UncategorizedOnly,
+            criteria.DescriptionSearch,
             (page - 1) * PageSize,
             PageSize,
             cancellationToken);

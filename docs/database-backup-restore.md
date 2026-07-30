@@ -253,12 +253,14 @@ This procedure is a full-database operational backup. It is not the portable hou
 
 Application-level work still required includes:
 
-- human-readable transaction CSV export;
 - a versioned household backup archive;
 - authorization checks;
 - validation and preview before restore;
 - restore into a new empty household;
 - automated round-trip and cross-household tests.
+
+The human-readable transaction CSV export is implemented and documented in
+[Transaction CSV export](transaction-csv-export.md).
 
 ## Related Documentation
 

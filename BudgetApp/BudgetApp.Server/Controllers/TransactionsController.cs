@@ -14,6 +14,7 @@ namespace BudgetApp.Server.Controllers;
 [Route("api/households/{householdId:guid}/transactions")]
 public sealed class TransactionsController(
     TransactionManagementService transactionManagementService,
+    TransactionCsvExportService transactionCsvExportService,
     ILogger<TransactionsController> logger) : ControllerBase
 {
     [HttpGet]
@@ -48,6 +49,50 @@ public sealed class TransactionsController(
                 description,
                 page,
                 cancellationToken));
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
+    [HttpGet("export.csv")]
+    public async Task<IActionResult> ExportCsv(
+        Guid householdId,
+        [FromQuery] Guid? accountId,
+        [FromQuery] DateOnly? fromDate,
+        [FromQuery] DateOnly? toDate,
+        [FromQuery] string? categoryType,
+        [FromQuery] Guid? categoryId,
+        [FromQuery] bool uncategorizedOnly,
+        [FromQuery] string? description,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var export = await transactionCsvExportService.ExportAsync(
+                householdId,
+                userId,
+                accountId,
+                fromDate,
+                toDate,
+                categoryType,
+                categoryId,
+                uncategorizedOnly,
+                description,
+                cancellationToken);
+            logger.LogInformation(
+                "User {UserId} exported {TransactionCount} visible transactions " +
+                "from household {HouseholdId}",
+                userId,
+                export.TransactionCount,
+                householdId);
+            return File(export.Content, "text/csv; charset=utf-8", export.FileName);
         }
         catch (Exception exception) when (IsExpected(exception))
         {

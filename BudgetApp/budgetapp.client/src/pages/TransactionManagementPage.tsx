@@ -7,6 +7,7 @@ import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 import {
+  downloadTransactionsCsv,
   getTransactions,
   updateTransaction,
   type TransactionItem,
@@ -168,6 +169,7 @@ export function TransactionManagementPage() {
   const [editRequest, setEditRequest] = useState<UpdateTransactionRequest | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
   useEffect(() => {
@@ -311,6 +313,24 @@ export function TransactionManagementPage() {
     }
   }
 
+  const handleExport = async () => {
+    if (isEditDirty && !window.confirm(
+      'The export contains saved transactions only. Continue without saving your current edit?',
+    )) {
+      return
+    }
+
+    setIsExporting(true)
+    setErrors([])
+    try {
+      await downloadTransactionsCsv(currentHousehold.id, appliedQuery)
+    } catch (error) {
+      setErrors(getErrorMessages(error))
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const firstResult = pagination.totalCount === 0
     ? 0
     : (pagination.page - 1) * pagination.pageSize + 1
@@ -331,7 +351,7 @@ export function TransactionManagementPage() {
           <div>
             <p className="eyebrow">Household activity</p>
             <h1>Transactions</h1>
-            <p>Search and correct official transactions without changing their import history.</p>
+            <p>Search and edit transactions in BudgetApp while preserving their import history.</p>
           </div>
           <AppLink to="/import">Import CSV</AppLink>
         </div>
@@ -459,6 +479,10 @@ export function TransactionManagementPage() {
             <button className="secondary-button" type="button" disabled={isLoading}
               onClick={handleResetFilters}>
               Reset filters
+            </button>
+            <button className="secondary-button" type="button"
+              disabled={isLoading || isExporting} onClick={() => void handleExport()}>
+              {isExporting ? 'Preparing export...' : 'Export matching transactions'}
             </button>
           </div>
         </form>
