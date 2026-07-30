@@ -1,4 +1,5 @@
 using BudgetApp.Application.Accounts;
+using BudgetApp.Application.Authentication;
 using BudgetApp.Application.Auditing;
 using BudgetApp.Application.Categories;
 using BudgetApp.Application.CategorizationRules;
@@ -71,6 +72,7 @@ public static class DependencyInjection
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<TransactionManagementService>();
         services.AddScoped<TransactionCsvExportService>();
+        services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();
         services.AddSingleton(TimeProvider.System);
         AddEmailInfrastructure(
             services,

@@ -4,7 +4,10 @@
 
 BudgetApp uses ASP.NET Core Identity with secure cookie authentication. The React client never stores a password, authentication token, or session identifier in JavaScript-accessible storage.
 
-The initial authentication scope includes registration, login, logout, current-user lookup, password changes, lockout protection, and antiforgery protection. Email confirmation, forgotten-password recovery, external login providers, and two-factor authentication are deferred.
+The authentication scope includes registration, login, logout, current-user
+lookup, password changes, forgotten-password recovery, lockout protection, and
+antiforgery protection. Email confirmation, external login providers, and
+two-factor authentication are deferred.
 
 ## Identity Storage
 
@@ -28,11 +31,15 @@ All authentication routes use the `/api/auth` prefix.
 | `GET` | `/antiforgery` | Anonymous | No | Issue an antiforgery cookie and return its request token |
 | `POST` | `/register` | Anonymous | Yes | Create and sign in a user |
 | `POST` | `/login` | Anonymous | Yes | Validate credentials and issue the authentication cookie |
+| `POST` | `/forgot-password` | Anonymous | Yes | Generate password-recovery instructions when an account exists |
+| `POST` | `/reset-password` | Anonymous | Yes | Validate a recovery token and set a new password |
 | `POST` | `/logout` | Required | Yes | End the current session |
 | `GET` | `/me` | Required | No | Return the current user ID, email, and display name |
 | `POST` | `/change-password` | Required | Yes | Change the current user's password |
 
-Registration and login are rate-limited per client address. Repeated failed password attempts lock the account for 15 minutes after five failures.
+Registration, login, forgotten-password, and password-reset requests are
+rate-limited per client address. Repeated failed password attempts lock the
+account for 15 minutes after five failures.
 
 ## Antiforgery Flow
 
@@ -65,6 +72,33 @@ Passwords must contain between 12 and 128 characters. BudgetApp favors longer pa
 
 The login endpoint always uses a generic invalid-credentials response. Logs contain internal user IDs for successful account operations but never passwords, cookies, antiforgery tokens, or email addresses.
 
-## Deferred Recovery
+## Password Recovery
 
-There is no public forgotten-password endpoint until a secure delivery channel exists. A local administrator recovery command can be added separately for local-first use. Email-based reset links, confirmation, and provider configuration will be planned when deployment work begins.
+The login page links to `/forgot-password`. Every syntactically valid email
+request receives the same public response, regardless of whether an account
+exists. This prevents the endpoint from being used to discover registered email
+addresses.
+
+For a matching account, ASP.NET Core Identity generates a protected password
+reset token and the configured backend email sender receives a recovery
+message. Development writes the message to the local file outbox documented in
+[Email infrastructure](email.md). Production email delivery remains disabled
+until a real provider is configured.
+
+The recovery link opens `/reset-password` with an opaque user ID and protected
+token. The token:
+
+- expires after one hour;
+- is validated by ASP.NET Core Identity;
+- becomes invalid after a successful password reset;
+- cannot be used to determine or change another user's password;
+- is never written to ordinary application logs.
+
+Successful reset signs the current browser out and returns it to the login page.
+Invalid, expired, incomplete, and previously used links return the same recovery
+error. Password-policy errors remain visible so the user can choose a valid
+replacement password.
+
+No additional database table or EF Core migration is required. Identity's
+configured data-protection token provider supplies and validates the protected
+token.

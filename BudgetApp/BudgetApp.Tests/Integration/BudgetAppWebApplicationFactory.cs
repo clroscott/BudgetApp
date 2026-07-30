@@ -1,4 +1,5 @@
 using System.Data.Common;
+using BudgetApp.Application.Email;
 using BudgetApp.Infrastructure.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -25,15 +26,20 @@ public sealed class BudgetAppWebApplicationFactory : WebApplicationFactory<Progr
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:BudgetApp", "Data Source=integration-tests");
+        builder.UseSetting("AuthenticationRateLimit:PermitLimit", "1000");
 
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<BudgetAppDbContext>>();
             services.RemoveAll<IDbContextOptionsConfiguration<BudgetAppDbContext>>();
+            services.RemoveAll<IEmailSender>();
 
             services.AddSingleton<DbConnection>(connection);
             services.AddDbContext<BudgetAppDbContext>((serviceProvider, options) =>
                 options.UseSqlite(serviceProvider.GetRequiredService<DbConnection>()));
+            services.AddSingleton<RecordingEmailSender>();
+            services.AddSingleton<IEmailSender>(serviceProvider =>
+                serviceProvider.GetRequiredService<RecordingEmailSender>());
         });
     }
 

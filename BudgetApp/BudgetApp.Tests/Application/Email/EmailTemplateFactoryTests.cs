@@ -14,6 +14,7 @@ public sealed class EmailTemplateFactoryTests
 
         var message = factory.CreatePasswordRecovery(
             "person@example.test",
+            Guid.NewGuid(),
             "reset-token",
             new DateTimeOffset(2026, 8, 1, 18, 30, 0, TimeSpan.Zero));
 
@@ -51,7 +52,7 @@ public sealed class EmailTemplateFactoryTests
         string passwordRecoveryLink,
         string householdInvitationLink) : IApplicationEmailLinkBuilder
     {
-        public string BuildPasswordRecoveryLink(string token) =>
+        public string BuildPasswordRecoveryLink(Guid userId, string token) =>
             passwordRecoveryLink;
 
         public string BuildHouseholdInvitationLink(string token) =>
