@@ -29,6 +29,7 @@ Backend foundations for configuration, EF Core, SQL Server, technical logging, a
 
 ## Documentation
 
+- [Clean development machine setup](docs/development-setup.md)
 - [Core data model](docs/core-data-model.md)
 - [Principal workflows](docs/workflows.md)
 - [Local development and secrets](docs/local-development.md)
