@@ -10,6 +10,7 @@ using BudgetApp.Application.Households;
 using BudgetApp.Application.Imports;
 using BudgetApp.Application.RecurringExpenses;
 using BudgetApp.Application.Transactions;
+using BudgetApp.Application.Tutorials;
 using BudgetApp.Infrastructure.Accounts;
 using BudgetApp.Infrastructure.Auditing;
 using BudgetApp.Infrastructure.Categories;
@@ -23,6 +24,7 @@ using BudgetApp.Infrastructure.Identity;
 using BudgetApp.Infrastructure.Imports;
 using BudgetApp.Infrastructure.RecurringExpenses;
 using BudgetApp.Infrastructure.Transactions;
+using BudgetApp.Infrastructure.Tutorials;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -82,6 +84,8 @@ public static class DependencyInjection
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<TransactionManagementService>();
         services.AddScoped<TransactionCsvExportService>();
+        services.AddScoped<ITutorialProgressRepository, TutorialProgressRepository>();
+        services.AddScoped<TutorialProgressService>();
         services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();
         services.AddSingleton(TimeProvider.System);
         AddEmailInfrastructure(

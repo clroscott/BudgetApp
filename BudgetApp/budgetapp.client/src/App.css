@@ -3097,6 +3097,276 @@ a {
   font-size: 0.9rem;
 }
 
+.dashboard-tutorial-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 1rem;
+  background:
+    linear-gradient(
+      115deg,
+      color-mix(in srgb, var(--accent) 12%, var(--surface)),
+      var(--surface)
+    );
+  box-shadow: var(--small-shadow);
+}
+
+.dashboard-tutorial-prompt h2,
+.dashboard-tutorial-prompt p {
+  margin: 0.2rem 0;
+}
+
+.dashboard-tutorial-prompt > div:last-child {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tutorial-hub-content {
+  max-width: 64rem;
+}
+
+.tutorial-list {
+  display: grid;
+}
+
+.tutorial-library {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.tutorial-kind-section {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.tutorial-kind-section-learnonly {
+  --tutorial-section-color: #4779b8;
+  --tutorial-section-soft: color-mix(in srgb, #4779b8 10%, var(--surface));
+}
+
+.tutorial-kind-section-guidedsetup {
+  --tutorial-section-color: var(--accent);
+  --tutorial-section-soft: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.tutorial-kind-section-guidedfinancialtask {
+  --tutorial-section-color: #b77a12;
+  --tutorial-section-soft: color-mix(in srgb, #d39a2f 13%, var(--surface));
+}
+
+.tutorial-kind-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.9rem 1rem;
+  border-left: 0.3rem solid var(--tutorial-section-color);
+  background: var(--tutorial-section-soft);
+}
+
+.tutorial-kind-heading h2,
+.tutorial-kind-heading p {
+  margin: 0;
+}
+
+.tutorial-kind-heading p {
+  margin-top: 0.2rem;
+  color: var(--muted-text);
+  font-size: 0.88rem;
+}
+
+.tutorial-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  min-height: 4.25rem;
+  padding: 0.8rem 1rem;
+}
+
+.tutorial-card + .tutorial-card {
+  border-top: 1px solid var(--border);
+}
+
+.tutorial-card h2 {
+  margin: 0.3rem 0 0.15rem;
+  font-size: 1rem;
+}
+
+.tutorial-card p {
+  margin: 0;
+  color: var(--muted-text);
+  font-size: 0.84rem;
+}
+
+.tutorial-card small {
+  color: var(--muted-text);
+  font-size: 0.75rem;
+}
+
+.tutorial-card-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tutorial-status {
+  display: inline-flex;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted-text);
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.tutorial-kind {
+  display: inline-flex;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.tutorial-kind-learnonly {
+  background: color-mix(in srgb, #4779b8 16%, var(--surface));
+  color: #285486;
+}
+
+.tutorial-kind-guidedsetup {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--accent);
+}
+
+.tutorial-kind-guidedfinancialtask {
+  background: color-mix(in srgb, #d39a2f 20%, var(--surface));
+  color: #78510c;
+}
+
+.tutorial-status-inprogress {
+  background: color-mix(in srgb, #d39a2f 20%, var(--surface));
+  color: #78510c;
+}
+
+.tutorial-status-completed {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.tutorial-card-coming-soon {
+  background: color-mix(in srgb, var(--surface-soft) 60%, var(--surface));
+}
+
+.tutorial-card-coming-soon .tutorial-status {
+  border: 1px dashed var(--border);
+}
+
+.tutorial-layer {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tutorial-blocker {
+  position: fixed;
+  background: rgba(5, 17, 14, 0.72);
+  pointer-events: auto;
+}
+
+.tutorial-blocker-full {
+  inset: 0;
+}
+
+.tutorial-spotlight {
+  position: fixed;
+  z-index: 1;
+  border: 3px solid #f7c75f;
+  border-radius: 0.75rem;
+  box-shadow:
+    0 0 0 0.2rem rgba(247, 199, 95, 0.28),
+    0 0 1.5rem rgba(247, 199, 95, 0.45);
+  pointer-events: none;
+}
+
+.tutorial-coach-card {
+  position: fixed;
+  z-index: 2;
+  box-sizing: border-box;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border));
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: 0 1.25rem 4rem rgba(0, 0, 0, 0.3);
+  pointer-events: auto;
+}
+
+.tutorial-coach-card h2 {
+  margin: 0.7rem 0 0.35rem;
+  font-size: 1.2rem;
+}
+
+.tutorial-coach-card > p {
+  margin: 0;
+  color: var(--muted-text);
+}
+
+.tutorial-coach-progress,
+.tutorial-coach-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.tutorial-coach-progress {
+  color: var(--muted-text);
+  font-size: 0.78rem;
+}
+
+.tutorial-coach-progress .text-button {
+  padding: 0.25rem;
+}
+
+.tutorial-coach-actions {
+  margin-top: 1rem;
+}
+
+.tutorial-coach-actions > span {
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .dashboard-tutorial-prompt,
+  .tutorial-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-tutorial-prompt > div:last-child,
+  .tutorial-card-actions {
+    justify-content: flex-start;
+  }
+
+  .tutorial-kind-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .recurring-content {
   max-width: 64rem;
 }

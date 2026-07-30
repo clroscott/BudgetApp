@@ -21,6 +21,7 @@ function NavigationLinks({
   return items.map(item => (
     <AppLink
       className={currentPath === item.path ? 'active' : undefined}
+      data-tutorial-id={`nav-${item.id}`}
       key={item.path}
       to={item.path}
       title={item.label}
@@ -97,6 +98,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <button
           className="sidebar-menu-button secondary-button"
+          data-tutorial-id="sidebar-menu"
           type="button"
           aria-expanded={isNavigationOpen}
           onClick={() => setIsNavigationOpen(open => !open)}

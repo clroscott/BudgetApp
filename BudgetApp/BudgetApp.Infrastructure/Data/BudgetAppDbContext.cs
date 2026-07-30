@@ -8,6 +8,7 @@ using BudgetApp.Domain.Households;
 using BudgetApp.Domain.Imports;
 using BudgetApp.Domain.RecurringExpenses;
 using BudgetApp.Domain.Transactions;
+using BudgetApp.Domain.Tutorials;
 using BudgetApp.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -52,6 +53,8 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
     public DbSet<RecurringExpense> RecurringExpenses => Set<RecurringExpense>();
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
+
+    public DbSet<TutorialProgress> TutorialProgress => Set<TutorialProgress>();
 
     public DbSet<YearlyPlan> YearlyPlans => Set<YearlyPlan>();
 
