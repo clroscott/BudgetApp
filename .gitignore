@@ -462,6 +462,9 @@ yarn-error.log*
 # Local database files
 *.mdf
 *.ldf
+*.bak
+*.bacpac
+*.trn
 
 # OS junk
 .DS_Store
