@@ -108,6 +108,15 @@ export const appPages: AppPageDefinition[] = [
     component: page(() => import('../pages/DashboardPage'), 'DashboardPage'),
   },
   {
+    id: 'tutorials',
+    path: '/tutorials',
+    label: 'Tutorials',
+    icon: 'activity',
+    access: 'household',
+    navigation: { section: 'settings', order: 100 },
+    component: page(() => import('../pages/TutorialHubPage'), 'TutorialHubPage'),
+  },
+  {
     id: 'transactions',
     path: '/transactions',
     label: 'Transactions',

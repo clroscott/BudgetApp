@@ -312,7 +312,7 @@ export function BudgetManagementPage() {
 
       <div className="budget-page-layout">
       <section className="management-content budget-content">
-        <div className="page-title-row">
+        <div className="page-title-row" data-tutorial-id="monthly-budget-page-title">
           <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time.</p></div>
           {budget?.status && <span className={`budget-status budget-status-${budget.status.toLowerCase()}`}>{budget.status}</span>}
         </div>

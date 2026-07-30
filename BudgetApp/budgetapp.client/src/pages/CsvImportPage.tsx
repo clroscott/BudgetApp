@@ -201,7 +201,7 @@ export function CsvImportPage() {
       </header>
 
       <section className="management-content import-content">
-        <div className="page-title-row">
+        <div className="page-title-row" data-tutorial-id="csv-import-page-title">
           <div>
             <p className="eyebrow">Transactions</p>
             <h1>Import CSV</h1>

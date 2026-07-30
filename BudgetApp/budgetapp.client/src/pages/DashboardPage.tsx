@@ -22,6 +22,8 @@ import {
   dashboardPanels,
   defaultDashboardPanelKeys,
 } from '../routing/pageRegistry'
+import { tutorialByKey } from '../tutorials/tutorialDefinitions'
+import { useTutorials } from '../tutorials/useTutorials'
 
 const panelByKey = new Map(dashboardPanels.map(panel => [panel.key, panel]))
 
@@ -37,6 +39,7 @@ function withClientDefaults(layout: DashboardLayout): DashboardLayout {
 export function DashboardPage() {
   const { user } = useAuth()
   const { currentHousehold } = useHouseholds()
+  const { dismiss, isLoading: tutorialsLoading, progress, start } = useTutorials()
   const [layout, setLayout] = useState<DashboardLayout | null>(null)
   const [draftPanelKeys, setDraftPanelKeys] = useState<string[]>([])
   const [draftColumnCount, setDraftColumnCount] = useState(3)
@@ -235,7 +238,7 @@ export function DashboardPage() {
   return (
     <main className="dashboard-page">
       <section className="dashboard-content">
-        <div className="dashboard-title-row">
+        <div className="dashboard-title-row" data-tutorial-id="dashboard-welcome">
           <div>
             <p className="eyebrow">Dashboard</p>
             <h1>Hello, {user.displayName}</h1>
@@ -255,6 +258,41 @@ export function DashboardPage() {
         </div>
 
         <ErrorSummary errors={errors} />
+
+        {!tutorialsLoading && (() => {
+          const tutorial = tutorialByKey.get('getting-started')
+          if (!tutorial) return null
+          const saved = progress.find(item =>
+            item.tutorialKey === tutorial.key &&
+            item.tutorialVersion === tutorial.version)
+          if (saved?.status === 'Completed' || saved?.status === 'Dismissed') {
+            return null
+          }
+          return (
+            <section className="dashboard-tutorial-prompt">
+              <div>
+                <p className="eyebrow">New to MC Budget?</p>
+                <h2>Take the guided tour</h2>
+                <p>
+                  Learn where accounts, budgets, and transaction imports live.
+                  The tour does not create or change financial data.
+                </p>
+              </div>
+              <div>
+                <button type="button" onClick={() => void start(
+                  tutorial.key,
+                  saved?.status === 'InProgress',
+                )}>
+                  {saved?.status === 'InProgress' ? 'Resume tour' : 'Start tour'}
+                </button>
+                <button className="text-button" type="button"
+                  onClick={() => void dismiss(tutorial.key)}>
+                  Explore on my own
+                </button>
+              </div>
+            </section>
+          )
+        })()}
 
         {isCustomizing && (
           <section className="dashboard-customizer" aria-label="Dashboard settings">

@@ -10,6 +10,7 @@ import { useHouseholds } from './households/useHouseholds'
 import { appPages } from './routing/pageRegistry'
 import { RouterProvider } from './routing/RouterProvider'
 import { useRouter } from './routing/useRouter'
+import { TutorialProvider } from './tutorials/TutorialProvider'
 
 function Redirect({ to }: { to: string }) {
   const { navigate } = useRouter()
@@ -186,8 +187,10 @@ function App() {
     <RouterProvider>
       <AuthProvider>
         <HouseholdProvider>
-          <AppRoutes />
-          <BackToTopButton />
+          <TutorialProvider>
+            <AppRoutes />
+            <BackToTopButton />
+          </TutorialProvider>
         </HouseholdProvider>
       </AuthProvider>
     </RouterProvider>

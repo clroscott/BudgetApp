@@ -302,7 +302,7 @@ export function AccountManagementPage() {
       </header>
 
       <section className="management-content">
-        <div className="page-title-row">
+        <div className="page-title-row" data-tutorial-id="accounts-page-title">
           <div>
             <p className="eyebrow">Household</p>
             <h1>Accounts</h1>
