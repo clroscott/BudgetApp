@@ -74,6 +74,11 @@ public static class AuditActions
     public const string Reopened = "Reopened";
     public const string Copied = "Copied";
     public const string Cleared = "Cleared";
+    public const string Invited = "Invited";
+    public const string Resent = "Resent";
+    public const string Revoked = "Revoked";
+    public const string Accepted = "Accepted";
+    public const string Left = "Left";
 }
 
 public static class AuditEntityTypes
@@ -87,4 +92,5 @@ public static class AuditEntityTypes
     public const string ImportProfile = "ImportProfile";
     public const string CategorizationRule = "CategorizationRule";
     public const string HouseholdMember = "HouseholdMember";
+    public const string HouseholdInvitation = "HouseholdInvitation";
 }

@@ -82,6 +82,16 @@ export const appPages: AppPageDefinition[] = [
     ),
   },
   {
+    id: 'household-invitation-accept',
+    path: '/household-invitations/accept',
+    label: 'Household invitation',
+    access: 'public',
+    component: page(
+      () => import('../pages/HouseholdInvitationAcceptancePage'),
+      'HouseholdInvitationAcceptancePage',
+    ),
+  },
+  {
     id: 'household-setup',
     path: '/household/setup',
     label: 'Household setup',
@@ -234,6 +244,26 @@ export const appPages: AppPageDefinition[] = [
     component: page(() => import('../pages/ActivityPage'), 'ActivityPage'),
   },
   {
+    id: 'household',
+    path: '/household',
+    label: 'Household',
+    icon: 'household',
+    access: 'household',
+    navigation: { section: 'primary', order: 80 },
+    dashboard: {
+      panelKey: 'household',
+      panelLabel: 'Household',
+      panelTitle: 'Household details',
+      panelDescription: 'Review household members and invitations.',
+      linkLabel: 'Manage household',
+      defaultOrder: 60,
+    },
+    component: page(
+      () => import('../pages/HouseholdManagementPage'),
+      'HouseholdManagementPage',
+    ),
+  },
+  {
     id: 'categories',
     path: '/settings/categories',
     label: 'Categories',
@@ -331,16 +361,6 @@ for (const pageDefinition of appPages) {
     }],
   })
 }
-
-pageDashboardPanels.set('household', {
-  icon: 'household',
-  key: 'household',
-  label: 'Household',
-  title: 'Household details',
-  description: 'See the household currently used for budgeting.',
-  defaultOrder: 60,
-  links: [],
-})
 
 export const dashboardPanels = [...pageDashboardPanels.values()]
   .sort((left, right) =>

@@ -98,10 +98,10 @@ Templates include expiration, one-time-use, ignore, and support guidance.
 Normal logs record only the email purpose and delivery outcome. They do not
 record recipient addresses, message bodies, or invitation/recovery tokens.
 
-Password recovery now uses `EmailDispatchService`. Household invitations have
-not yet been implemented. When invitations are added, they should persist their
-own state successfully and then dispatch the email. A failed delivery can be
-shown as retryable without rolling back or misrepresenting the invitation.
+Password recovery and household invitations use `EmailDispatchService`.
+An invitation is persisted before delivery is attempted. If delivery fails,
+the pending invitation remains visible and can be resent without
+misrepresenting the household membership state.
 
 ## Local Verification
 
@@ -143,6 +143,10 @@ outbox files.
 
 Use fictional Development accounts only. Production currently uses the
 `Disabled` sender and therefore does not produce a recovery file.
+
+Household invitation testing uses the same outbox. See
+[Household invitations](household-invitations.md) for the complete acceptance,
+resend, and revoke flow.
 
 ## Future Provider
 
