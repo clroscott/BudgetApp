@@ -1266,6 +1266,129 @@ a {
   margin-top: 1rem;
 }
 
+.activity-content {
+  max-width: 68rem;
+}
+
+.activity-filter-panel {
+  margin-bottom: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.activity-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.activity-filter-grid label {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+}
+
+.activity-filter-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.activity-result-summary {
+  margin: 0 0 0.75rem;
+  color: var(--muted-text);
+}
+
+.activity-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.activity-card {
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.activity-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.activity-card h2 {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+}
+
+.activity-card-meta,
+.activity-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--muted-text);
+  font-size: 0.78rem;
+}
+
+.activity-badges {
+  justify-content: flex-end;
+}
+
+.activity-badges span {
+  padding: 0.22rem 0.45rem;
+  border-radius: 999px;
+  background: var(--page-bg);
+}
+
+.activity-badges .activity-personal-badge {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.activity-details {
+  margin-top: 0.8rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.7rem;
+}
+
+.activity-details summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.activity-details dl {
+  display: grid;
+  gap: 0;
+  margin: 0.75rem 0 0;
+}
+
+.activity-details dl > div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.35fr) minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.activity-details dt {
+  color: var(--muted-text);
+  font-weight: 700;
+}
+
+.activity-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .transaction-result-summary {
   margin-bottom: 0.75rem;
   color: var(--muted-text);
@@ -2537,6 +2660,10 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .activity-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .transaction-flags {
     grid-column: 2;
   }
@@ -2698,8 +2825,23 @@ a {
 
   .transaction-row,
   .transaction-edit-grid,
-  .transaction-filter-grid {
+  .transaction-filter-grid,
+  .activity-filter-grid {
     grid-template-columns: 1fr;
+  }
+
+  .activity-card-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .activity-badges {
+    justify-content: flex-start;
+  }
+
+  .activity-details dl > div {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
   }
 
   .transaction-description-filter {

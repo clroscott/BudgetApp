@@ -197,6 +197,23 @@ export const appPages: AppPageDefinition[] = [
     ),
   },
   {
+    id: 'activity',
+    path: '/activity',
+    label: 'Activity',
+    icon: 'activity',
+    access: 'household',
+    navigation: { section: 'primary', order: 70 },
+    dashboard: {
+      panelKey: 'activity',
+      panelLabel: 'Activity',
+      panelTitle: 'Household history',
+      panelDescription:
+        'Review meaningful household changes and your personal activity.',
+      linkLabel: 'View activity',
+    },
+    component: page(() => import('../pages/ActivityPage'), 'ActivityPage'),
+  },
+  {
     id: 'categories',
     path: '/settings/categories',
     label: 'Categories',

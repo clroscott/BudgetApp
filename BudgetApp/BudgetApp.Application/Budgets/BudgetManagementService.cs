@@ -1,6 +1,9 @@
+using System.Globalization;
+using BudgetApp.Application.Auditing;
 using BudgetApp.Application.Households;
 using BudgetApp.Application.RecurringExpenses;
 using BudgetApp.Domain.Budgeting;
+using BudgetApp.Domain.Auditing;
 using BudgetApp.Domain.RecurringExpenses;
 
 namespace BudgetApp.Application.Budgets;
@@ -9,7 +12,8 @@ public sealed class BudgetManagementService(
     IBudgetRepository budgetRepository,
     IRecurringExpenseRepository recurringExpenseRepository,
     HouseholdAuthorizationService authorizationService,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    AuditWriter? auditWriter = null)
 {
     public async Task<BudgetPageModel> GetAsync(
         Guid householdId,
@@ -63,6 +67,11 @@ public sealed class BudgetManagementService(
             ? BudgetMonth.CreateHousehold(householdId, year, month, currency, now)
             : BudgetMonth.CreatePersonal(householdId, userId, year, month, currency, now);
         await budgetRepository.AddAsync(budget, cancellationToken);
+        RecordBudgetEvent(
+            budget,
+            userId,
+            AuditActions.Created,
+            $"Created {FormatBudgetName(budget)}.");
         await budgetRepository.SaveChangesAsync(cancellationToken);
         var categories = await budgetRepository.ListExpenseCategoriesAsync(
             householdId, cancellationToken);
@@ -123,6 +132,16 @@ public sealed class BudgetManagementService(
         foreach (var line in source.Lines.Where(line => activeCategoryIds.Contains(line.CategoryId)))
             budget.AddLine(line.CategoryId, line.BudgetedAmount, now);
         await budgetRepository.AddAsync(budget, cancellationToken);
+        RecordBudgetEvent(
+            budget,
+            userId,
+            AuditActions.Copied,
+            $"Copied {sourceYear:D4}-{sourceMonth:D2} into {FormatBudgetName(budget)}.",
+            new Dictionary<string, string?>
+            {
+                ["Source month"] = $"{sourceYear:D4}-{sourceMonth:D2}",
+                ["Budget lines copied"] = budget.Lines.Count.ToString()
+            });
         await budgetRepository.SaveChangesAsync(cancellationToken);
         return await BuildModelAsync(
             budget, year, month, budgetScope, currency, categories,
@@ -209,6 +228,15 @@ public sealed class BudgetManagementService(
         foreach (var item in applicable)
             budget.AddLine(item.CategoryId, item.Amount, now);
         await budgetRepository.AddAsync(budget, cancellationToken);
+        RecordBudgetEvent(
+            budget,
+            userId,
+            AuditActions.Created,
+            $"Created {FormatBudgetName(budget)} from recurring expenses.",
+            new Dictionary<string, string?>
+            {
+                ["Budget lines created"] = budget.Lines.Count.ToString()
+            });
         await budgetRepository.SaveChangesAsync(cancellationToken);
         return await BuildModelAsync(
             budget, year, month, budgetScope, currency, categories,
@@ -225,6 +253,11 @@ public sealed class BudgetManagementService(
         var budget = await GetOwnedBudget(householdId, userId, budgetId, cancellationToken);
         if (budget.Status != BudgetStatus.Draft)
             throw new InvalidOperationException("Only a draft budget can be deleted.");
+        RecordBudgetEvent(
+            budget,
+            userId,
+            AuditActions.Deleted,
+            $"Deleted draft {FormatBudgetName(budget)}.");
         budgetRepository.Remove(budget);
         await budgetRepository.SaveChangesAsync(cancellationToken);
     }
@@ -238,6 +271,9 @@ public sealed class BudgetManagementService(
     {
         await authorizationService.RequireEditAsync(householdId, userId, cancellationToken);
         var budget = await GetOwnedBudget(householdId, userId, budgetId, cancellationToken);
+        var previousAmounts = budget.Lines.ToDictionary(
+            line => line.CategoryId,
+            line => line.BudgetedAmount);
         if (lines.Select(line => line.CategoryId).Distinct().Count() != lines.Count)
         {
             throw new ArgumentException("Each category can appear only once in a budget.", nameof(lines));
@@ -281,6 +317,35 @@ public sealed class BudgetManagementService(
             await budgetRepository.AddLineAsync(budgetLine, cancellationToken);
         }
 
+        var changedDetails = new Dictionary<string, string?>();
+        foreach (var categoryId in previousAmounts.Keys
+                     .Union(budget.Lines.Select(line => line.CategoryId)))
+        {
+            decimal? before = previousAmounts.TryGetValue(
+                categoryId,
+                out var previousAmount)
+                ? previousAmount
+                : null;
+            var after = budget.Lines
+                .SingleOrDefault(line => line.CategoryId == categoryId)
+                ?.BudgetedAmount;
+            if (before == after)
+            {
+                continue;
+            }
+
+            var categoryName = categoryById.GetValueOrDefault(categoryId)?.Name
+                ?? "Unknown category";
+            changedDetails[categoryName] =
+                $"{FormatAmount(before)} → {FormatAmount(after)}";
+        }
+
+        RecordBudgetEvent(
+            budget,
+            userId,
+            AuditActions.Updated,
+            $"Updated {FormatBudgetName(budget)}.",
+            changedDetails);
         await budgetRepository.SaveChangesAsync(cancellationToken);
         return await BuildModelAsync(
             budget, budget.Year, budget.Month, budget.Scope, budget.Currency, categories,
@@ -323,6 +388,21 @@ public sealed class BudgetManagementService(
             default:
                 throw new ArgumentOutOfRangeException(nameof(change));
         }
+        var (action, verb) = change switch
+        {
+            BudgetStatusChange.Activate =>
+                (AuditActions.Activated, "Activated"),
+            BudgetStatusChange.Close =>
+                (AuditActions.Closed, "Closed"),
+            BudgetStatusChange.Reopen =>
+                (AuditActions.Reopened, "Reopened"),
+            _ => throw new ArgumentOutOfRangeException(nameof(change))
+        };
+        RecordBudgetEvent(
+            budget,
+            userId,
+            action,
+            $"{verb} {FormatBudgetName(budget)}.");
         await budgetRepository.SaveChangesAsync(cancellationToken);
         var categories = await budgetRepository.ListExpenseCategoriesAsync(
             householdId, cancellationToken);
@@ -552,6 +632,38 @@ public sealed class BudgetManagementService(
         if (year is < BudgetMonth.MinimumYear or > BudgetMonth.MaximumYear || month is < 1 or > 12)
             throw new ArgumentOutOfRangeException(nameof(year), "Enter a valid budget month and year.");
     }
+
+    private void RecordBudgetEvent(
+        BudgetMonth budget,
+        Guid actorUserId,
+        string action,
+        string summary,
+        IReadOnlyDictionary<string, string?>? details = null)
+    {
+        auditWriter?.Record(new AuditEventInput(
+            budget.HouseholdId,
+            actorUserId,
+            budget.Scope == BudgetScope.Personal
+                ? AuditVisibility.Personal
+                : AuditVisibility.Household,
+            budget.Scope == BudgetScope.Personal
+                ? budget.OwnerUserId
+                : null,
+            action,
+            AuditEntityTypes.Budget,
+            budget.Id,
+            summary,
+            details));
+    }
+
+    private static string FormatBudgetName(BudgetMonth budget) =>
+        $"{budget.Year:D4}-{budget.Month:D2} " +
+        $"{budget.Scope.ToString().ToLowerInvariant()} budget";
+
+    private static string FormatAmount(decimal? amount) =>
+        amount.HasValue
+            ? amount.Value.ToString("0.00", CultureInfo.InvariantCulture)
+            : "(none)";
 
     private enum BudgetStatusChange
     {

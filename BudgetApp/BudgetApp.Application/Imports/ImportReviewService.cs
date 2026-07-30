@@ -1,8 +1,10 @@
 using System.Text.Json;
+using BudgetApp.Application.Auditing;
 using BudgetApp.Application.Categories;
 using BudgetApp.Application.CategorizationRules;
 using BudgetApp.Application.Households;
 using BudgetApp.Domain.Households;
+using BudgetApp.Domain.Auditing;
 using BudgetApp.Domain.Imports;
 using BudgetApp.Domain.Transactions;
 
@@ -13,7 +15,8 @@ public sealed class ImportReviewService(
     ICategoryRepository categoryRepository,
     ICategorizationRuleRepository categorizationRuleRepository,
     HouseholdAuthorizationService authorizationService,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    AuditWriter? auditWriter = null)
 {
     public async Task<IReadOnlyList<ImportListItem>> ListAsync(
         Guid householdId,
@@ -147,6 +150,22 @@ public sealed class ImportReviewService(
             changedRows++;
         }
 
+        if (changedRows > 0)
+        {
+            RecordImportEvent(
+                access,
+                userId,
+                AuditActions.Updated,
+                $"Applied categorization rules to '{access.ImportFile.OriginalFileName}'.",
+                new Dictionary<string, string?>
+                {
+                    ["Rows changed"] = changedRows.ToString(),
+                    ["Rows unchanged"] = unchangedRows.ToString(),
+                    ["Existing categories replaced"] =
+                        replaceExistingCategories ? "Yes" : "No"
+                });
+        }
+
         await importRepository.SaveChangesAsync(cancellationToken);
         return new ApplyCategorizationRulesResult(
             changedRows + unchangedRows,
@@ -266,6 +285,15 @@ public sealed class ImportReviewService(
             transactionDate, amount, description, selectedCategoryId, now);
         await ApplyDuplicateResults(access.ImportFile.AccountId, [draft], cancellationToken);
         access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), now);
+        RecordImportEvent(
+            access,
+            userId,
+            AuditActions.Updated,
+            $"Corrected a staged row in '{access.ImportFile.OriginalFileName}'.",
+            new Dictionary<string, string?>
+            {
+                ["CSV row"] = draft.SourceRowNumber.ToString()
+            });
         await importRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -344,6 +372,16 @@ public sealed class ImportReviewService(
             updatedDrafts,
             cancellationToken);
         access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), now);
+        RecordImportEvent(
+            access,
+            userId,
+            AuditActions.Updated,
+            $"Corrected {updatedDrafts.Count} staged rows in " +
+            $"'{access.ImportFile.OriginalFileName}'.",
+            new Dictionary<string, string?>
+            {
+                ["Rows corrected"] = updatedDrafts.Count.ToString()
+            });
         await importRepository.SaveChangesAsync(cancellationToken);
         return updatedDrafts.Count;
     }
@@ -383,6 +421,21 @@ public sealed class ImportReviewService(
         }
 
         access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), now);
+        var action = decision.Trim().Equals(
+            "approved",
+            StringComparison.OrdinalIgnoreCase)
+            ? AuditActions.Approved
+            : decision.Trim().Equals(
+                "excluded",
+                StringComparison.OrdinalIgnoreCase)
+                ? AuditActions.Excluded
+                : AuditActions.Updated;
+        RecordImportEvent(
+            access,
+            userId,
+            action,
+            $"{action} CSV row {draft.SourceRowNumber} in " +
+            $"'{access.ImportFile.OriginalFileName}'.");
         await importRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -403,6 +456,7 @@ public sealed class ImportReviewService(
             draft.ReviewDecision == ImportDraftReviewDecision.Pending).ToList();
         var normalizedDecision = decision.Trim().ToLowerInvariant();
         var now = timeProvider.GetUtcNow();
+        var affectedRows = 0;
 
         switch (normalizedDecision)
         {
@@ -417,19 +471,24 @@ public sealed class ImportReviewService(
                 {
                     draft.Approve(userId, acknowledgePossibleDuplicate: true, now);
                 }
+                affectedRows = validDrafts.Count;
                 break;
             case "excluded":
                 foreach (var draft in pendingDrafts)
                 {
                     draft.Exclude(userId, now);
                 }
+                affectedRows = pendingDrafts.Count;
                 break;
             case "pending":
-                foreach (var draft in drafts.Where(draft =>
-                             draft.ReviewDecision != ImportDraftReviewDecision.Pending))
+                var reviewedDrafts = drafts.Where(draft =>
+                        draft.ReviewDecision != ImportDraftReviewDecision.Pending)
+                    .ToList();
+                foreach (var draft in reviewedDrafts)
                 {
                     draft.MarkPending(now);
                 }
+                affectedRows = reviewedDrafts.Count;
                 break;
             default:
                 throw new ArgumentException(
@@ -438,6 +497,26 @@ public sealed class ImportReviewService(
         }
 
         access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), now);
+        if (affectedRows > 0)
+        {
+            var (auditAction, verb) = normalizedDecision switch
+            {
+                "approved" => (AuditActions.Approved, "Approved"),
+                "excluded" => (AuditActions.Excluded, "Excluded"),
+                _ => (AuditActions.Updated, "Returned to pending")
+            };
+            RecordImportEvent(
+                access,
+                userId,
+                auditAction,
+                $"{verb} {affectedRows} staged rows in " +
+                $"'{access.ImportFile.OriginalFileName}'.",
+                new Dictionary<string, string?>
+                {
+                    ["Rows affected"] = affectedRows.ToString()
+                });
+        }
+
         await importRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -467,6 +546,12 @@ public sealed class ImportReviewService(
         access.ImportFile.RefreshStatisticsAfterRowRemoval(
             CalculateStatistics(remainingDrafts),
             timeProvider.GetUtcNow());
+        RecordImportEvent(
+            access,
+            userId,
+            AuditActions.Deleted,
+            $"Removed CSV row {draft.SourceRowNumber} from " +
+            $"'{access.ImportFile.OriginalFileName}'.");
         await importRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -531,6 +616,18 @@ public sealed class ImportReviewService(
 
         await importRepository.AddTransactionsAsync(transactions, cancellationToken);
         importFile.Complete(statistics, now);
+        RecordImportEvent(
+            access,
+            userId,
+            AuditActions.Approved,
+            $"Created {transactions.Count} transactions from " +
+            $"'{importFile.OriginalFileName}'.",
+            new Dictionary<string, string?>
+            {
+                ["Transactions created"] = transactions.Count.ToString(),
+                ["Rows approved"] = importFile.ApprovedRowCount.ToString(),
+                ["Rows excluded"] = importFile.ExcludedRowCount.ToString()
+            });
         await importRepository.SaveChangesAsync(cancellationToken);
         return new CompleteImportResult(
             importFile.Id, transactions.Count, importFile.ApprovedRowCount,
@@ -553,8 +650,38 @@ public sealed class ImportReviewService(
                 "A completed import cannot be discarded because its official transactions retain import history.");
         }
 
+        RecordImportEvent(
+            access,
+            userId,
+            AuditActions.Deleted,
+            $"Discarded staged import '{access.ImportFile.OriginalFileName}'.",
+            new Dictionary<string, string?>
+            {
+                ["Rows discarded"] = access.ImportFile.TotalRowCount.ToString()
+            });
         importRepository.Remove(access.ImportFile);
         await importRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    private void RecordImportEvent(
+        ImportAccessRecord access,
+        Guid actorUserId,
+        string action,
+        string summary,
+        IReadOnlyDictionary<string, string?>? details = null)
+    {
+        auditWriter?.Record(new AuditEventInput(
+            access.ImportFile.HouseholdId,
+            actorUserId,
+            access.IsPersonalAccount
+                ? AuditVisibility.Personal
+                : AuditVisibility.Household,
+            access.IsPersonalAccount ? access.AccountOwnerUserId : null,
+            action,
+            AuditEntityTypes.Import,
+            access.ImportFile.Id,
+            summary,
+            details));
     }
 
     public async Task ApplyDuplicateResults(

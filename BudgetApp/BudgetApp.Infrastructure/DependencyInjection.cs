@@ -1,4 +1,5 @@
 using BudgetApp.Application.Accounts;
+using BudgetApp.Application.Auditing;
 using BudgetApp.Application.Categories;
 using BudgetApp.Application.CategorizationRules;
 using BudgetApp.Application.Dashboards;
@@ -8,6 +9,7 @@ using BudgetApp.Application.Imports;
 using BudgetApp.Application.RecurringExpenses;
 using BudgetApp.Application.Transactions;
 using BudgetApp.Infrastructure.Accounts;
+using BudgetApp.Infrastructure.Auditing;
 using BudgetApp.Infrastructure.Categories;
 using BudgetApp.Infrastructure.CategorizationRules;
 using BudgetApp.Infrastructure.Dashboards;
@@ -36,6 +38,9 @@ public static class DependencyInjection
             options.UseSqlServer(connectionString));
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<AccountManagementService>();
+        services.AddScoped<IAuditRepository, AuditRepository>();
+        services.AddScoped<AuditWriter>();
+        services.AddScoped<AuditQueryService>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
         services.AddScoped<CategoryManagementService>();
         services.AddScoped<ICategorizationRuleRepository, CategorizationRuleRepository>();
