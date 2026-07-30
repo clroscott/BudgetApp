@@ -39,5 +39,6 @@ Backend foundations for configuration, EF Core, SQL Server, technical logging, a
 - [Local development and secrets](docs/local-development.md)
 - [Database environments](docs/database-environments.md)
 - [Technical logging](docs/logging.md)
+- [Email infrastructure and development outbox](docs/email.md)
 - [Household activity and audit history](docs/audit-history.md)
 - [Authentication](docs/authentication.md)

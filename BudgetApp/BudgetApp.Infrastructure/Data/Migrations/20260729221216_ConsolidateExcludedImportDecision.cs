@@ -21,8 +21,10 @@ namespace BudgetApp.Infrastructure.Data.Migrations
 
             migrationBuilder.Sql(
                 """
-                UPDATE [ImportFiles]
-                SET [ExcludedRowCount] = [ExcludedRowCount] + [SkippedRowCount];
+                EXEC(N'
+                    UPDATE [ImportFiles]
+                    SET [ExcludedRowCount] = [ExcludedRowCount] + [SkippedRowCount];
+                ');
                 """);
 
             migrationBuilder.Sql(
