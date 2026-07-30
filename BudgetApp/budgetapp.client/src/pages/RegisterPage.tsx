@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
+import { getSafeReturnPath } from '../auth/returnPath'
 import { useAuth } from '../auth/useAuth'
 import { BrandLogo } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
@@ -33,7 +34,7 @@ export function RegisterPage() {
         email: String(form.get('email') ?? ''),
         password,
       })
-      navigate('/household/setup', { replace: true })
+      navigate(getSafeReturnPath() ?? '/household/setup', { replace: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {

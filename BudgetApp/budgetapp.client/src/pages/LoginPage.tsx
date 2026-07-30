@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
+import { getSafeReturnPath } from '../auth/returnPath'
 import { useAuth } from '../auth/useAuth'
 import { BrandLogo } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
@@ -27,7 +28,7 @@ export function LoginPage() {
         password: String(form.get('password') ?? ''),
         rememberMe: form.get('rememberMe') === 'on',
       })
-      navigate('/dashboard', { replace: true })
+      navigate(getSafeReturnPath() ?? '/dashboard', { replace: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {

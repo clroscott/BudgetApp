@@ -248,6 +248,173 @@ button:disabled {
   font-size: 0.88rem;
 }
 
+.household-invite-form,
+.household-management-section {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.household-invite-form {
+  grid-template-columns: minmax(14rem, 1fr) minmax(9rem, 12rem) auto;
+  align-items: end;
+  gap: 1rem;
+}
+
+.household-invite-form > .household-section-heading,
+.household-invite-help {
+  grid-column: 1 / -1;
+}
+
+.household-invite-form label {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.household-invite-form .primary-button {
+  margin-top: 0;
+}
+
+.household-section-heading,
+.household-member-row,
+.household-member-meta,
+.household-invitation-actions {
+  display: flex;
+  align-items: center;
+}
+
+.household-section-heading,
+.household-member-row {
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.household-section-heading {
+  margin-bottom: 1rem;
+}
+
+.household-section-heading h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.household-section-heading p,
+.household-member-row p {
+  margin: 0;
+  color: var(--muted-text);
+}
+
+.household-member-row {
+  padding: 0.9rem 0;
+}
+
+.household-member-row + .household-member-row {
+  border-top: 1px solid var(--border);
+}
+
+.household-member-meta,
+.household-invitation-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.household-invitation-actions button {
+  padding: 0.45rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.household-exit-section {
+  border-color: #dfbbb3;
+  background: #fffafa;
+}
+
+.household-exit-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0;
+}
+
+.household-exit-action + .household-exit-action {
+  border-top: 1px solid #ead1cb;
+}
+
+.household-exit-action p,
+.household-exit-blocked {
+  margin: 0.25rem 0 0;
+  color: var(--muted-text);
+}
+
+.household-exit-blocked {
+  padding: 0.8rem;
+  border-radius: 0.65rem;
+  background: var(--surface-soft);
+}
+
+.household-exit-blocked > strong {
+  color: var(--text);
+}
+
+.household-exit-blocked p {
+  margin: 0.45rem 0 0;
+}
+
+.invitation-preview {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface-soft);
+}
+
+.invitation-preview > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.invitation-preview span,
+.invitation-preview p {
+  color: var(--muted-text);
+}
+
+.invitation-preview p {
+  margin: 0.4rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.invitation-auth-actions {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.primary-link-button,
+.secondary-link-button {
+  display: block;
+  padding: 0.75rem 1rem;
+  border-radius: 0.65rem;
+  text-decoration: none;
+}
+
+.primary-link-button {
+  background: var(--accent);
+  color: white;
+}
+
+.secondary-link-button {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+}
+
 a {
   color: var(--accent);
   font-weight: 700;
@@ -2968,5 +3135,25 @@ a {
 
   .recurring-card-main > strong {
     justify-items: start;
+  }
+
+  .household-invite-form {
+    grid-template-columns: 1fr;
+  }
+
+  .household-invite-form > .household-section-heading,
+  .household-invite-help {
+    grid-column: 1;
+  }
+
+  .household-member-row,
+  .household-exit-action,
+  .invitation-preview > div {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .household-invitation-actions {
+    justify-content: flex-start;
   }
 }

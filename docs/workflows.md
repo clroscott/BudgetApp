@@ -83,7 +83,8 @@ Categories, categorization rules, merchant aliases, and import profiles are seco
 
 1. The user opens Household management.
 2. The user supplies the invitee's email and selects an initial role.
-3. The application creates a pending invitation or membership.
+3. The application creates a pending HouseholdInvitation and sends its link
+   through the configured backend email sender.
 4. The invitee follows the invitation and signs in or registers.
 5. The invitee accepts the invitation.
 6. The membership becomes Active.
@@ -97,20 +98,28 @@ Categories, categorization rules, merchant aliases, and import profiles are seco
 
 ### Records created or updated
 
-- Household invitation or pending HouseholdMember
+- HouseholdInvitation with a hashed token
 - Identity User, if the invitee registers
-- HouseholdMember status and joined date upon acceptance
+- Active HouseholdMember and invitation acceptance details upon acceptance
 
 ### Failure and recovery behavior
 
 - Pending invitations can be resent or revoked.
 - Expired or revoked invitations cannot be accepted.
 - A failed registration does not activate the membership.
+- A failed email delivery leaves a retryable pending invitation.
+- A non-Owner may leave their current household before accepting.
+- A sole Owner may delete an unused, unchanged household before accepting.
+- Financially active or customized households cannot be deleted through this
+  recovery flow.
 
 ### Permissions
 
-- Owner and authorized Admin members may invite or revoke members.
-- Viewer and Editor permissions are read/write financial roles, not household-administration roles, unless later configured otherwise.
+- Owners may invite Admin, Editor, or Viewer members.
+- Admins may invite Editor or Viewer members.
+- Viewers and Editors cannot manage invitations.
+- Owners cannot leave until ownership can be transferred or their unused
+  single-member household is deleted.
 
 ## 3. Create an Account
 

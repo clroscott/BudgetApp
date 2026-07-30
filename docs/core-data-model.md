@@ -122,6 +122,29 @@ Rules:
 - A disabled or pending member cannot access household financial data.
 - Household roles govern shared data; they do not automatically grant access to another member's personal data.
 
+### HouseholdInvitation
+
+Represents an invitation before the invited account becomes a household member.
+
+Key data:
+
+- Household ID
+- Invited email and normalized email
+- Assigned role: Admin, Editor, or Viewer
+- Status: Pending, Accepted, or Revoked
+- Hashed one-time token
+- Inviter, send time, expiry, and optional acceptance/revocation details
+
+Rules:
+
+- A household can have only one pending invitation for a normalized email.
+- Invitation links expire after seven days.
+- Resending replaces the token hash and expiry so the previous link stops
+  working.
+- Acceptance requires an authenticated account with the invited email.
+- A HouseholdMember is created only during successful acceptance.
+- Raw tokens are never stored in the database or audit history.
+
 ### Account
 
 Represents the source or destination of transactions, such as chequing, savings, credit card, cash, or another account type.

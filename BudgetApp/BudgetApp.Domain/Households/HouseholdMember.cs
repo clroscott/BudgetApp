@@ -66,4 +66,37 @@ public sealed class HouseholdMember
             createdAtUtc,
             createdAtUtc);
     }
+
+    internal static HouseholdMember CreateInvitedMember(
+        Guid householdId,
+        Guid userId,
+        HouseholdRole role,
+        Guid invitedByUserId,
+        DateTimeOffset joinedAtUtc)
+    {
+        if (householdId == Guid.Empty || userId == Guid.Empty ||
+            invitedByUserId == Guid.Empty)
+        {
+            throw new ArgumentException("Household member IDs are required.");
+        }
+
+        if (role is HouseholdRole.Owner)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(role),
+                "An invited member cannot become the household owner.");
+        }
+
+        return new HouseholdMember(
+            Guid.NewGuid(),
+            householdId,
+            userId,
+            role,
+            HouseholdMemberStatus.Active,
+            joinedAtUtc,
+            joinedAtUtc)
+        {
+            InvitedByUserId = invitedByUserId
+        };
+    }
 }

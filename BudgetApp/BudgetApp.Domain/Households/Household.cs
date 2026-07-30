@@ -81,6 +81,29 @@ public sealed class Household
         return household;
     }
 
+    public HouseholdMember AddInvitedMember(
+        Guid userId,
+        HouseholdRole role,
+        Guid invitedByUserId,
+        DateTimeOffset joinedAtUtc)
+    {
+        if (_members.Any(member => member.UserId == userId))
+        {
+            throw new InvalidOperationException(
+                "The user already belongs to this household.");
+        }
+
+        var member = HouseholdMember.CreateInvitedMember(
+            Id,
+            userId,
+            role,
+            invitedByUserId,
+            joinedAtUtc);
+        _members.Add(member);
+        UpdatedAtUtc = joinedAtUtc;
+        return member;
+    }
+
     private static string ValidateRequiredText(
         string value,
         int maxLength,

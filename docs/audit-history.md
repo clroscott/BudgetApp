@@ -69,8 +69,12 @@ The first implementation records meaningful changes for:
 - household and personal monthly budgets;
 - household and personal recurring expenses.
 
-Household invitation and membership events will use the same writer when those
-management workflows are implemented.
+Household invitation creation, resend, revocation, and acceptance use the same
+writer. Audit details record the assigned role but exclude the invited email
+address and raw invitation token. A member leaving an existing household is
+also recorded. Permanently deleting an unused household removes its household-
+scoped audit history along with the household and writes a technical warning
+log instead.
 
 Bulk work is summarized as one event with counts rather than producing hundreds
 of feed entries. For example, approving an import records the number of rows

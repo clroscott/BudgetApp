@@ -58,8 +58,15 @@ public static class DependencyInjection
         services.AddScoped<IBudgetRepository, BudgetRepository>();
         services.AddScoped<BudgetManagementService>();
         services.AddScoped<IHouseholdRepository, HouseholdRepository>();
+        services.AddScoped<IHouseholdInvitationRepository, HouseholdInvitationRepository>();
+        services.AddScoped<IHouseholdLifecycleRepository, HouseholdLifecycleRepository>();
+        services.AddSingleton<
+            IHouseholdInvitationTokenService,
+            HouseholdInvitationTokenService>();
         services.AddScoped<IHouseholdAuthorizationRepository, HouseholdAuthorizationRepository>();
         services.AddScoped<HouseholdAuthorizationService>();
+        services.AddScoped<HouseholdInvitationService>();
+        services.AddScoped<HouseholdLifecycleService>();
         services.AddScoped<HouseholdOnboardingService>();
         services.AddScoped<IImportRepository, ImportRepository>();
         services.AddScoped<IImportProfileRepository, ImportProfileRepository>();

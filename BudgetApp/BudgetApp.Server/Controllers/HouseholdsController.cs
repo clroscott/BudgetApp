@@ -11,6 +11,7 @@ namespace BudgetApp.Server.Controllers;
 [Route("api/households")]
 public sealed class HouseholdsController(
     HouseholdOnboardingService householdOnboardingService,
+    HouseholdLifecycleService householdLifecycleService,
     ILogger<HouseholdsController> logger) : ControllerBase
 {
     [HttpGet]
@@ -26,6 +27,62 @@ public sealed class HouseholdsController(
             .GetActiveMembershipsAsync(userId, cancellationToken);
 
         return Ok(memberships.Select(ToResponse));
+    }
+
+    [HttpPost("{householdId:guid}/leave")]
+    public async Task<IActionResult> Leave(
+        Guid householdId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await householdLifecycleService.LeaveAsync(
+                householdId,
+                userId,
+                cancellationToken);
+            return NoContent();
+        }
+        catch (HouseholdAccessDeniedException)
+        {
+            return Forbid();
+        }
+        catch (HouseholdExitNotAllowedException exception)
+        {
+            return ExitConflict(exception.Message);
+        }
+    }
+
+    [HttpDelete("{householdId:guid}/unused")]
+    public async Task<IActionResult> DeleteUnused(
+        Guid householdId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            await householdLifecycleService.DeleteUnusedAsync(
+                householdId,
+                userId,
+                cancellationToken);
+            return NoContent();
+        }
+        catch (HouseholdAccessDeniedException)
+        {
+            return Forbid();
+        }
+        catch (HouseholdExitNotAllowedException exception)
+        {
+            return ExitConflict(exception.Message);
+        }
     }
 
     [HttpPost]
@@ -78,6 +135,14 @@ public sealed class HouseholdsController(
     {
         return Guid.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out userId);
     }
+
+    private ObjectResult ExitConflict(string detail) =>
+        Conflict(new ProblemDetails
+        {
+            Status = StatusCodes.Status409Conflict,
+            Title = "Household cannot be left or deleted",
+            Detail = detail
+        });
 
     private static HouseholdResponse ToResponse(HouseholdMembership membership) =>
         new(

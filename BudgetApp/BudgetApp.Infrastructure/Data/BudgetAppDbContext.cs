@@ -37,6 +37,9 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
 
     public DbSet<Household> Households => Set<Household>();
 
+    public DbSet<HouseholdInvitation> HouseholdInvitations =>
+        Set<HouseholdInvitation>();
+
     public DbSet<HouseholdMember> HouseholdMembers => Set<HouseholdMember>();
 
     public DbSet<ImportFile> ImportFiles => Set<ImportFile>();
