@@ -7,20 +7,35 @@ public sealed class ApplicationEmailLinkBuilder(ApplicationUrlOptions options)
 {
     private readonly Uri _publicBaseUri = CreateBaseUri(options.PublicBaseUrl);
 
-    public string BuildPasswordRecoveryLink(string token) =>
-        BuildLink("/reset-password", token);
+    public string BuildPasswordRecoveryLink(Guid userId, string token) =>
+        BuildLink(
+            "/reset-password",
+            ("userId", userId.ToString()),
+            ("token", token));
 
     public string BuildHouseholdInvitationLink(string token) =>
-        BuildLink("/household-invitations/accept", token);
+        BuildLink("/household-invitations/accept", ("token", token));
 
-    private string BuildLink(string relativePath, string token)
+    private string BuildLink(
+        string relativePath,
+        params (string Name, string Value)[] parameters)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(token);
+        if (parameters.Length == 0 ||
+            parameters.Any(parameter => string.IsNullOrWhiteSpace(parameter.Value)))
+        {
+            throw new ArgumentException(
+                "Email link parameters cannot be empty.",
+                nameof(parameters));
+        }
 
         var target = new Uri(_publicBaseUri, relativePath);
         var builder = new UriBuilder(target)
         {
-            Query = $"token={Uri.EscapeDataString(token)}"
+            Query = string.Join(
+                '&',
+                parameters.Select(parameter =>
+                    $"{Uri.EscapeDataString(parameter.Name)}=" +
+                    Uri.EscapeDataString(parameter.Value)))
         };
 
         return builder.Uri.AbsoluteUri;

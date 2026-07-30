@@ -1,7 +1,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
 import type { AppIconName } from '../components/AppIcon'
 
-export type PageAccess = 'anonymous' | 'household-setup' | 'household'
+export type PageAccess = 'public' | 'anonymous' | 'household-setup' | 'household'
 export type NavigationSection = 'primary' | 'settings'
 
 interface PageNavigation {
@@ -60,6 +60,26 @@ export const appPages: AppPageDefinition[] = [
     label: 'Register',
     access: 'anonymous',
     component: page(() => import('../pages/RegisterPage'), 'RegisterPage'),
+  },
+  {
+    id: 'forgot-password',
+    path: '/forgot-password',
+    label: 'Forgot password',
+    access: 'anonymous',
+    component: page(
+      () => import('../pages/ForgotPasswordPage'),
+      'ForgotPasswordPage',
+    ),
+  },
+  {
+    id: 'reset-password',
+    path: '/reset-password',
+    label: 'Reset password',
+    access: 'public',
+    component: page(
+      () => import('../pages/ResetPasswordPage'),
+      'ResetPasswordPage',
+    ),
   },
   {
     id: 'household-setup',

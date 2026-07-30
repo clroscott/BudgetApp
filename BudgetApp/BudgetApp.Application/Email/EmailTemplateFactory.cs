@@ -7,13 +7,14 @@ public sealed class EmailTemplateFactory(IApplicationEmailLinkBuilder linkBuilde
 {
     public EmailMessage CreatePasswordRecovery(
         string recipientAddress,
+        Guid userId,
         string token,
         DateTimeOffset expiresAtUtc)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(recipientAddress);
         ArgumentException.ThrowIfNullOrWhiteSpace(token);
 
-        var recoveryLink = linkBuilder.BuildPasswordRecoveryLink(token);
+        var recoveryLink = linkBuilder.BuildPasswordRecoveryLink(userId, token);
         var expiry = FormatExpiry(expiresAtUtc);
         var encodedLink = WebUtility.HtmlEncode(recoveryLink);
         var encodedExpiry = WebUtility.HtmlEncode(expiry);

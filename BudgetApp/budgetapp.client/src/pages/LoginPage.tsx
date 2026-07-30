@@ -11,6 +11,8 @@ export function LoginPage() {
   const { navigate } = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const passwordWasReset =
+    new URLSearchParams(window.location.search).get('passwordReset') === 'true'
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -44,6 +46,13 @@ export function LoginPage() {
 
         <ErrorSummary errors={errors} />
 
+        {passwordWasReset && (
+          <div className="success-summary" role="status">
+            <strong>Password updated</strong>
+            <span>Sign in with your new password.</span>
+          </div>
+        )}
+
         <form onSubmit={(event) => void handleSubmit(event)}>
           <label htmlFor="email">Email</label>
           <input
@@ -64,6 +73,9 @@ export function LoginPage() {
             maxLength={128}
             required
           />
+          <div className="auth-form-link">
+            <AppLink to="/forgot-password">Forgot your password?</AppLink>
+          </div>
 
           <label className="checkbox-row">
             <input name="rememberMe" type="checkbox" />

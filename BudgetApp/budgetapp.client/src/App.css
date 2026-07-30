@@ -230,6 +230,24 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.auth-form-link {
+  margin-top: 0.15rem;
+  text-align: right;
+  font-size: 0.86rem;
+}
+
+.success-summary {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0 0 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #8bbfae;
+  border-radius: 0.65rem;
+  background: #edf8f3;
+  color: #1f5f4c;
+  font-size: 0.88rem;
+}
+
 a {
   color: var(--accent);
   font-weight: 700;

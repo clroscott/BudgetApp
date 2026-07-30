@@ -98,10 +98,10 @@ Templates include expiration, one-time-use, ignore, and support guidance.
 Normal logs record only the email purpose and delivery outcome. They do not
 record recipient addresses, message bodies, or invitation/recovery tokens.
 
-The invitation and password-recovery workflows have not been implemented yet.
-When they are added, they should persist their own state successfully and then
-use `EmailDispatchService`. A failed delivery can be shown as retryable without
-rolling back or misrepresenting the underlying operation.
+Password recovery now uses `EmailDispatchService`. Household invitations have
+not yet been implemented. When invitations are added, they should persist their
+own state successfully and then dispatch the email. A failed delivery can be
+shown as retryable without rolling back or misrepresenting the invitation.
 
 ## Local Verification
 
@@ -123,8 +123,26 @@ The tests verify:
 - successful dispatch and safe failure reporting.
 
 The file-output test uses a unique temporary directory and removes it after the
-test. Actual outbox files will begin appearing when recovery and invitation
-workflows call the email infrastructure.
+test. Password-recovery requests made while running in Development create actual
+outbox files.
+
+## Manual Password-Recovery Test
+
+1. Start BudgetApp from Visual Studio in the Development environment.
+2. Register a fictional development account, or use an existing Development
+   account.
+3. Sign out and select **Forgot your password?** on the login page.
+4. Enter the account email. The page always displays the same confirmation,
+   whether or not the account exists.
+5. Open `%LOCALAPPDATA%\BudgetApp\development-email`.
+6. Open the newest password-recovery `.txt` or `.eml` file.
+7. Follow the recovery link and set a password of at least 12 characters.
+8. Confirm the old password is rejected and the new password signs in.
+9. Reopen the same link and confirm it is rejected because it has already been
+   used.
+
+Use fictional Development accounts only. Production currently uses the
+`Disabled` sender and therefore does not produce a recovery file.
 
 ## Future Provider
 

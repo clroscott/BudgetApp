@@ -79,12 +79,15 @@ try
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        var authenticationPermitLimit =
+            builder.Configuration.GetValue<int?>(
+                "AuthenticationRateLimit:PermitLimit") ?? 10;
         options.AddPolicy("authentication", context =>
             RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions
                 {
-                    PermitLimit = 10,
+                    PermitLimit = authenticationPermitLimit,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                     AutoReplenishment = true
@@ -112,7 +115,11 @@ try
             emailOptions,
             applicationUrlOptions,
             builder.Environment.IsDevelopment())
+        .AddDefaultTokenProviders()
         .AddSignInManager();
+    builder.Services.Configure<DataProtectionTokenProviderOptions>(options =>
+        options.TokenLifespan =
+            BudgetApp.Infrastructure.Identity.PasswordRecoveryService.TokenLifespan);
 
     var app = builder.Build();
 

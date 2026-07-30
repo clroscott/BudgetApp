@@ -12,14 +12,16 @@ public sealed class ApplicationEmailLinkBuilderTests
             {
                 PublicBaseUrl = "https://budget.example/application/"
             });
+        var userId = Guid.NewGuid();
 
-        var recovery = builder.BuildPasswordRecoveryLink("token +/&?");
+        var recovery = builder.BuildPasswordRecoveryLink(userId, "token +/&?");
         var invitation = builder.BuildHouseholdInvitationLink("invitation token");
 
         Assert.StartsWith(
             "https://budget.example/reset-password?",
             recovery,
             StringComparison.Ordinal);
+        Assert.Contains($"userId={userId}", recovery);
         Assert.Contains("token=token%20%2B%2F%26%3F", recovery);
         Assert.StartsWith(
             "https://budget.example/household-invitations/accept?",

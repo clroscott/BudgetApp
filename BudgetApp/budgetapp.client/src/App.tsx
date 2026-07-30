@@ -139,6 +139,10 @@ function AppRoutes() {
     return <AnonymousOnlyRoute>{content}</AnonymousOnlyRoute>
   }
 
+  if (page.access === 'public') {
+    return content
+  }
+
   if (page.access === 'household-setup') {
     return (
       <ProtectedRoute>

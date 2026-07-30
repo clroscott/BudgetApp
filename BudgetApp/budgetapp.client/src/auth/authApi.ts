@@ -18,6 +18,20 @@ export interface LoginRequest {
   rememberMe: boolean
 }
 
+export interface ForgotPasswordRequest {
+  email: string
+}
+
+export interface PasswordRecoveryRequestedResponse {
+  message: string
+}
+
+export interface ResetPasswordRequest {
+  userId: string
+  token: string
+  newPassword: string
+}
+
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   try {
     return await apiGet<CurrentUser>('/api/auth/me')
@@ -40,4 +54,17 @@ export function login(request: LoginRequest): Promise<CurrentUser> {
 
 export function logout(): Promise<void> {
   return apiPost<void>('/api/auth/logout', {})
+}
+
+export function requestPasswordRecovery(
+  request: ForgotPasswordRequest,
+): Promise<PasswordRecoveryRequestedResponse> {
+  return apiPost<PasswordRecoveryRequestedResponse>(
+    '/api/auth/forgot-password',
+    request,
+  )
+}
+
+export function resetPassword(request: ResetPasswordRequest): Promise<void> {
+  return apiPost<void>('/api/auth/reset-password', request)
 }

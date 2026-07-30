@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using BudgetApp.Application.Authentication;
 using BudgetApp.Infrastructure.Identity;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
@@ -13,6 +14,7 @@ namespace BudgetApp.Server.Controllers;
 public sealed class AuthController(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
+    IPasswordRecoveryService passwordRecoveryService,
     ILogger<AuthController> logger) : ControllerBase
 {
     [AllowAnonymous]
@@ -89,6 +91,57 @@ public sealed class AuthController(
         return Ok(ToResponse(user));
     }
 
+    [AllowAnonymous]
+    [EnableRateLimiting("authentication")]
+    [HttpPost("forgot-password")]
+    public async Task<ActionResult<PasswordRecoveryRequestedResponse>>
+        ForgotPassword(
+            ForgotPasswordRequest request,
+            CancellationToken cancellationToken)
+    {
+        await passwordRecoveryService.RequestPasswordResetAsync(
+            request.Email,
+            cancellationToken);
+
+        return Accepted(new PasswordRecoveryRequestedResponse(
+            "If an account exists for that email address, password recovery instructions have been generated."));
+    }
+
+    [AllowAnonymous]
+    [EnableRateLimiting("authentication")]
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(
+        ResetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = request.UserId == Guid.Empty
+            ? PasswordResetResult.Failure(
+                new Dictionary<string, string[]>
+                {
+                    ["InvalidToken"] =
+                    [
+                        "The password reset link is invalid, expired, or has already been used."
+                    ]
+                })
+            : await passwordRecoveryService.ResetPasswordAsync(
+                request.UserId,
+                request.Token,
+                request.NewPassword,
+                cancellationToken);
+
+        if (!result.Succeeded)
+        {
+            return ValidationProblem(
+                new ValidationProblemDetails(
+                    result.Errors.ToDictionary(
+                        item => item.Key,
+                        item => item.Value)));
+        }
+
+        await signInManager.SignOutAsync();
+        return NoContent();
+    }
+
     [Authorize]
     [HttpPost("logout")]
     public async Task<IActionResult> Logout()
@@ -161,6 +214,16 @@ public sealed record LoginRequest(
     [param: Required, EmailAddress, StringLength(256)] string Email,
     [param: Required, StringLength(128)] string Password,
     bool RememberMe = false);
+
+public sealed record ForgotPasswordRequest(
+    [param: Required, EmailAddress, StringLength(256)] string Email);
+
+public sealed record ResetPasswordRequest(
+    Guid UserId,
+    [param: Required, StringLength(4096)] string Token,
+    [param: Required, StringLength(128, MinimumLength = 12)] string NewPassword);
+
+public sealed record PasswordRecoveryRequestedResponse(string Message);
 
 public sealed record ChangePasswordRequest(
     [param: Required, StringLength(128)] string CurrentPassword,
