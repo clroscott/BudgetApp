@@ -86,7 +86,7 @@ public sealed class HouseholdsController(
     }
 
     [HttpPost]
-    public async Task<ActionResult<HouseholdResponse>> CreateInitial(
+    public async Task<ActionResult<HouseholdResponse>> Create(
         CreateHouseholdRequest request,
         CancellationToken cancellationToken)
     {
@@ -98,7 +98,7 @@ public sealed class HouseholdsController(
         try
         {
             var membership = await householdOnboardingService
-                .CreateInitialHouseholdAsync(
+                .CreateHouseholdAsync(
                     userId,
                     request.Name,
                     request.DefaultCurrency,
@@ -111,15 +111,6 @@ public sealed class HouseholdsController(
                 userId);
 
             return Created("/api/households", ToResponse(membership));
-        }
-        catch (HouseholdMembershipExistsException exception)
-        {
-            return Conflict(new ProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Household setup is already complete",
-                Detail = exception.Message
-            });
         }
         catch (ArgumentException exception)
         {

@@ -57,8 +57,8 @@ export function HouseholdInvitationAcceptancePage() {
     setIsAccepting(true)
     setErrors([])
     try {
-      await acceptHouseholdInvitation(token)
-      await refresh()
+      const acceptedHousehold = await acceptHouseholdInvitation(token)
+      await refresh(acceptedHousehold.id)
       navigate('/dashboard', { replace: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
@@ -122,27 +122,19 @@ export function HouseholdInvitationAcceptancePage() {
           </div>
         )}
 
-        {preview?.isAvailable && user && currentHousehold && (
-          <div className="invitation-auth-actions">
-            <p>
-              You currently belong to <strong>{currentHousehold.name}</strong>.
-              Leave or delete that household before accepting this invitation.
-            </p>
-            <AppLink
-              className="secondary-link-button"
-              to={`/household?returnTo=${encodeURIComponent(returnPath)}`}
-            >
-              Manage current household
-            </AppLink>
-          </div>
-        )}
-
-        {preview?.isAvailable && user && !currentHousehold && (
+        {preview?.isAvailable && user && (
           <div className="invitation-auth-actions">
             <p>
               You are signed in as <strong>{user.email}</strong>.
               The email must match the invitation.
             </p>
+            {currentHousehold && (
+              <p>
+                Accepting adds this household alongside{' '}
+                <strong>{currentHousehold.name}</strong>. It does not move or
+                combine any financial data.
+              </p>
+            )}
             <button
               className="primary-button"
               type="button"

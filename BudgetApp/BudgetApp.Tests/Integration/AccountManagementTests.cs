@@ -132,6 +132,45 @@ public sealed class AccountManagementTests(BudgetAppWebApplicationFactory factor
             account => account.Id == householdAccountId).IsActive);
     }
 
+    [Fact]
+    public async Task UserWithMultipleHouseholds_SeesOnlyEachHouseholdsAccounts()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        await Register(client);
+        var firstHouseholdId = await CreateHousehold(
+            client,
+            "First Account Household");
+        var secondHouseholdId = await CreateHousehold(
+            client,
+            "Second Account Household");
+        var token = await GetAntiforgeryToken(client);
+
+        await CreateAccount(
+            client,
+            firstHouseholdId,
+            CreateAccountRequest(name: "First household account"),
+            token);
+        await CreateAccount(
+            client,
+            secondHouseholdId,
+            CreateAccountRequest(name: "Second household account"),
+            token);
+
+        var firstAccounts = await GetAccounts(client, firstHouseholdId);
+        var secondAccounts = await GetAccounts(client, secondHouseholdId);
+
+        Assert.Equal(
+            "First household account",
+            Assert.Single(firstAccounts).Name);
+        Assert.Equal(
+            "Second household account",
+            Assert.Single(secondAccounts).Name);
+
+        var memberships = await client.GetFromJsonAsync<
+            CreateHouseholdResponse[]>("/api/households");
+        Assert.Equal(2, memberships?.Length);
+    }
+
     [Theory]
     [InlineData("Unknown", "Household")]
     [InlineData("Chequing", "Unknown")]
@@ -268,7 +307,9 @@ public sealed class AccountManagementTests(BudgetAppWebApplicationFactory factor
             "The current-user endpoint did not return an ID.");
     }
 
-    private static async Task<Guid> CreateHousehold(HttpClient client)
+    private static async Task<Guid> CreateHousehold(
+        HttpClient client,
+        string name = "Account Test Household")
     {
         var response = await SendWithAntiforgery(
             client,
@@ -276,7 +317,7 @@ public sealed class AccountManagementTests(BudgetAppWebApplicationFactory factor
             "/api/households",
             new
             {
-                name = "Account Test Household",
+                name,
                 defaultCurrency = "CAD",
                 timeZoneId = "America/Vancouver"
             },

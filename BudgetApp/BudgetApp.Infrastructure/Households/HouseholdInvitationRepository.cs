@@ -123,18 +123,6 @@ internal sealed class HouseholdInvitationRepository(
                 cancellationToken);
     }
 
-    public Task<bool> HasActiveMembershipAsync(
-        Guid userId,
-        CancellationToken cancellationToken)
-    {
-        return dbContext.HouseholdMembers.AnyAsync(
-            member =>
-                member.UserId == userId &&
-                member.Status == HouseholdMemberStatus.Active &&
-                member.Household.IsActive,
-            cancellationToken);
-    }
-
     public Task<UserEmailRecord?> GetUserEmailAsync(
         Guid userId,
         CancellationToken cancellationToken)

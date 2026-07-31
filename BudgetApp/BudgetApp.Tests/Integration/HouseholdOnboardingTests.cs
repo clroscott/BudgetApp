@@ -26,7 +26,7 @@ public sealed class HouseholdOnboardingTests(BudgetAppWebApplicationFactory fact
     }
 
     [Fact]
-    public async Task CreateInitialHousehold_CreatesOwnerMembership()
+    public async Task CreateHousehold_CreatesOwnerMembership()
     {
         using var client = factory.CreateAuthenticatedTestClient();
         await Register(client);
@@ -68,7 +68,7 @@ public sealed class HouseholdOnboardingTests(BudgetAppWebApplicationFactory fact
     }
 
     [Fact]
-    public async Task CreateInitialHousehold_WithExistingMembership_ReturnsConflict()
+    public async Task CreateHousehold_WithExistingMembership_CreatesAnotherHousehold()
     {
         using var client = factory.CreateAuthenticatedTestClient();
         await Register(client);
@@ -80,17 +80,22 @@ public sealed class HouseholdOnboardingTests(BudgetAppWebApplicationFactory fact
             await GetAntiforgeryToken(client));
         Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
 
-        var duplicateResponse = await PostWithAntiforgeryToken(
+        var secondResponse = await PostWithAntiforgeryToken(
             client,
             "/api/households",
             CreateHouseholdRequest("Another Household"),
             await GetAntiforgeryToken(client));
 
-        Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
+        var memberships = await client.GetFromJsonAsync<HouseholdResponse[]>(
+            "/api/households");
+        Assert.Equal(2, memberships?.Length);
+        Assert.Contains(memberships!, item => item.Name == "Scott Household");
+        Assert.Contains(memberships!, item => item.Name == "Another Household");
     }
 
     [Fact]
-    public async Task CreateInitialHousehold_WithUnsupportedTimeZone_ReturnsBadRequest()
+    public async Task CreateHousehold_WithUnsupportedTimeZone_ReturnsBadRequest()
     {
         using var client = factory.CreateAuthenticatedTestClient();
         await Register(client);
@@ -112,7 +117,7 @@ public sealed class HouseholdOnboardingTests(BudgetAppWebApplicationFactory fact
     }
 
     [Fact]
-    public async Task CreateInitialHousehold_WithUnsupportedCurrency_ReturnsBadRequest()
+    public async Task CreateHousehold_WithUnsupportedCurrency_ReturnsBadRequest()
     {
         using var client = factory.CreateAuthenticatedTestClient();
         await Register(client);

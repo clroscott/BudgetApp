@@ -233,13 +233,6 @@ public sealed class HouseholdInvitationService(
             throw new HouseholdInvitationEmailMismatchException();
         }
 
-        if (await invitationRepository.HasActiveMembershipAsync(
-                userId,
-                cancellationToken))
-        {
-            throw new MultipleHouseholdsNotSupportedException();
-        }
-
         var member = invitation.Household.AddInvitedMember(
             userId,
             invitation.Role,

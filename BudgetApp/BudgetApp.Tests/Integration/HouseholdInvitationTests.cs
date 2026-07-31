@@ -91,7 +91,7 @@ public sealed class HouseholdInvitationTests(
     }
 
     [Fact]
-    public async Task Invitation_RejectsWrongEmailAndExistingHousehold()
+    public async Task Invitation_RejectsWrongEmail_AndAllowsAnotherHousehold()
     {
         using var ownerClient = factory.CreateAuthenticatedTestClient();
         using var wrongUserClient = factory.CreateAuthenticatedTestClient();
@@ -123,7 +123,12 @@ public sealed class HouseholdInvitationTests(
             existingMemberClient,
             "/api/household-invitations/accept",
             new { token });
-        Assert.Equal(HttpStatusCode.Conflict, existingResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, existingResponse.StatusCode);
+
+        var memberships = await existingMemberClient.GetFromJsonAsync<
+            List<HouseholdResponse>>("/api/households");
+        Assert.Equal(2, memberships?.Count);
+        Assert.Contains(memberships!, item => item.Id == household.Id);
     }
 
     [Fact]

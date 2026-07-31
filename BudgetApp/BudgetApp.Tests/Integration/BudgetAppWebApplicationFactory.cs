@@ -1,6 +1,7 @@
 using System.Data.Common;
 using BudgetApp.Application.Email;
 using BudgetApp.Infrastructure.Data;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -34,6 +35,8 @@ public sealed class BudgetAppWebApplicationFactory : WebApplicationFactory<Progr
             services.RemoveAll<IDbContextOptionsConfiguration<BudgetAppDbContext>>();
             services.RemoveAll<IEmailSender>();
 
+            services.AddDataProtection()
+                .UseEphemeralDataProtectionProvider();
             services.AddSingleton<DbConnection>(connection);
             services.AddDbContext<BudgetAppDbContext>((serviceProvider, options) =>
                 options.UseSqlite(serviceProvider.GetRequiredService<DbConnection>()));

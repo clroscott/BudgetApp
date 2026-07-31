@@ -11,7 +11,3 @@ public sealed class HouseholdInvitationUnavailableException()
 
 public sealed class HouseholdInvitationEmailMismatchException()
     : Exception("Sign in with the email address that received this invitation.");
-
-public sealed class MultipleHouseholdsNotSupportedException()
-    : Exception(
-        "This account already belongs to a household. Multiple households are not supported yet.");

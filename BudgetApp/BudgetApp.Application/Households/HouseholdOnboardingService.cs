@@ -22,7 +22,7 @@ public sealed class HouseholdOnboardingService(
             cancellationToken);
     }
 
-    public async Task<HouseholdMembership> CreateInitialHouseholdAsync(
+    public async Task<HouseholdMembership> CreateHouseholdAsync(
         Guid userId,
         string name,
         string defaultCurrency,
@@ -32,13 +32,6 @@ public sealed class HouseholdOnboardingService(
         if (userId == Guid.Empty)
         {
             throw new ArgumentException("User ID is required.", nameof(userId));
-        }
-
-        if (await householdRepository.HasActiveMembershipAsync(
-                userId,
-                cancellationToken))
-        {
-            throw new HouseholdMembershipExistsException();
         }
 
         var normalizedCurrency = CurrencyCatalog.NormalizeSupported(defaultCurrency);

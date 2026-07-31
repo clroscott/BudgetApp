@@ -1,51 +1,27 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { BrandMark } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
-import { currencies } from '../finance/currencies'
+import { HouseholdForm } from '../households/HouseholdForm'
+import type { CreateHouseholdRequest } from '../households/householdApi'
 import { useHouseholds } from '../households/useHouseholds'
 import { useRouter } from '../routing/useRouter'
 
-function getBrowserTimeZone(): string {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Vancouver'
-}
-
-function getSupportedTimeZones(fallback: string[]): string[] {
-  if (typeof Intl.supportedValuesOf !== 'function') {
-    return fallback
-  }
-
-  return Intl.supportedValuesOf('timeZone')
-}
-
-const browserTimeZone = getBrowserTimeZone()
-const supportedTimeZones = getSupportedTimeZones([browserTimeZone])
-const timeZones = supportedTimeZones.includes(browserTimeZone)
-  ? supportedTimeZones
-  : [browserTimeZone, ...supportedTimeZones]
-
 export function HouseholdSetupPage() {
   const { user, logout } = useAuth()
-  const { createInitialHousehold } = useHouseholds()
+  const { createHousehold } = useHouseholds()
   const { navigate } = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const handleSubmit = async (request: CreateHouseholdRequest) => {
     setIsSubmitting(true)
     setErrors([])
 
-    const form = new FormData(event.currentTarget)
-
     try {
-      await createInitialHousehold({
-        name: String(form.get('name') ?? ''),
-        defaultCurrency: String(form.get('defaultCurrency') ?? ''),
-        timeZoneId: String(form.get('timeZoneId') ?? ''),
-      })
+      await createHousehold(request)
       navigate('/dashboard', { replace: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
@@ -89,54 +65,10 @@ export function HouseholdSetupPage() {
 
         <ErrorSummary errors={errors} />
 
-        <form onSubmit={(event) => void handleSubmit(event)}>
-          <label htmlFor="name">Household name</label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            autoComplete="organization"
-            maxLength={100}
-            placeholder="e.g. Our Household"
-            required
-          />
-
-          <label htmlFor="defaultCurrency">Default currency</label>
-          <select
-            id="defaultCurrency"
-            name="defaultCurrency"
-            defaultValue="CAD"
-            aria-describedby="currency-help"
-            required
-          >
-            {currencies.map(currency => (
-              <option key={currency} value={currency}>{currency}</option>
-            ))}
-          </select>
-          <p id="currency-help" className="field-help">
-            Budget amounts will use this currency.
-          </p>
-
-          <label htmlFor="timeZoneId">Time zone</label>
-          <select
-            id="timeZoneId"
-            name="timeZoneId"
-            defaultValue={browserTimeZone}
-            aria-describedby="timezone-help"
-            required
-          >
-            {timeZones.map(timeZone => (
-              <option key={timeZone} value={timeZone}>{timeZone}</option>
-            ))}
-          </select>
-          <p id="timezone-help" className="field-help">
-            This controls monthly boundaries and future forecasts.
-          </p>
-
-          <button className="primary-button" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating household...' : 'Create household'}
-          </button>
-        </form>
+        <HouseholdForm
+          isSubmitting={isSubmitting}
+          onSubmit={handleSubmit}
+        />
       </section>
     </main>
   )

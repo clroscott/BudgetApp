@@ -34,7 +34,11 @@ function NavigationLinks({
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { logout, user } = useAuth()
-  const { currentHousehold } = useHouseholds()
+  const {
+    currentHousehold,
+    households,
+    selectHousehold,
+  } = useHouseholds()
   const { navigate, path } = useRouter()
   const [isNavigationOpen, setIsNavigationOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -113,12 +117,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="sidebar-household">
-            <strong>{currentHousehold?.name}</strong>
-            <small>
-              {currentHousehold?.defaultCurrency} / {currentHousehold?.role}
-            </small>
-          </div>
           {signOutError && <small className="sidebar-error">{signOutError}</small>}
           <button
             className="text-button"
@@ -147,7 +145,38 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
       </aside>
-      <div className="app-shell-content">{children}</div>
+      <div className="app-shell-content">
+        <div className="household-context-bar">
+          <div className="household-context-current">
+            <span className="household-context-label">Current household</span>
+            {households.length > 1 ? (
+              <select
+                aria-label="Current household"
+                value={currentHousehold?.id ?? ''}
+                onChange={event => {
+                  selectHousehold(event.target.value)
+                  setIsNavigationOpen(false)
+                }}
+              >
+                {households.map(household => (
+                  <option key={household.id} value={household.id}>
+                    {household.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <strong>{currentHousehold?.name}</strong>
+            )}
+            <span className="household-context-meta">
+              {currentHousehold?.defaultCurrency} · {currentHousehold?.role}
+            </span>
+          </div>
+          <AppLink className="household-context-manage" to="/household">
+            Manage household
+          </AppLink>
+        </div>
+        {children}
+      </div>
     </div>
   )
 }
