@@ -11,6 +11,18 @@ using Serilog.Events;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Development must always use its local User Secrets configuration. Reload it
+// after the default providers so an inherited Production environment variable
+// cannot redirect Visual Studio to the real household database.
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets(
+        typeof(DatabaseEnvironmentGuard).Assembly,
+        optional: true,
+        reloadOnChange: true);
+}
+
 var errorLogPath = Path.Combine(
     builder.Environment.ContentRootPath,
     "logs",
