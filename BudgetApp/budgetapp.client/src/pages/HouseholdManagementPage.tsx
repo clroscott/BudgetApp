@@ -15,6 +15,7 @@ import {
   type HouseholdMemberManagement,
 } from '../households/householdInvitationApi'
 import { useHouseholds } from '../households/useHouseholds'
+import { AppLink } from '../routing/AppLink'
 import { useRouter } from '../routing/useRouter'
 
 const formatter = new Intl.DateTimeFormat(undefined, {
@@ -23,7 +24,12 @@ const formatter = new Intl.DateTimeFormat(undefined, {
 })
 
 export function HouseholdManagementPage() {
-  const { currentHousehold, refresh } = useHouseholds()
+  const {
+    currentHousehold,
+    households,
+    refresh,
+    selectHousehold,
+  } = useHouseholds()
   const { navigate } = useRouter()
   const [management, setManagement] =
     useState<HouseholdMemberManagement | null>(null)
@@ -98,7 +104,7 @@ export function HouseholdManagementPage() {
     try {
       await operation()
       await refresh()
-      navigate(getSafeReturnPath() ?? '/household/setup', { replace: true })
+      navigate(getSafeReturnPath() ?? '/dashboard', { replace: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
       setIsSaving(false)
@@ -132,10 +138,58 @@ export function HouseholdManagementPage() {
             <h1>{currentHousehold.name}</h1>
             <p>Review members and manage invitations to your shared budget.</p>
           </div>
+          <AppLink className="primary-link-button" to="/households/new">
+            Create household
+          </AppLink>
         </header>
 
         <ErrorSummary errors={errors} />
         {notice && <div className="success-summary" role="status">{notice}</div>}
+
+        <section className="household-management-section">
+          <div className="household-section-heading">
+            <div>
+              <h2>Your households</h2>
+              <p>
+                Each household has separate members, accounts, categories,
+                imports, and budgets.
+              </p>
+            </div>
+            <span className="status-pill">{households.length}</span>
+          </div>
+
+          <div className="household-member-list">
+            {households.map(household => {
+              const isCurrent = household.id === currentHousehold.id
+              return (
+                <article className="household-member-row" key={household.id}>
+                  <div>
+                    <strong>{household.name}</strong>
+                    <p>
+                      {household.defaultCurrency} · {household.role}
+                    </p>
+                  </div>
+                  <div className="household-member-meta">
+                    {isCurrent ? (
+                      <span className="status-pill">Current</span>
+                    ) : (
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => {
+                          selectHousehold(household.id)
+                          setNotice(`Switched to ${household.name}.`)
+                        }}
+                      >
+                        Switch
+                      </button>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        </section>
 
         {management?.canManageInvitations && (
           <form
@@ -290,10 +344,11 @@ export function HouseholdManagementPage() {
           <section className="household-management-section household-exit-section">
             <div className="household-section-heading">
               <div>
-                <h2>Changing households</h2>
+                <h2>Leave or delete this household</h2>
                 <p>
-                  Households are invitation-only. Ask an Owner or Admin of the
-                  other household to invite your account email before leaving.
+                  Leaving removes only your membership in{' '}
+                  {currentHousehold.name}. Your other household memberships are
+                  not affected.
                 </p>
               </div>
             </div>
@@ -340,12 +395,11 @@ export function HouseholdManagementPage() {
 
             {management.exitOptions.blockedReason && (
               <div className="household-exit-blocked">
-                <strong>Changing households is not available yet</strong>
+                <strong>An ownership change is required first</strong>
                 <p>{management.exitOptions.blockedReason}</p>
                 <p>
-                  <strong>Planned features:</strong> multiple-household
-                  membership and switching, followed by ownership transfer,
-                  household archival, and selected-data copying.
+                  <strong>Planned feature:</strong> ownership transfer will
+                  allow the last Owner to assign responsibility before leaving.
                 </p>
               </div>
             )}

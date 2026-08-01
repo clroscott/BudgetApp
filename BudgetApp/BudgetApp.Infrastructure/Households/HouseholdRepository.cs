@@ -29,18 +29,6 @@ internal sealed class HouseholdRepository(BudgetAppDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
-    public Task<bool> HasActiveMembershipAsync(
-        Guid userId,
-        CancellationToken cancellationToken)
-    {
-        return dbContext.HouseholdMembers.AnyAsync(
-            member =>
-                member.UserId == userId &&
-                member.Status == HouseholdMemberStatus.Active &&
-                member.Household.IsActive,
-            cancellationToken);
-    }
-
     public async Task AddAsync(
         Household household,
         IReadOnlyCollection<Category> initialCategoryRoots,

@@ -9,10 +9,6 @@ public interface IHouseholdRepository
         Guid userId,
         CancellationToken cancellationToken);
 
-    Task<bool> HasActiveMembershipAsync(
-        Guid userId,
-        CancellationToken cancellationToken);
-
     Task AddAsync(
         Household household,
         IReadOnlyCollection<Category> initialCategoryRoots,

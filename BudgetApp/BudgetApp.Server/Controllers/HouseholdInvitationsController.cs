@@ -285,15 +285,6 @@ public sealed class HouseholdInvitationAcceptanceController(
                     Detail = exception.Message
                 });
         }
-        catch (MultipleHouseholdsNotSupportedException exception)
-        {
-            return Conflict(new ProblemDetails
-            {
-                Status = StatusCodes.Status409Conflict,
-                Title = "Account already has a household",
-                Detail = exception.Message
-            });
-        }
         catch (HouseholdInvitationUnavailableException exception)
         {
             return StatusCode(

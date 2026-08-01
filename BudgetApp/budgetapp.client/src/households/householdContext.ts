@@ -9,10 +9,11 @@ export interface HouseholdContextValue {
   currentHousehold: HouseholdMembership | null
   isLoading: boolean
   initializationError: string | null
-  createInitialHousehold: (
+  selectHousehold: (householdId: string) => void
+  createHousehold: (
     request: CreateHouseholdRequest,
   ) => Promise<HouseholdMembership>
-  refresh: () => Promise<void>
+  refresh: (preferredHouseholdId?: string) => Promise<void>
 }
 
 export const HouseholdContext = createContext<HouseholdContextValue | null>(null)

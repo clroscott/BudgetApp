@@ -35,10 +35,6 @@ public interface IHouseholdInvitationRepository
         string normalizedEmail,
         CancellationToken cancellationToken);
 
-    Task<bool> HasActiveMembershipAsync(
-        Guid userId,
-        CancellationToken cancellationToken);
-
     Task<UserEmailRecord?> GetUserEmailAsync(
         Guid userId,
         CancellationToken cancellationToken);

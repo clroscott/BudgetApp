@@ -56,7 +56,7 @@ function HouseholdRequiredRoute({ children }: { children: ReactNode }) {
   }
 
   return currentHousehold
-    ? <AppShell>{children}</AppShell>
+    ? <AppShell key={currentHousehold.id}>{children}</AppShell>
     : <Redirect to="/household/setup" />
 }
 

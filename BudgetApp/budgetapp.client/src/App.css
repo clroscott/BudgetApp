@@ -264,6 +264,10 @@ button:disabled {
   gap: 1rem;
 }
 
+.household-create-form {
+  max-width: 32rem;
+}
+
 .household-invite-form > .household-section-heading,
 .household-invite-help {
   grid-column: 1 / -1;
@@ -446,6 +450,10 @@ a {
   width: min(100% - 2rem, 70rem);
   margin: 0 auto;
   padding: 3rem 0;
+}
+
+.narrow-management-content {
+  width: min(100% - 2rem, 44rem);
 }
 
 .page-title-row {
@@ -1035,11 +1043,6 @@ a {
   border-top: 1px solid var(--border);
 }
 
-.sidebar-footer > div {
-  display: grid;
-  gap: 0.2rem;
-}
-
 .sidebar-footer small {
   color: var(--muted-text);
 }
@@ -1063,7 +1066,6 @@ a {
 
 .app-sidebar.collapsed .sidebar-brand .brand-lockup > span,
 .app-sidebar.collapsed .sidebar-label,
-.app-sidebar.collapsed .sidebar-household,
 .app-sidebar.collapsed .sidebar-error {
   display: none;
 }
@@ -1104,6 +1106,69 @@ a {
 
 .app-shell-content {
   min-width: 0;
+}
+
+.household-context-bar {
+  min-height: 3.75rem;
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 2rem;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 95%, transparent);
+  box-sizing: border-box;
+  backdrop-filter: blur(0.75rem);
+}
+
+.household-context-current {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.household-context-label {
+  color: var(--muted-text);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.household-context-current strong {
+  overflow: hidden;
+  color: var(--heading);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.household-context-current select {
+  width: auto;
+  min-width: 11rem;
+  max-width: min(22rem, 42vw);
+  padding: 0.5rem 2.25rem 0.5rem 0.7rem;
+  border-radius: 0.65rem;
+  background-color: var(--surface);
+  color: var(--heading);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.household-context-meta {
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.household-context-manage {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 0.84rem;
+  font-weight: 750;
 }
 
 .app-shell-content .app-header {
@@ -3515,10 +3580,6 @@ a {
     display: inline;
   }
 
-  .app-sidebar.collapsed .sidebar-household {
-    display: grid;
-  }
-
   .app-sidebar.collapsed .sidebar-navigation a {
     justify-content: flex-start;
   }
@@ -3566,6 +3627,11 @@ a {
     justify-content: space-between;
     gap: 1rem;
     margin-top: 0.75rem;
+  }
+
+  .household-context-bar {
+    padding-right: 1rem;
+    padding-left: 1rem;
   }
 
   .dashboard-grid,
@@ -3671,6 +3737,32 @@ a {
 }
 
 @media (max-width: 40rem) {
+  .household-context-bar {
+    align-items: flex-start;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .household-context-current {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.2rem 0.65rem;
+  }
+
+  .household-context-label {
+    grid-column: 1 / -1;
+  }
+
+  .household-context-current select {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .household-context-meta {
+    align-self: center;
+  }
+
   .app-sidebar.open .sidebar-navigation {
     grid-template-columns: 1fr;
   }

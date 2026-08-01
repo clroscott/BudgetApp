@@ -99,6 +99,16 @@ export const appPages: AppPageDefinition[] = [
     component: page(() => import('../pages/HouseholdSetupPage'), 'HouseholdSetupPage'),
   },
   {
+    id: 'household-create',
+    path: '/households/new',
+    label: 'Create household',
+    access: 'household',
+    component: page(
+      () => import('../pages/HouseholdCreatePage'),
+      'HouseholdCreatePage',
+    ),
+  },
+  {
     id: 'dashboard',
     path: '/dashboard',
     label: 'Dashboard',
