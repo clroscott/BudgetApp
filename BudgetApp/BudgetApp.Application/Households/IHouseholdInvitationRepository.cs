@@ -26,6 +26,15 @@ public interface IHouseholdInvitationRepository
         string tokenHash,
         CancellationToken cancellationToken);
 
+    Task<HouseholdInvitation?> GetTrackedByIdAsync(
+        Guid invitationId,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<HouseholdInvitationForUserRecord>>
+        GetPendingInvitationsForEmailAsync(
+            string normalizedEmail,
+            CancellationToken cancellationToken);
+
     Task<HouseholdInvitationPreviewRecord?> GetPreviewByTokenHashAsync(
         string tokenHash,
         CancellationToken cancellationToken);
@@ -60,6 +69,14 @@ public sealed record HouseholdInvitationPreviewRecord(
     string Email,
     HouseholdRole Role,
     HouseholdInvitationStatus Status,
+    DateTimeOffset ExpiresAtUtc);
+
+public sealed record HouseholdInvitationForUserRecord(
+    Guid Id,
+    Guid HouseholdId,
+    string HouseholdName,
+    string InviterDisplayName,
+    HouseholdRole Role,
     DateTimeOffset ExpiresAtUtc);
 
 public sealed record UserEmailRecord(

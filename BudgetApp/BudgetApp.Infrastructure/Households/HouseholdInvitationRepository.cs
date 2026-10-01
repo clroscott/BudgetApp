@@ -85,6 +85,42 @@ internal sealed class HouseholdInvitationRepository(
                 cancellationToken);
     }
 
+    public Task<HouseholdInvitation?> GetTrackedByIdAsync(
+        Guid invitationId,
+        CancellationToken cancellationToken)
+    {
+        return dbContext.HouseholdInvitations
+            .Include(invitation => invitation.Household)
+            .ThenInclude(household => household.Members)
+            .SingleOrDefaultAsync(
+                invitation => invitation.Id == invitationId,
+                cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<HouseholdInvitationForUserRecord>>
+        GetPendingInvitationsForEmailAsync(
+            string normalizedEmail,
+            CancellationToken cancellationToken)
+    {
+        return await dbContext.HouseholdInvitations
+            .AsNoTracking()
+            .Where(invitation =>
+                invitation.NormalizedEmail == normalizedEmail &&
+                invitation.Status == HouseholdInvitationStatus.Pending)
+            .Join(
+                dbContext.Users,
+                invitation => invitation.InvitedByUserId,
+                user => user.Id,
+                (invitation, user) => new HouseholdInvitationForUserRecord(
+                    invitation.Id,
+                    invitation.HouseholdId,
+                    invitation.Household.Name,
+                    user.DisplayName,
+                    invitation.Role,
+                    invitation.ExpiresAtUtc))
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<HouseholdInvitationPreviewRecord?> GetPreviewByTokenHashAsync(
         string tokenHash,
         CancellationToken cancellationToken)

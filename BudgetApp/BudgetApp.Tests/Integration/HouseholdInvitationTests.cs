@@ -12,6 +12,60 @@ public sealed class HouseholdInvitationTests(
     : IClassFixture<BudgetAppWebApplicationFactory>
 {
     [Fact]
+    public async Task PendingInvitations_AppearForMatchingAccount_AndCanBeAcceptedWithoutToken()
+    {
+        using var ownerClient = factory.CreateAuthenticatedTestClient();
+        using var inviteeClient = factory.CreateAuthenticatedTestClient();
+        using var otherClient = factory.CreateAuthenticatedTestClient();
+        var inviteeEmail = $"new-member-{Guid.NewGuid():N}@example.test";
+        var household = await RegisterAndCreateHousehold(
+            ownerClient,
+            $"owner-{Guid.NewGuid():N}@example.test");
+
+        var inviteResponse = await Post(
+            ownerClient,
+            $"/api/households/{household.Id}/invitations",
+            new { email = inviteeEmail, role = "Editor" });
+        inviteResponse.EnsureSuccessStatusCode();
+        var dispatch = await inviteResponse.Content
+            .ReadFromJsonAsync<InvitationDispatchResponse>();
+
+        await Register(inviteeClient, inviteeEmail);
+        var invitations = await inviteeClient.GetFromJsonAsync<
+            List<InvitationForUserResponse>>(
+            "/api/household-invitations/pending");
+        var invitation = Assert.Single(invitations!);
+        Assert.Equal(dispatch!.Invitation.Id, invitation.Id);
+        Assert.Equal(household.Id, invitation.HouseholdId);
+        Assert.Equal("Editor", invitation.Role);
+
+        await Register(
+            otherClient,
+            $"other-{Guid.NewGuid():N}@example.test");
+        Assert.Empty((await otherClient.GetFromJsonAsync<
+            List<InvitationForUserResponse>>(
+            "/api/household-invitations/pending"))!);
+        var wrongUserResponse = await Post(
+            otherClient,
+            $"/api/household-invitations/pending/{invitation.Id}/accept",
+            new { });
+        Assert.Equal(HttpStatusCode.Forbidden, wrongUserResponse.StatusCode);
+
+        var acceptResponse = await Post(
+            inviteeClient,
+            $"/api/household-invitations/pending/{invitation.Id}/accept",
+            new { });
+        Assert.Equal(HttpStatusCode.OK, acceptResponse.StatusCode);
+        Assert.Empty((await inviteeClient.GetFromJsonAsync<
+            List<InvitationForUserResponse>>(
+            "/api/household-invitations/pending"))!);
+
+        var memberships = await inviteeClient.GetFromJsonAsync<
+            List<HouseholdResponse>>("/api/households");
+        Assert.Equal(household.Id, Assert.Single(memberships!).Id);
+    }
+
+    [Fact]
     public async Task Invitation_AcceptanceCreatesViewerMembershipForMatchingEmail()
     {
         using var ownerClient = factory.CreateAuthenticatedTestClient();
@@ -446,6 +500,10 @@ public sealed class HouseholdInvitationTests(
     private sealed record InvitationDispatchResponse(
         InvitationItemResponse Invitation,
         bool EmailDelivered);
+    private sealed record InvitationForUserResponse(
+        Guid Id,
+        Guid HouseholdId,
+        string Role);
     private sealed record ManagementResponse(
         bool CanManageInvitations,
         List<object> Members,

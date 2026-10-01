@@ -34,6 +34,14 @@ public sealed record HouseholdInvitationPreview(
     bool IsAvailable,
     string Status);
 
+public sealed record HouseholdInvitationForUser(
+    Guid Id,
+    Guid HouseholdId,
+    string HouseholdName,
+    string InviterDisplayName,
+    HouseholdRole Role,
+    DateTimeOffset ExpiresAtUtc);
+
 public sealed record HouseholdInvitationDispatch(
     HouseholdInvitationItem Invitation,
     bool EmailDelivered);

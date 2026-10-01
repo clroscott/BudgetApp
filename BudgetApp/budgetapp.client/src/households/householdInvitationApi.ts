@@ -48,6 +48,15 @@ export interface HouseholdInvitationPreview {
   status: string
 }
 
+export interface HouseholdInvitationForUser {
+  id: string
+  householdId: string
+  householdName: string
+  inviterDisplayName: string
+  role: HouseholdInvitationRole
+  expiresAtUtc: string
+}
+
 export function getHouseholdMembers(
   householdId: string,
 ): Promise<HouseholdMemberManagement> {
@@ -100,5 +109,22 @@ export function acceptHouseholdInvitation(
   return apiPost<HouseholdMembership>(
     '/api/household-invitations/accept',
     { token },
+  )
+}
+
+export function getPendingHouseholdInvitations(): Promise<
+  HouseholdInvitationForUser[]
+> {
+  return apiGet<HouseholdInvitationForUser[]>(
+    '/api/household-invitations/pending',
+  )
+}
+
+export function acceptPendingHouseholdInvitation(
+  invitationId: string,
+): Promise<HouseholdMembership> {
+  return apiPost<HouseholdMembership>(
+    `/api/household-invitations/pending/${invitationId}/accept`,
+    {},
   )
 }
