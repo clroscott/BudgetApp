@@ -205,6 +205,34 @@ public sealed class HouseholdInvitationService(
                     : record.Status.ToString());
     }
 
+    public async Task<IReadOnlyList<HouseholdInvitationForUser>>
+        GetPendingForUserAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default)
+    {
+        var userEmail = await invitationRepository.GetUserEmailAsync(
+                userId,
+                cancellationToken)
+            ?? throw new HouseholdInvitationEmailMismatchException();
+        var invitations = await invitationRepository
+            .GetPendingInvitationsForEmailAsync(
+                userEmail.NormalizedEmail,
+                cancellationToken);
+        var now = timeProvider.GetUtcNow();
+
+        return invitations
+            .Where(invitation => invitation.ExpiresAtUtc > now)
+            .OrderBy(invitation => invitation.ExpiresAtUtc)
+            .Select(invitation => new HouseholdInvitationForUser(
+                invitation.Id,
+                invitation.HouseholdId,
+                invitation.HouseholdName,
+                invitation.InviterDisplayName,
+                invitation.Role,
+                invitation.ExpiresAtUtc))
+            .ToList();
+    }
+
     public async Task<HouseholdMembership> AcceptAsync(
         Guid userId,
         string rawToken,
@@ -214,6 +242,28 @@ public sealed class HouseholdInvitationService(
                 tokenService.Hash(rawToken),
                 cancellationToken)
             ?? throw new HouseholdInvitationUnavailableException();
+
+        return await AcceptAsync(userId, invitation, cancellationToken);
+    }
+
+    public async Task<HouseholdMembership> AcceptForUserAsync(
+        Guid userId,
+        Guid invitationId,
+        CancellationToken cancellationToken = default)
+    {
+        var invitation = await invitationRepository.GetTrackedByIdAsync(
+                invitationId,
+                cancellationToken)
+            ?? throw new HouseholdInvitationUnavailableException();
+
+        return await AcceptAsync(userId, invitation, cancellationToken);
+    }
+
+    private async Task<HouseholdMembership> AcceptAsync(
+        Guid userId,
+        HouseholdInvitation invitation,
+        CancellationToken cancellationToken)
+    {
         var now = timeProvider.GetUtcNow();
 
         if (invitation.Status != HouseholdInvitationStatus.Pending ||

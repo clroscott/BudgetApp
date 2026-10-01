@@ -33,6 +33,7 @@ Backend foundations for configuration, EF Core, SQL Server, technical logging, a
 - [Clean development machine setup](docs/development-setup.md)
 - [Initial local Production installation](docs/local-production-installation.md)
 - [Local Production deployment checklist](docs/local-production-deployment-checklist.md)
+- [Manual QA and regression test plan](docs/manual-qa-regression-test-plan.md)
 - [Manual Production database backup and restore](docs/database-backup-restore.md)
 - [Transaction CSV export](docs/transaction-csv-export.md)
 - [Core data model](docs/core-data-model.md)

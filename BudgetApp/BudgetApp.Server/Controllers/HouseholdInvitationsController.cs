@@ -217,6 +217,22 @@ public sealed class HouseholdInvitationsController(
 public sealed class HouseholdInvitationAcceptanceController(
     HouseholdInvitationService invitationService) : ControllerBase
 {
+    [Authorize]
+    [HttpGet("pending")]
+    public async Task<ActionResult<IReadOnlyList<HouseholdInvitationForUserResponse>>>
+        GetPending(CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        var invitations = await invitationService.GetPendingForUserAsync(
+            userId,
+            cancellationToken);
+        return Ok(invitations.Select(ToResponse).ToList());
+    }
+
     [AllowAnonymous]
     [HttpGet("preview")]
     public async Task<ActionResult<HouseholdInvitationPreviewResponse>> Preview(
@@ -254,9 +270,7 @@ public sealed class HouseholdInvitationAcceptanceController(
         AcceptHouseholdInvitationRequest request,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(
-                User.FindFirstValue(ClaimTypes.NameIdentifier),
-                out var userId))
+        if (!TryGetUserId(out var userId))
         {
             return Unauthorized();
         }
@@ -297,6 +311,72 @@ public sealed class HouseholdInvitationAcceptanceController(
                 });
         }
     }
+
+    [Authorize]
+    [HttpPost("pending/{invitationId:guid}/accept")]
+    public async Task<ActionResult<HouseholdResponse>> AcceptPending(
+        Guid invitationId,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId))
+        {
+            return Unauthorized();
+        }
+
+        try
+        {
+            var membership = await invitationService.AcceptForUserAsync(
+                userId,
+                invitationId,
+                cancellationToken);
+            return Ok(ToResponse(membership));
+        }
+        catch (HouseholdInvitationEmailMismatchException exception)
+        {
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new ProblemDetails
+                {
+                    Status = StatusCodes.Status403Forbidden,
+                    Title = "Invitation email does not match",
+                    Detail = exception.Message
+                });
+        }
+        catch (HouseholdInvitationUnavailableException exception)
+        {
+            return StatusCode(
+                StatusCodes.Status410Gone,
+                new ProblemDetails
+                {
+                    Status = StatusCodes.Status410Gone,
+                    Title = "Invitation unavailable",
+                    Detail = exception.Message
+                });
+        }
+    }
+
+    private bool TryGetUserId(out Guid userId) =>
+        Guid.TryParse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier),
+            out userId);
+
+    private static HouseholdInvitationForUserResponse ToResponse(
+        HouseholdInvitationForUser invitation) =>
+        new(
+            invitation.Id,
+            invitation.HouseholdId,
+            invitation.HouseholdName,
+            invitation.InviterDisplayName,
+            invitation.Role.ToString(),
+            invitation.ExpiresAtUtc);
+
+    private static HouseholdResponse ToResponse(HouseholdMembership membership) =>
+        new(
+            membership.HouseholdId,
+            membership.Name,
+            membership.DefaultCurrency,
+            membership.TimeZoneId,
+            membership.Role.ToString());
 }
 
 public sealed record CreateHouseholdInvitationRequest(
@@ -346,3 +426,11 @@ public sealed record HouseholdInvitationPreviewResponse(
     DateTimeOffset ExpiresAtUtc,
     bool IsAvailable,
     string Status);
+
+public sealed record HouseholdInvitationForUserResponse(
+    Guid Id,
+    Guid HouseholdId,
+    string HouseholdName,
+    string InviterDisplayName,
+    string Role,
+    DateTimeOffset ExpiresAtUtc);

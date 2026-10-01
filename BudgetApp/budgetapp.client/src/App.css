@@ -24,6 +24,10 @@
   box-sizing: border-box;
 }
 
+.household-setup-card {
+  width: min(100%, 38rem);
+}
+
 .status-card {
   text-align: center;
 }
@@ -266,6 +270,78 @@ button:disabled {
 
 .household-create-form {
   max-width: 32rem;
+}
+
+.setup-invitations {
+  margin-bottom: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.85rem;
+  background: var(--accent-soft);
+}
+
+.setup-section-heading,
+.setup-invitation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.setup-section-heading h2,
+.setup-invitation h3 {
+  margin: 0;
+}
+
+.setup-section-heading h2 {
+  font-size: 1.15rem;
+}
+
+.setup-section-heading .eyebrow {
+  margin: 0 0 0.2rem;
+}
+
+.setup-section-help {
+  margin: 0.65rem 0 0.9rem;
+  color: var(--muted-text);
+}
+
+.setup-invitation {
+  padding: 0.9rem;
+  border-radius: 0.7rem;
+  background: var(--surface);
+}
+
+.setup-invitation + .setup-invitation {
+  margin-top: 0.65rem;
+}
+
+.setup-invitation p {
+  margin: 0.25rem 0 0;
+  color: var(--muted-text);
+}
+
+.setup-invitation .primary-button {
+  flex: 0 0 auto;
+  margin-top: 0;
+}
+
+.setup-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.25rem 0 0.7rem;
+  color: var(--muted-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.setup-divider::before,
+.setup-divider::after {
+  height: 1px;
+  flex: 1;
+  background: var(--border);
+  content: '';
 }
 
 .household-invite-form > .household-section-heading,
@@ -4194,6 +4270,7 @@ a {
 
   .household-member-row,
   .household-exit-action,
+  .setup-invitation,
   .invitation-preview > div {
     align-items: flex-start;
     flex-direction: column;
@@ -4201,6 +4278,10 @@ a {
 
   .household-invitation-actions {
     justify-content: flex-start;
+  }
+
+  .setup-invitation .primary-button {
+    width: 100%;
   }
 }
 
