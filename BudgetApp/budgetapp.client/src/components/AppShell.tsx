@@ -39,7 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     households,
     selectHousehold,
   } = useHouseholds()
-  const { navigate, path } = useRouter()
+  const { confirmNavigation, navigate, path } = useRouter()
   const [isNavigationOpen, setIsNavigationOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (!user) return false
@@ -55,11 +55,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [signOutError, setSignOutError] = useState<string | null>(null)
 
   const handleLogout = async () => {
+    if (!confirmNavigation()) return
     setIsSigningOut(true)
     setSignOutError(null)
     try {
       await logout()
-      navigate('/login', { replace: true })
+      navigate('/login', { replace: true, bypassBlocker: true })
     } catch (error) {
       setSignOutError(getErrorMessages(error)[0] ?? 'Unable to sign out.')
       setIsSigningOut(false)

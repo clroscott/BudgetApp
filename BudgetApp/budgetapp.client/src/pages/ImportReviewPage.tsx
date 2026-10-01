@@ -73,6 +73,8 @@ interface DraftRowProps {
   canEdit: boolean
   isCompleted: boolean
   onChanged: () => Promise<void>
+  onRuleCreated: () => Promise<number>
+  onFillRemaining: () => Promise<boolean>
   onDirtyChange: (draftId: string, update: PendingDraftUpdate | null) => void
   onRemove: (draftId: string, sourceRowNumber: number) => Promise<void>
   onError: (error: unknown) => void
@@ -107,6 +109,8 @@ function DraftRow({
   canEdit,
   isCompleted,
   onChanged,
+  onRuleCreated,
+  onFillRemaining,
   onDirtyChange,
   onRemove,
   onError,
@@ -128,6 +132,8 @@ function DraftRow({
   const [isRuleEditorOpen, setIsRuleEditorOpen] = useState(false)
   const [isCreatingRule, setIsCreatingRule] = useState(false)
   const [ruleCreated, setRuleCreated] = useState(false)
+  const [ruleFillCount, setRuleFillCount] = useState(0)
+  const [isFillingRuleMatches, setIsFillingRuleMatches] = useState(false)
   const [ruleMatchOperator, setRuleMatchOperator] =
     useState<CategorizationRuleMatchOperator>('Contains')
   const [ruleMatchValue, setRuleMatchValue] = useState('')
@@ -224,8 +230,8 @@ function DraftRow({
       })
       setRuleCreated(true)
       setIsRuleEditorOpen(false)
-      await onChanged()
       onDirtyChange(draft.id, null)
+      setRuleFillCount(await onRuleCreated())
     } catch (error) {
       onError(error)
     } finally {
@@ -240,6 +246,17 @@ function DraftRow({
       onDirtyChange(draft.id, null)
     } catch (error) {
       onError(error)
+    }
+  }
+
+  const fillRemainingRuleMatches = async () => {
+    setIsFillingRuleMatches(true)
+    try {
+      if (await onFillRemaining()) setRuleFillCount(0)
+    } catch (error) {
+      onError(error)
+    } finally {
+      setIsFillingRuleMatches(false)
     }
   }
 
@@ -415,9 +432,38 @@ function DraftRow({
         </div>
       </form>
       {ruleCreated && (
-        <p className="rule-created-message" role="status">
-          Rule created. Future matching imports will use it.
-        </p>
+        <div className="rule-created-message" role="status">
+          <strong>Rule created.</strong>
+          {ruleFillCount > 0 ? (
+            <>
+              <span>
+                It can also fill {ruleFillCount} other uncategorized {
+                  ruleFillCount === 1 ? 'row' : 'rows'
+                } in this import. Fill them now?
+              </span>
+              <span className="rule-created-actions">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  disabled={isFillingRuleMatches}
+                  onClick={() => void fillRemainingRuleMatches()}
+                >
+                  {isFillingRuleMatches
+                    ? 'Filling categories...'
+                    : `Fill remaining (${ruleFillCount})`}
+                </button>
+                <button
+                  className="text-button"
+                  type="button"
+                  disabled={isFillingRuleMatches}
+                  onClick={() => setRuleFillCount(0)}
+                >Not now</button>
+              </span>
+            </>
+          ) : (
+            <span>Future matching imports will use it.</span>
+          )}
+        </div>
       )}
       {isRuleEditorOpen && selectedCategoryId && (
         <form
@@ -532,6 +578,17 @@ export function ImportReviewPage() {
     const updated = await getImport(currentHousehold.id, selectedImportId)
     setDetail(updated)
     await refreshList(currentHousehold.id)
+  }
+
+  const handleRuleCreated = async () => {
+    if (!currentHousehold || !selectedImportId) return 0
+    await refreshDetail()
+    const preview = await getImportCategorizationRulePreview(
+      currentHousehold.id,
+      selectedImportId,
+    )
+    setRulePreview(preview)
+    return preview.fillChangedRows
   }
 
   useEffect(() => {
@@ -694,12 +751,12 @@ export function ImportReviewPage() {
   const handleApplyCategorizationRules = async (
     mode: RuleApplicationMode,
   ) => {
-    if (!detail || hasUnsavedRows) return
+    if (!detail || hasUnsavedRows) return false
     if (mode === 'reapply' && !window.confirm(
       `Reapply rules to ${reapplyRulePotentialCount} matching staged ${
         reapplyRulePotentialCount === 1 ? 'row' : 'rows'
       } that would change? Existing categories will be replaced.`,
-    )) return
+    )) return false
 
     setApplyingRuleMode(mode)
     setErrors([])
@@ -722,8 +779,10 @@ export function ImportReviewPage() {
           : `${result.changedRows} ${
             result.changedRows === 1 ? 'row was' : 'rows were'
           } changed; ${result.unchangedRows} stayed the same.`)
+      return true
     } catch (error) {
       setErrors(getErrorMessages(error))
+      return false
     } finally {
       setApplyingRuleMode(null)
     }
@@ -1119,6 +1178,8 @@ export function ImportReviewPage() {
                     canEdit={detail.canEdit}
                     isCompleted={detail.status === 'Completed'}
                     onChanged={refreshDetail}
+                    onRuleCreated={handleRuleCreated}
+                    onFillRemaining={() => handleApplyCategorizationRules('fill')}
                     onDirtyChange={handleDirtyChange}
                     onRemove={handleRemoveDraft}
                     onError={error => setErrors(getErrorMessages(error))}

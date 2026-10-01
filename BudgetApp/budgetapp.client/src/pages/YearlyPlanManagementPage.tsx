@@ -13,6 +13,7 @@ import {
   type YearlyPlanData,
 } from '../budgets/yearlyPlanApi'
 import { BrandLockup } from '../components/Brand'
+import { AmountCalculator } from '../components/AmountCalculator'
 import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
@@ -637,19 +638,27 @@ function TargetRow({
   })
   return <div className="yearly-target-row">
     <strong>{name}</strong>
-    <label className="currency-input">
-      <span>{currency}</span>
-      <input
-        type="number"
-        min="0"
-        step="10"
+    <div className="amount-entry-with-calculator">
+      <label className="currency-input">
+        <span>{currency}</span>
+        <input
+          type="number"
+          min="0"
+          step="10"
+          value={amount}
+          disabled={disabled}
+          onChange={event => onChange(event.target.value)}
+          onWheel={event => event.currentTarget.blur()}
+          aria-label={`${name} annual target`}
+        />
+      </label>
+      <AmountCalculator
+        label={`${name} annual target`}
         value={amount}
         disabled={disabled}
-        onChange={event => onChange(event.target.value)}
-        onWheel={event => event.currentTarget.blur()}
-        aria-label={`${name} annual target`}
+        onApply={onChange}
       />
-    </label>
+    </div>
     <div>
       <small>Equivalent monthly target</small>
       <strong>{monthly === null || !Number.isFinite(monthly)

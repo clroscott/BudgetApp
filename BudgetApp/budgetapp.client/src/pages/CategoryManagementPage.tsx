@@ -282,21 +282,27 @@ export function CategoryManagementPage() {
           )}
           <div className="category-name-block">
             {editingId === category.id ? (
-              <div className="inline-edit">
-                <input
-                  aria-label={`Rename ${category.name}`}
-                  value={editingName}
-                  maxLength={100}
-                  onChange={event => setEditingName(event.target.value)}
-                />
-                <button
-                  type="button"
-                  disabled={isSaving || !editingName.trim()}
-                  onClick={() => void handleRename(category.id)}
-                >Save</button>
-                <button className="text-button" type="button" onClick={() => setEditingId(null)}>
-                  Cancel
-                </button>
+              <div className="category-rename-editor">
+                <div className="inline-edit">
+                  <input
+                    aria-label={`Rename ${category.name}`}
+                    value={editingName}
+                    maxLength={100}
+                    onChange={event => setEditingName(event.target.value)}
+                  />
+                  <button
+                    type="button"
+                    disabled={isSaving || !editingName.trim()}
+                    onClick={() => void handleRename(category.id)}
+                  >Rename everywhere</button>
+                  <button className="text-button" type="button" onClick={() => setEditingId(null)}>
+                    Cancel
+                  </button>
+                </div>
+                <small>
+                  Existing transactions and budgets assigned to this category will show the new name.
+                  Imported descriptions and history will not change.
+                </small>
               </div>
             ) : (
               <>
