@@ -6,6 +6,7 @@ import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
+import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 import {
   downloadTransactionsCsv,
   getTransactions,
@@ -245,6 +246,10 @@ export function TransactionManagementPage() {
   )
   const isEditDirty = editingTransaction !== null && editRequest !== null &&
     JSON.stringify(editRequest) !== JSON.stringify(toEditRequest(editingTransaction))
+  useUnsavedChangesGuard(
+    isEditDirty,
+    'Discard the unsaved transaction changes?',
+  )
   const filterCategories = categories.filter(category =>
     !filters.categoryType || category.type === filters.categoryType)
   const filterSubcategories = categories.find(category =>
