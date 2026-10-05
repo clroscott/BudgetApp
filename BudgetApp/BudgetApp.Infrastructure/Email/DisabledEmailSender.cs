@@ -17,6 +17,8 @@ public sealed class DisabledEmailSender(
             "Email delivery is disabled; message for purpose {EmailPurpose} was not sent",
             message.Purpose);
 
-        return Task.CompletedTask;
+        throw new EmailDeliveryException(
+            "Email delivery is disabled.",
+            failureKind: EmailDeliveryFailureKind.Disabled);
     }
 }

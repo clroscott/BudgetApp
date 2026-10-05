@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using BudgetApp.Application.Email;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 
 namespace BudgetApp.Tests.Integration;
 
@@ -236,6 +239,38 @@ public sealed class AuthenticationTests(BudgetAppWebApplicationFactory factory)
             new { email, password = newPassword, rememberMe = false },
             await GetAntiforgeryToken(loginClient));
         Assert.Equal(HttpStatusCode.OK, newPasswordResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task PasswordRecovery_DeliveryFailureKeepsGenericResponseAndAccountUsable()
+    {
+        using var initializeDatabase = factory.CreateAuthenticatedTestClient();
+        using var failingHost = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender, FailingEmailSender>();
+        }));
+        using var client = failingHost.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
+        });
+        var email = $"failure-{Guid.NewGuid():N}@example.test";
+        const string password = "a long test password";
+        var registration = await PostWithAntiforgeryToken(client, "/api/auth/register",
+            new { email, password, displayName = "Recovery Failure" }, await GetAntiforgeryToken(client));
+        registration.EnsureSuccessStatusCode();
+
+        var known = await PostWithAntiforgeryToken(client, "/api/auth/forgot-password", new { email }, await GetAntiforgeryToken(client));
+        var unknown = await PostWithAntiforgeryToken(client, "/api/auth/forgot-password",
+            new { email = $"unknown-{Guid.NewGuid():N}@example.test" }, await GetAntiforgeryToken(client));
+
+        Assert.Equal(HttpStatusCode.Accepted, known.StatusCode);
+        Assert.Equal(known.StatusCode, unknown.StatusCode);
+        Assert.Equal(await known.Content.ReadAsStringAsync(), await unknown.Content.ReadAsStringAsync());
+        var login = await PostWithAntiforgeryToken(client, "/api/auth/login",
+            new { email, password, rememberMe = false }, await GetAntiforgeryToken(client));
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
     }
 
     private static Uri ExtractFirstUri(string text)

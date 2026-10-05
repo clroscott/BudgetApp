@@ -28,10 +28,14 @@ public sealed class EmailDispatchService(
         }
         catch (Exception exception)
         {
+            // Provider exceptions can include addresses, message content, or credentials.
+            // Log only our controlled failure category, never the raw exception.
             logger.LogError(
-                exception,
-                "Email dispatch failed for purpose {EmailPurpose}",
-                message.Purpose);
+                "Email dispatch failed for purpose {EmailPurpose}; failure category {EmailFailureKind}",
+                message.Purpose,
+                exception is EmailDeliveryException deliveryException
+                    ? deliveryException.FailureKind
+                    : EmailDeliveryFailureKind.Unspecified);
 
             return EmailDispatchResult.Failure();
         }
