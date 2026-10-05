@@ -44,11 +44,13 @@ public sealed class ApplicationEmailLinkBuilder(ApplicationUrlOptions options)
     private static Uri CreateBaseUri(string value)
     {
         if (!Uri.TryCreate(value, UriKind.Absolute, out var baseUri) ||
-            (baseUri.Scheme != Uri.UriSchemeHttps &&
-             baseUri.Scheme != Uri.UriSchemeHttp))
+            baseUri.Scheme != Uri.UriSchemeHttps ||
+            !string.IsNullOrEmpty(baseUri.UserInfo) ||
+            !string.IsNullOrEmpty(baseUri.Query) ||
+            !string.IsNullOrEmpty(baseUri.Fragment))
         {
             throw new InvalidOperationException(
-                "Application:PublicBaseUrl must be an absolute HTTP or HTTPS URL.");
+                "Application:PublicBaseUrl must be a clean absolute HTTPS URL.");
         }
 
         return new Uri(baseUri.AbsoluteUri.TrimEnd('/') + '/');

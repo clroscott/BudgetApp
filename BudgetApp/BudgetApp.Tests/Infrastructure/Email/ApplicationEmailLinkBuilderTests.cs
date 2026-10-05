@@ -30,12 +30,16 @@ public sealed class ApplicationEmailLinkBuilderTests
         Assert.Contains("token=invitation%20token", invitation);
     }
 
-    [Fact]
-    public void Constructor_RejectsNonHttpBaseUrl()
+    [Theory]
+    [InlineData("http://budget.example")]
+    [InlineData("file:///C:/BudgetApp")]
+    [InlineData("https://user:password@budget.example")]
+    [InlineData("https://budget.example?redirect=elsewhere")]
+    public void Constructor_RejectsUnsafeBaseUrl(string publicBaseUrl)
     {
         var options = new ApplicationUrlOptions
         {
-            PublicBaseUrl = "file:///C:/BudgetApp"
+            PublicBaseUrl = publicBaseUrl
         };
 
         Assert.Throws<InvalidOperationException>(
