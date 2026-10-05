@@ -2,8 +2,12 @@ using System.Net;
 using System.Net.Http.Json;
 using BudgetApp.Domain.Households;
 using BudgetApp.Infrastructure.Data;
+using BudgetApp.Application.Email;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace BudgetApp.Tests.Integration;
 
@@ -11,6 +15,41 @@ public sealed class HouseholdInvitationTests(
     BudgetAppWebApplicationFactory factory)
     : IClassFixture<BudgetAppWebApplicationFactory>
 {
+    [Fact]
+    public async Task Invitation_DeliveryFailurePreservesPendingInvitationAndResendDoesNotDuplicateIt()
+    {
+        using var initializeDatabase = factory.CreateAuthenticatedTestClient();
+        using var failingHost = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<IEmailSender>();
+            services.AddSingleton<IEmailSender, FailingEmailSender>();
+        }));
+        using var client = failingHost.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
+        });
+        var household = await RegisterAndCreateHousehold(client, $"owner-failure-{Guid.NewGuid():N}@example.test");
+        var recipient = $"invite-failure-{Guid.NewGuid():N}@example.test";
+
+        var create = await Post(client, $"/api/households/{household.Id}/invitations", new { email = recipient, role = "Viewer" });
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var created = (await create.Content.ReadFromJsonAsync<InvitationDispatchResponse>())!;
+        Assert.False(created.EmailDelivered);
+        var resend = await Post(client, $"/api/households/{household.Id}/invitations/{created.Invitation.Id}/resend", new { });
+        resend.EnsureSuccessStatusCode();
+        var resent = (await resend.Content.ReadFromJsonAsync<InvitationDispatchResponse>())!;
+        Assert.False(resent.EmailDelivered);
+        Assert.Equal(created.Invitation.Id, resent.Invitation.Id);
+
+        using var scope = failingHost.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        var stored = Assert.Single(await db.HouseholdInvitations.AsNoTracking()
+            .Where(item => item.HouseholdId == household.Id).ToListAsync());
+        Assert.Equal(HouseholdInvitationStatus.Pending, stored.Status);
+        Assert.Equal(1, await db.HouseholdMembers.CountAsync(member => member.HouseholdId == household.Id));
+    }
+
     [Fact]
     public async Task PendingInvitations_AppearForMatchingAccount_AndCanBeAcceptedWithoutToken()
     {

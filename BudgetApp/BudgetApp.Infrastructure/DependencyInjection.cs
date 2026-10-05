@@ -121,10 +121,11 @@ public static class DependencyInjection
     {
         var mode = emailOptions.DeliveryMode.Trim();
         if (!mode.Equals(EmailOptions.DisabledMode, StringComparison.OrdinalIgnoreCase) &&
-            !mode.Equals(EmailOptions.FileMode, StringComparison.OrdinalIgnoreCase))
+            !mode.Equals(EmailOptions.FileMode, StringComparison.OrdinalIgnoreCase) &&
+            !mode.Equals(EmailOptions.SmtpMode, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                "Email:DeliveryMode must be 'Disabled' or 'File'.");
+                "Email:DeliveryMode must be 'Disabled', 'File', or 'Smtp'.");
         }
 
         if (mode.Equals(EmailOptions.FileMode, StringComparison.OrdinalIgnoreCase) &&
@@ -132,6 +133,11 @@ public static class DependencyInjection
         {
             throw new InvalidOperationException(
                 "File email delivery is permitted only in the Development environment.");
+        }
+
+        if (mode.Equals(EmailOptions.SmtpMode, StringComparison.OrdinalIgnoreCase))
+        {
+            SmtpEmailSender.ValidateOptions(emailOptions);
         }
 
         services.AddSingleton(emailOptions);
@@ -143,6 +149,11 @@ public static class DependencyInjection
         if (mode.Equals(EmailOptions.FileMode, StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IEmailSender, FileEmailSender>();
+        }
+        else if (mode.Equals(EmailOptions.SmtpMode, StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<ISmtpClientFactory, SmtpClientFactory>();
+            services.AddSingleton<IEmailSender, SmtpEmailSender>();
         }
         else
         {

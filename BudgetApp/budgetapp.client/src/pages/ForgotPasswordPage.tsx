@@ -50,8 +50,8 @@ export function ForgotPasswordPage() {
               <span>{confirmation}</span>
             </div>
             <p className="auth-switch">
-              Development messages are written to the configured local email
-              outbox.
+              If the message hasn&apos;t arrived, check your junk or spam folder.
+              You can request new instructions if needed.
             </p>
           </>
         ) : (

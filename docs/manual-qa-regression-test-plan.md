@@ -101,13 +101,35 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] Protected pages redirect an unauthenticated visitor to login.
 - [ ] Password recovery always shows the same confirmation for existing and unknown
       email addresses.
-- [ ] An existing account produces a password-recovery message in the Development
-      email outbox.
+- [ ] An existing account produces a password-recovery message in the configured
+      File outbox or SMTP recipient inbox.
 - [ ] The recovery link uses the configured public base URL.
 - [ ] A valid recovery link resets the password and allows login with the new one.
 - [ ] An invalid or expired recovery token is rejected without changing the password.
 - [ ] No password, reset token, or secret is written to normal client-visible data or
       routine logs.
+
+## Email delivery
+
+- [ ] The Gmail setup script works from a different working directory, hides the
+      app password, and preserves the existing database connection secret.
+- [ ] File, Disabled, and SMTP modes take effect after restart.
+- [ ] With SMTP enabled, password recovery arrives at the existing test account's
+      real inbox; the link opens the configured frontend and resets the password.
+- [ ] An invitation arrives at the intended test inbox; acceptance, resend, and
+      revocation behave correctly with delivered links.
+- [ ] An invalid app password produces a controlled backend Authentication failure;
+      recovery keeps a generic response and invitations remain pending for Resend.
+- [ ] Disabled mode does not claim an invitation was delivered.
+- [ ] Provider acceptance is distinguished from inbox arrival: inspect spam/bounces
+      when a message is accepted but absent from the inbox.
+- [ ] A localhost link is tested on the host computer; any LAN/private link is tested
+      on the intended recipient device with trusted HTTPS.
+- [ ] Development user secrets are used by Visual Studio; the local deployed app
+      uses its own protected credential and backend environment settings.
+- [ ] No SMTP password, recipient address, message body, or token-bearing link is
+      present in routine logs, API configuration, or frontend assets.
+- [ ] Returning to File mode stops real sends and produces the expected local files.
 
 ## Security baseline
 
