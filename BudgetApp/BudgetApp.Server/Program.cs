@@ -12,6 +12,9 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(options =>
+    options.AddServerHeader = false);
+
 // Development must always use its local User Secrets configuration. Reload it
 // after the default providers so an inherited Production environment variable
 // cannot redirect Visual Studio to the real household database.
@@ -79,6 +82,12 @@ try
         };
     });
     builder.Services.AddAuthorization();
+    builder.Services.AddHsts(options =>
+    {
+        options.MaxAge = TimeSpan.FromDays(180);
+        options.IncludeSubDomains = false;
+        options.Preload = false;
+    });
     builder.Services.AddAntiforgery(options =>
     {
         options.HeaderName = "X-XSRF-TOKEN";
@@ -149,10 +158,18 @@ try
     app.UseDefaultFiles();
     app.MapStaticAssets();
 
+    app.UseMiddleware<SecurityHeadersMiddleware>();
+
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
+    }
+
+    if (!app.Environment.IsDevelopment() &&
+        !app.Environment.IsEnvironment("Testing"))
+    {
+        app.UseHsts();
     }
 
     app.UseHttpsRedirection();

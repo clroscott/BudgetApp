@@ -109,6 +109,29 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] No password, reset token, or secret is written to normal client-visible data or
       routine logs.
 
+## Security baseline
+
+- [ ] Production is reachable only over HTTPS with the intended trusted certificate.
+- [ ] Production responses include HSTS; Development does not pin its local hostname.
+- [ ] Responses include CSP, frame-denial, MIME-sniffing, referrer, and permissions
+      headers without breaking normal page behavior.
+- [ ] API responses containing account or financial data specify `Cache-Control:
+      no-store`.
+- [ ] The authentication cookie is host-only, Secure, HttpOnly, SameSite=Strict, and
+      does not contain a Domain attribute.
+- [ ] An authenticated POST, PUT, or DELETE without a valid antiforgery header fails.
+- [ ] Anonymous requests cannot read any household, personal, import, budget,
+      transaction, activity, dashboard, or tutorial endpoint.
+- [ ] A member cannot substitute another household, user, account, import, budget,
+      transaction, or invitation ID to cross an authorization boundary.
+- [ ] Repeated failed sign-ins trigger lockout/rate limiting without revealing whether
+      the email exists.
+- [ ] Oversized import and import-profile inspection files are rejected before parsing.
+- [ ] Application and error logs contain no passwords, bearer tokens, connection
+      strings, complete CSV rows, or unnecessary financial details.
+- [ ] Dependency and secret scanning are enabled and have no unresolved High/Critical
+      finding accepted without a documented decision.
+
 ## First-time user and household onboarding
 
 - [ ] A new uninvited user is guided to create a household.
