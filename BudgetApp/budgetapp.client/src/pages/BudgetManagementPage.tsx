@@ -17,6 +17,8 @@ import {
   type BudgetScope,
 } from '../budgets/budgetApi'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { PageLoadFeedback } from '../components/PageLoadFeedback'
+import { usePageLoad } from './usePageLoad'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
@@ -116,14 +118,16 @@ export function BudgetManagementPage() {
   const [amounts, setAmounts] = useState<Amounts>({})
   const [modes, setModes] = useState<Modes>({})
   const [savedSnapshot, setSavedSnapshot] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const [notice, setNotice] = useState<string | null>(null)
+  const loadState = usePageLoad(`${currentHousehold?.id}/${year}/${month}/${scope}`)
+  const { run, markReady, invalidate } = loadState
 
   const currentSnapshot = useMemo(() => snapshot(amounts), [amounts])
   const isDirty = Boolean(budget?.id) && currentSnapshot !== savedSnapshot
   const confirmDiscard = useUnsavedChangesGuard(isDirty, 'Discard your unsaved budget changes?')
-  const canManage = currentHousehold?.role !== 'Viewer'
+  const canManage = currentHousehold?.role !== 'Viewer' && loadState.isFresh
   const isClosed = budget?.status === 'Closed'
   const canEdit = canManage && Boolean(budget?.id) && !isClosed
 
@@ -133,17 +137,16 @@ export function BudgetManagementPage() {
     setAmounts(state.amounts)
     setModes(state.modes)
     setSavedSnapshot(snapshot(state.amounts))
-  }, [])
+    markReady()
+  }, [markReady])
 
   const loadBudget = useCallback(async () => {
     if (!currentHousehold) return
-    setIsLoading(true)
     setErrors([])
-    try {
-      const [loadedBudget, options] = await Promise.all([
+    return await run(() => Promise.all([
         getBudget(currentHousehold.id, year, month, scope),
         getBudgetMonthOptions(currentHousehold.id, scope),
-      ])
+      ]), ([loadedBudget, options]) => {
       applyBudget(loadedBudget)
       setBudgetOptions(options)
       const previous = new Date(year, month - 2, 1)
@@ -152,24 +155,20 @@ export function BudgetManagementPage() {
         option.month === previous.getMonth() + 1)
       const selected = preferred ?? options[0]
       setCopySource(selected ? `${selected.year}-${selected.month}` : '')
-    } catch (error) {
-      setErrors(getErrorMessages(error))
-      setBudget(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [applyBudget, currentHousehold, month, scope, year])
+    })
+  }, [applyBudget, currentHousehold, month, scope, year, run])
 
   useEffect(() => { void loadBudget() }, [loadBudget])
 
   if (!currentHousehold) return null
 
   const discardForSelection = () => {
-    setIsLoading(true)
+    invalidate()
     setBudget(null)
     setAmounts({})
     setModes({})
     setSavedSnapshot(snapshot({}))
+    setNotice(null)
   }
 
   const changePeriod = (nextYear: number, nextMonth: number) => {
@@ -190,6 +189,7 @@ export function BudgetManagementPage() {
   const handleCreate = async (
     method: 'blank' | 'copy' | 'from-recurring',
   ) => {
+    if (!canManage || isSaving || budget?.id) return
     setIsSaving(true)
     setErrors([])
     try {
@@ -217,13 +217,16 @@ export function BudgetManagementPage() {
   }
 
   const handleDeleteDraft = async () => {
-    if (!budget?.id || budget.status !== 'Draft' || !window.confirm(
+    if (!canManage || isSaving || !budget?.id || budget.status !== 'Draft' || !window.confirm(
       'Delete this draft budget and all of its amounts? This cannot be undone.',
     )) return
     setIsSaving(true)
     setErrors([])
     try {
       await deleteDraftBudget(currentHousehold.id, budget.id)
+      setNotice('Draft budget deleted. Reload the month if the updated view is unavailable.')
+      setBudget(null)
+      invalidate()
       await loadBudget()
     } catch (error) {
       setErrors(getErrorMessages(error))
@@ -233,7 +236,7 @@ export function BudgetManagementPage() {
   }
 
   const handleSave = async () => {
-    if (!budget?.id) return
+    if (!canEdit || isSaving || !budget?.id) return
     const lines = Object.entries(amounts)
       .filter(([, amount]) => amount.trim() !== '')
       .map(([categoryId, amount]) => ({ categoryId, budgetedAmount: Number(amount) }))
@@ -256,7 +259,7 @@ export function BudgetManagementPage() {
   const handleStatus = async (
     action: 'activate' | 'close' | 'return-to-draft' | 'reopen',
   ) => {
-    if (!budget?.id || isDirty) return
+    if (!canManage || isSaving || !budget?.id || isDirty) return
     if (action === 'close' && !window.confirm('Close this budget? It will become read-only.')) return
     if (action === 'return-to-draft' && !window.confirm(
       'Return this active budget to Draft? It can then be replaced from annual targets or deleted.',
@@ -289,6 +292,11 @@ export function BudgetManagementPage() {
       return next
     })
     setModes(current => ({ ...current, [rootId]: nextMode }))
+  }
+
+  const reloadBudget = () => {
+    if (isSaving || !confirmDiscard()) return
+    void loadBudget()
   }
 
   const total = budget?.categories.reduce((sum, root) => {
@@ -356,26 +364,31 @@ export function BudgetManagementPage() {
           <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time.</p>
             <p>Actuals follow “Include in budgets” on each transaction. Shared expenses can count
               in both scopes; your budget amounts remain separate.</p></div>
-          {budget?.status && <span className={`budget-status budget-status-${budget.status.toLowerCase()}`}>{budget.status}</span>}
+          {loadState.hasData && budget?.status && <span className={`budget-status budget-status-${budget.status.toLowerCase()}`}>{budget.status}</span>}
         </div>
         <BudgetingSectionNav current="monthly" />
 
         <section className="budget-period-panel" aria-label="Budget period">
-          <button className="secondary-button" type="button" onClick={() => changePeriod(year, month - 1)}>Previous</button>
-          <label>Month<select value={month} onChange={event => changePeriod(year, Number(event.target.value))}>
+          <button className="secondary-button" type="button" disabled={isSaving} onClick={() => changePeriod(year, month - 1)}>Previous</button>
+          <label>Month<select value={month} disabled={isSaving} onChange={event => changePeriod(year, Number(event.target.value))}>
             {monthNames.map((name, index) => <option value={index + 1} key={name}>{name}</option>)}
           </select></label>
-          <label>Year<input type="number" min="1" max="9999" value={year} onChange={event => changePeriod(Number(event.target.value), month)} /></label>
-          <label>Scope<select value={scope} onChange={event => handleScopeChange(event.target.value as BudgetScope)}>
+          <label>Year<input type="number" min="1" max="9999" value={year} disabled={isSaving} onChange={event => changePeriod(Number(event.target.value), month)} /></label>
+          <label>Scope<select value={scope} disabled={isSaving} onChange={event => handleScopeChange(event.target.value as BudgetScope)}>
             <option value="Household">Household</option><option value="Personal">Personal</option>
           </select></label>
-          <button className="secondary-button" type="button" onClick={() => changePeriod(now.getFullYear(), now.getMonth() + 1)}>Current month</button>
-          <button className="secondary-button" type="button" onClick={() => changePeriod(year, month + 1)}>Next</button>
+          <button className="secondary-button" type="button" disabled={isSaving} onClick={() => changePeriod(now.getFullYear(), now.getMonth() + 1)}>Current month</button>
+          <button className="secondary-button" type="button" disabled={isSaving} onClick={() => changePeriod(year, month + 1)}>Next</button>
         </section>
 
         <ErrorSummary errors={errors} />
+        {notice && <p role="status">{notice}</p>}
+        <PageLoadFeedback subject="budget" status={loadState.status} errors={loadState.errors}
+          disabled={isSaving} onReload={reloadBudget} />
 
-        {isLoading ? <p className="empty-state">Loading budget...</p> : !budget?.id ? (
+        {!loadState.hasData || !budget ? null : !budget.id && !loadState.isFresh ? (
+          <p className="empty-state">No budget was saved in the last successful response. Its current status is unavailable.</p>
+        ) : !budget.id ? (
           <div className="budget-empty-state"><div className="empty-state"><h2>No budget for {monthNames[month - 1]} {year}</h2><p>Choose how to start this {scope.toLowerCase()} budget.</p></div>{canManage && <div className="budget-initialization-grid"><article><h3>Copy an existing month</h3><p>Copy budget amounts and category detail from any existing {scope.toLowerCase()} budget.</p><label className="budget-copy-source"><span>Budget to copy</span><select value={copySource} disabled={budgetOptions.length === 0 || isSaving} onChange={event => setCopySource(event.target.value)}>{budgetOptions.length === 0 ? <option value="">No existing budgets</option> : budgetOptions.map(option => <option key={option.id} value={`${option.year}-${option.month}`}>{monthNames[option.month - 1]} {option.year} ({option.status})</option>)}</select></label><button className="secondary-button" type="button" disabled={isSaving || !copySource} onClick={() => void handleCreate('copy')}>Copy selected month</button></article><article><h3>Use recurring expenses</h3><p>Build category amounts from active recurring expenses that apply this month.</p><button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('from-recurring')}>Build from recurring expenses</button></article><article><h3>Start from scratch</h3><p>Create an empty draft and enter every amount yourself.</p><button className="primary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('blank')}>Create blank budget</button></article></div>}</div>
         ) : budget.categories.length === 0 ? (
           <div className="empty-state"><h2>No expense categories</h2><p>Add expense categories before entering budget amounts.</p><AppLink to="/settings/categories">Manage categories</AppLink></div>
@@ -407,10 +420,9 @@ export function BudgetManagementPage() {
           </>
         )}
       </section>
-        <section
+        {loadState.hasData && budget?.id && budget.categories.length > 0 && <section
           className="budget-save-bar"
           aria-label="Budget actions"
-          hidden={isLoading || !budget?.id || budget.categories.length === 0}
         >
           <div>
             <span>Monthly budget</span>
@@ -427,7 +439,7 @@ export function BudgetManagementPage() {
             {budget?.status === 'Closed' && canManage && <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleStatus('reopen')}>Reopen budget</button>}
             {canEdit && <button className="primary-button" type="button" disabled={isSaving || !isDirty} onClick={() => void handleSave()}>{isSaving ? 'Saving...' : 'Save budget'}</button>}
           </div>
-        </section>
+        </section>}
       </div>
     </main>
   )

@@ -16,6 +16,8 @@ import { BrandLockup } from '../components/Brand'
 import { AmountCalculator } from '../components/AmountCalculator'
 import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { PageLoadFeedback } from '../components/PageLoadFeedback'
+import { usePageLoad } from './usePageLoad'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
@@ -93,10 +95,11 @@ export function YearlyPlanManagementPage() {
   const [savedPlanStartMonth, setSavedPlanStartMonth] = useState(1)
   const [selectedPeriods, setSelectedPeriods] = useState<Set<string>>(new Set())
   const [replaceDrafts, setReplaceDrafts] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
+  const loadState = usePageLoad(`${currentHousehold?.id}/${year}/${scope}`)
+  const { run, markReady, invalidate } = loadState
 
   const currentSnapshot = useMemo(() => snapshot(amounts), [amounts])
   const isDirty = Boolean(plan) && (
@@ -106,7 +109,7 @@ export function YearlyPlanManagementPage() {
   const confirmDiscard = useUnsavedChangesGuard(
     isDirty || isDefaultDirty, 'Discard your unsaved annual targets or fiscal-year default changes?',
   )
-  const canManage = currentHousehold?.role !== 'Viewer'
+  const canManage = currentHousehold?.role !== 'Viewer' && loadState.isFresh && !isSaving
 
   const applyPlan = useCallback((data: YearlyPlanData, preserveDefault = false) => {
     const state = stateFromPlan(data)
@@ -120,27 +123,20 @@ export function YearlyPlanManagementPage() {
     setSelectedPeriods(new Set(
       fiscalMonths(data, data.fiscalYearStartMonth).map(fiscalPeriodKey),
     ))
-  }, [])
+    markReady()
+  }, [markReady])
 
   const load = useCallback(async () => {
     if (!currentHousehold) return
-    setIsLoading(true)
     setErrors([])
-    setNotice(null)
-    try {
-      const [loadedPlan, loadedBudgets] = await Promise.all([
+    return await run(() => Promise.all([
         getYearlyPlan(currentHousehold.id, year, scope),
         getBudgetMonthOptions(currentHousehold.id, scope),
-      ])
+      ]), ([loadedPlan, loadedBudgets]) => {
       applyPlan(loadedPlan)
       setBudgetOptions(loadedBudgets)
-    } catch (error) {
-      setErrors(getErrorMessages(error))
-      setPlan(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [applyPlan, currentHousehold, scope, year])
+    })
+  }, [applyPlan, currentHousehold, scope, year, run])
 
   useEffect(() => { void load() }, [load])
 
@@ -148,11 +144,12 @@ export function YearlyPlanManagementPage() {
 
   const changeSelection = (nextYear: number, nextScope: BudgetScope) => {
     if ((nextYear === year && nextScope === scope) || !confirmDiscard()) return
-    setIsLoading(true)
+    invalidate()
     setPlan(null)
     setAmounts({})
     setModes({})
     setSavedSnapshot(snapshot({}))
+    setNotice(null)
     setYear(nextYear)
     setScope(nextScope)
   }
@@ -175,6 +172,7 @@ export function YearlyPlanManagementPage() {
   }
 
   const handleSave = async () => {
+    if (!canManage) return
     const lines = Object.entries(amounts)
       .filter(([, amount]) => amount.trim() !== '')
       .map(([categoryId, amount]) => ({
@@ -204,6 +202,7 @@ export function YearlyPlanManagementPage() {
   }
 
   const handleDefaultMonth = async () => {
+    if (!canManage) return
     if (!window.confirm(
       `Use ${monthNames[defaultStartMonth - 1]} as the default start for new yearly plans? ` +
       'Existing yearly plans will not change.',
@@ -239,6 +238,7 @@ export function YearlyPlanManagementPage() {
   }
 
   const handleAllocate = async () => {
+    if (!canManage) return
     if (!plan?.id || isDirty) {
       setErrors(['Save annual targets before creating monthly budgets.'])
       return
@@ -275,12 +275,18 @@ export function YearlyPlanManagementPage() {
         `${result.createdCount} created, ${result.replacedDraftCount} draft ` +
         `replaced, and ${result.skippedCount} skipped.`,
       )
-      setBudgetOptions(await getBudgetMonthOptions(currentHousehold.id, scope))
+      // Allocation has already succeeded. A read retry must never allocate again.
+      await run(() => getBudgetMonthOptions(currentHousehold.id, scope), setBudgetOptions)
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const reloadPlan = () => {
+    if (isSaving || !confirmDiscard()) return
+    void load()
   }
 
   const periods = plan ? fiscalMonths(plan, planStartMonth) : []
@@ -352,6 +358,8 @@ export function YearlyPlanManagementPage() {
       <BudgetingSectionNav current="annual-targets" />
 
       <ErrorSummary errors={errors} />
+      <PageLoadFeedback subject="annual targets" status={loadState.status} errors={loadState.errors}
+        disabled={isSaving} onReload={reloadPlan} />
       {notice && <p className="success-message">{notice}</p>}
 
       <section className="panel yearly-plan-controls">
@@ -362,6 +370,7 @@ export function YearlyPlanManagementPage() {
             min="1"
             max="9998"
             value={year}
+            disabled={isSaving}
             onChange={event => {
               changeSelection(Number(event.target.value), scope)
             }}
@@ -370,11 +379,12 @@ export function YearlyPlanManagementPage() {
         <label>
           <span>Fiscal year begins</span>
           <select
-            value={planStartMonth}
+            value={loadState.hasData ? planStartMonth : ''}
             disabled={!canManage}
             onChange={event =>
               handlePlanStartMonthChange(Number(event.target.value))}
           >
+            {!loadState.hasData && <option value="">Unavailable</option>}
             {monthNames.map((name, index) =>
               <option key={name} value={index + 1}>{name}</option>)}
           </select>
@@ -386,6 +396,7 @@ export function YearlyPlanManagementPage() {
           <span>Scope</span>
           <select
             value={scope}
+            disabled={isSaving}
             onChange={event => {
               changeSelection(year, event.target.value as BudgetScope)
             }}
@@ -396,13 +407,13 @@ export function YearlyPlanManagementPage() {
         </label>
         <div className="yearly-plan-period">
           <span>Plan period</span>
-          <strong>{plan
+          <strong>{loadState.hasData && plan
             ? planPeriod(plan.fiscalYearStartYear, planStartMonth)
-            : 'Loading…'}</strong>
+            : 'Unavailable'}</strong>
         </div>
         <div className="yearly-plan-total">
           <span>Annual target total</span>
-          <strong>{currency.format(annualTotal)}</strong>
+          <strong>{loadState.hasData ? currency.format(annualTotal) : '—'}</strong>
         </div>
       </section>
 
@@ -415,10 +426,11 @@ export function YearlyPlanManagementPage() {
           </p>
         </div>
         <select
-          value={defaultStartMonth}
+          value={loadState.hasData ? defaultStartMonth : ''}
           disabled={!canManage || isSaving}
           onChange={event => setDefaultStartMonth(Number(event.target.value))}
         >
+          {!loadState.hasData && <option value="">Unavailable</option>}
           {monthNames.map((name, index) =>
             <option key={name} value={index + 1}>{name}</option>)}
         </select>
@@ -435,10 +447,13 @@ export function YearlyPlanManagementPage() {
         </button>
       </section>
 
-      {isLoading || !plan ? (
-        <p className="empty-state">Loading annual targets…</p>
-      ) : (
+      {loadState.hasData && plan && (
         <section className="yearly-target-sections">
+          {plan.categories.length === 0 && <div className="empty-state">
+            <h2>No expense categories</h2>
+            <p>Add expense categories before entering annual targets.</p>
+            <AppLink to="/settings/categories">Manage categories</AppLink>
+          </div>}
           {plan.categories.map(root => {
             const mode = modes[root.id] ?? 'overall'
             return <article className="budget-section" key={root.id}>
@@ -492,7 +507,7 @@ export function YearlyPlanManagementPage() {
         </section>
       )}
 
-      <section className="panel yearly-allocation-panel">
+      {loadState.isFresh && plan && <section className="panel yearly-allocation-panel">
         <div className="yearly-allocation-heading">
           <h2>Create monthly drafts</h2>
           <p>
@@ -617,11 +632,12 @@ export function YearlyPlanManagementPage() {
             onClick={() => void handleAllocate()}
           >Create selected drafts</button>
         </div>
-      </section>
+      </section>}
 
-      <div className="yearly-save-bar">
+      {loadState.hasData && plan && <div className="yearly-save-bar">
         <div>
-          <span>{isDirty ? 'Unsaved annual targets' : 'Annual targets saved'}</span>
+          <span>{!loadState.isFresh ? 'Previously loaded annual targets'
+            : isDirty ? 'Unsaved annual targets' : plan.id ? 'Annual targets saved' : 'No saved annual targets'}</span>
           <strong>{currency.format(annualTotal)}</strong>
         </div>
         <button
@@ -629,7 +645,7 @@ export function YearlyPlanManagementPage() {
           disabled={!canManage || isSaving || !isDirty}
           onClick={() => void handleSave()}
         >{isSaving ? 'Saving…' : 'Save annual targets'}</button>
-      </div>
+      </div>}
     </main>
   </div>
 }

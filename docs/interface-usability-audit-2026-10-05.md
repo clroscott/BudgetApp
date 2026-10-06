@@ -110,6 +110,13 @@ the original audited revision, not the updated behavior.
 **Medium. Pages:** Annual overview, Annual targets, Monthly budget, Household.
 **Issue:** [#176 Distinguish loading, empty, and failed page states](https://github.com/clroscott/BudgetApp/issues/176).
 
+**Implementation follow-up (#176):** These four pages now share explicit read
+feedback, same-context stale-data warnings, read-only retry controls, and guarded
+creation/allocation actions. Failed-save values remain protected, and confirmed
+writes can recover their view without repeating the write. Automated failure-path
+tests and permanent QA checks are included; live failure-injection sign-off is
+still required. See [page-load feedback](page-load-feedback.md).
+
 After a failed request, annual pages set their data to null but render Loading
 while it remains null. Monthly budget sets its data to null and offers No budget
 and creation actions. Household falls back to No household members were found.

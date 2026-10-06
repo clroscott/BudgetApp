@@ -1574,6 +1574,21 @@ a {
   max-width: 68rem;
 }
 
+.page-load-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.page-load-feedback h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.page-load-feedback button {
+  margin-top: 0.5rem;
+}
+
 .transaction-report-context,
 .transaction-active-filters,
 .transaction-matching-totals {
