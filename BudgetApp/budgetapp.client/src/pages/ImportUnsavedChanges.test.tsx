@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HouseholdContext } from '../households/householdContext'
 import { RouterProvider } from '../routing/RouterProvider'
@@ -112,35 +112,48 @@ describe('staged import edit protection', () => {
     await screen.findByRole('button', { name: 'Save all corrections (1)' })
     vi.mocked(bulkUpdateImportDrafts).mockResolvedValue({ savedRows: 1 })
     fireEvent.click(screen.getByRole('button', { name: 'Save all corrections (1)' }))
-    await waitFor(() => expect(bulkUpdateImportDrafts).toHaveBeenCalledWith('household-a', 'import-a', [
+    await screen.findByText('1 correction was saved.')
+    expect(bulkUpdateImportDrafts).toHaveBeenCalledWith('household-a', 'import-a', [
       expect.objectContaining({ draftId: 'row-a', includeInHouseholdBudget: false, includeInPersonalBudget: true }),
-    ]))
+    ])
   })
   it('supports current-page and all-matching choices across pagination', async () => {
     const batch = detail()
     batch.totalRows = 101
     batch.drafts = Array.from({ length: 101 }, (_, index) => ({ ...batch.drafts[0], id: `row-${index}`, sourceRowNumber: index + 2 }))
     vi.mocked(getImport).mockResolvedValue(batch)
-    show(<ImportReviewPage />)
-    await screen.findByLabelText('Bulk budget inclusion')
-    fireEvent.change(screen.getByLabelText('Apply to'), { target: { value: 'page' } })
-    fireEvent.change(screen.getByLabelText('Bulk budget inclusion'), { target: { value: 'PersonalAndHousehold' } })
+    const { container } = show(<ImportReviewPage />)
+    const preset = await screen.findByLabelText('Bulk budget inclusion') as HTMLSelectElement
+    await waitFor(() => expect(preset.disabled).toBe(false))
+    // A real 100-row page is intentionally retained. Scope accessibility queries
+    // to the small toolbars, rather than traversing thousands of row controls.
+    const bulkTools = within(preset.closest('section')!)
+    const prepareTools = within(container.querySelector<HTMLElement>('.import-control-group')!)
+    const pagination = within(container.querySelector<HTMLElement>('.import-pagination')!)
+    fireEvent.change(bulkTools.getByLabelText('Apply to'), { target: { value: 'page' } })
+    fireEvent.change(preset, { target: { value: 'PersonalAndHousehold' } })
     vi.mocked(window.confirm).mockReturnValue(true)
-    fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (100)' }))
-    await screen.findByRole('button', { name: 'Save all corrections (100)' })
-    fireEvent.click(screen.getByRole('button', { name: 'Next rows' }))
+    fireEvent.click(bulkTools.getByRole('button', { name: 'Apply budget choices (100)' }))
+    await prepareTools.findByRole('button', { name: 'Save all corrections (100)' })
+    fireEvent.click(pagination.getByRole('button', { name: 'Next rows' }))
     expect((await screen.findByLabelText('My personal budget') as HTMLInputElement).checked).toBe(false)
-    fireEvent.change(screen.getByLabelText('Apply to'), { target: { value: 'matching' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (1)' }))
-    await screen.findByRole('button', { name: 'Save all corrections (101)' })
+    fireEvent.change(bulkTools.getByLabelText('Apply to'), { target: { value: 'matching' } })
+    fireEvent.click(bulkTools.getByRole('button', { name: 'Apply budget choices (1)' }))
+    await prepareTools.findByRole('button', { name: 'Save all corrections (101)' })
+    const saved = { ...batch, drafts: batch.drafts.map(draft => ({ ...draft,
+      includeInPersonalBudget: true, includeInHouseholdBudget: true })) }
+    vi.mocked(getImport).mockResolvedValue(saved)
     vi.mocked(bulkUpdateImportDrafts).mockResolvedValue({ savedRows: 101 })
-    fireEvent.click(screen.getByRole('button', { name: 'Save all corrections (101)' }))
-    await waitFor(() => expect(bulkUpdateImportDrafts).toHaveBeenCalledOnce())
+    fireEvent.click(prepareTools.getByRole('button', { name: 'Save all corrections (101)' }))
+    // Await the complete save/refresh cycle; a mock invocation alone does not
+    // mean the asynchronous handler has finished before the next test starts.
+    await prepareTools.findByText('101 corrections were saved.')
+    expect(bulkUpdateImportDrafts).toHaveBeenCalledOnce()
     const updates = vi.mocked(bulkUpdateImportDrafts).mock.calls[0][2]
     expect(updates).toHaveLength(101)
     expect(new Set(updates.map(update => update.draftId)).size).toBe(101)
     expect(updates.every(update => update.includeInPersonalBudget && update.includeInHouseholdBudget)).toBe(true)
-  })
+  }, 15_000) // Only this real, full-page scenario needs extra headroom on CI.
   it('does not offer bulk controls for completed imports', async () => {
     const completed = detail()
     completed.status = 'Completed'
@@ -172,7 +185,9 @@ describe('staged import edit protection', () => {
   it('canceled route/import/filter changes keep corrections and the selected import', async () => {
     show(<ImportReviewPage />)
     const input = await screen.findByLabelText('Description') as HTMLInputElement
+    await waitFor(() => expect(input.disabled).toBe(false))
     fireEvent.change(input, { target: { value: 'Unsaved correction' } })
+    await screen.findByRole('button', { name: 'Save all corrections (1)' })
     fireEvent.click(screen.getByText('Leave page'))
     expect(window.confirm).toHaveBeenCalledTimes(1)
     fireEvent.change(screen.getByLabelText('Import'), { target: { value: 'import-b' } })
