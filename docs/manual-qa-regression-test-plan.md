@@ -195,6 +195,42 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] The learn-only tutorial highlights the correct controls and can be completed.
 - [ ] Coming-soon tutorials are clearly unavailable rather than appearing broken.
 
+## Interface acceptance checklist
+
+Use this short checklist for every new page or substantial workflow change. Run it
+as both a new and a returning user where applicable. Record Pass, Fail, or Not
+applicable; a source review alone is not a passed visual/keyboard test. See the
+[2026-10-05 interface audit](interface-usability-audit-2026-10-05.md) for the
+initial findings and pending live tasks.
+
+- [ ] The page title, current navigation item, household, and financial scope make
+      the user's current location and data context clear.
+- [ ] The main action and next step are understandable without reading a tutorial;
+      secondary/destructive actions are distinguishable and explain consequences.
+- [ ] Loading, successful empty results, stale data, and failed requests have
+      distinct messages. Failures stop loading and offer a safe recovery path.
+- [ ] Save progress and success are clear. Failed saves preserve entered values,
+      and retries do not create duplicate writes.
+- [ ] With dirty edits, test sidebar links, section links, Return to dashboard,
+      Back/Forward, sign-out, refresh/close, and household/year/scope changes.
+      Stay preserves values and context; Leave proceeds only after confirmation.
+- [ ] Report links preserve the intended period, scope, category, currency, and
+      budget-inclusion filters; results reconcile across all transaction pages.
+- [ ] Keyboard users can reach all intended controls, skip repeated navigation,
+      identify current location, and follow route changes with predictable focus.
+- [ ] Inputs and icons have meaningful accessible names; financial values retain
+      category/column meaning without relying only on color or indentation.
+- [ ] Dialogs, calculator popovers, and tutorials have usable keyboard dismissal
+      and focus return. A guided tour allows its intended target, not unrelated
+      background actions, and explains recovery when a target is unavailable.
+- [ ] Check desktop, narrow screens, 200% zoom, and navigation breakpoint widths
+      including 760px, 800px, and 880px; menus, tables, and tutorial targets remain usable.
+- [ ] Viewer, personal-scope, and multi-household cases explain permitted actions
+      without exposing another user's or household's data.
+- [ ] Help uses consistent terms: annual target, monthly equivalent, Draft,
+      protected month, staged import, and official transaction. Coming-soon actions
+      cannot be mistaken for working features.
+
 ## Accounts and recurring expenses
 
 - [ ] A shared account can be created, edited, archived, and reactivated.
