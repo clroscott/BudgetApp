@@ -136,6 +136,27 @@ describe('staged import edit protection', () => {
 })
 
 describe('pending CSV uploads', () => {
+  it.each(['profile-a', 'profile/other?download=true#"><img data-url-injection src=x>'])
+  ('renders a safe template link for selected profile %s', async profileId => {
+    vi.mocked(getImportProfiles).mockResolvedValue([{
+      id: profileId, name: 'Sample CSV profile', headers: ['Date', 'Description', 'Amount'],
+      dateColumn: 'Date', descriptionColumn: 'Description', amountColumn: 'Amount',
+      debitColumn: null, creditColumn: null, categoryColumn: null, subcategoryColumn: null,
+      amountConvention: 'SpendingPositive', defaultAccountId: null, isActive: true,
+    }])
+    show(<CsvImportPage />, '/import')
+    await screen.findByRole('option', { name: 'Sample CSV profile' })
+    fireEvent.change(screen.getByLabelText(/^CSV profile/), { target: { value: profileId } })
+    const link = await screen.findByRole('link', { name: 'Download selected profile template' })
+    expect(link.getAttribute('href'))
+      .toBe(`/api/households/household-a/import-profiles/${encodeURIComponent(profileId)}/template`)
+    const url = new URL((link as HTMLAnchorElement).href)
+    expect(url.origin).toBe(window.location.origin)
+    expect(url.search).toBe('')
+    expect(url.hash).toBe('')
+    expect(document.querySelector('[data-url-injection]')).toBeNull()
+  })
+
   it('protects a selected file before upload and clears protection after a successful upload', async () => {
     show(<CsvImportPage />, '/import')
     const fileInput = await screen.findByLabelText(/^CSV file/)

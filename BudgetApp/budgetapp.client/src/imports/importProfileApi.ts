@@ -28,7 +28,7 @@ export interface ImportProfileInspection {
 }
 
 const base = (householdId: string) =>
-  `/api/households/${householdId}/import-profiles`
+  `/api/households/${encodeURIComponent(householdId)}/import-profiles`
 
 export function getImportProfiles(
   householdId: string,
@@ -85,5 +85,5 @@ export function importProfileTemplateUrl(
   householdId: string,
   profileId: string,
 ) {
-  return `${base(householdId)}/${profileId}/template`
+  return `${base(householdId)}/${encodeURIComponent(profileId)}/template`
 }

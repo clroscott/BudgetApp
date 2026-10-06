@@ -555,7 +555,7 @@ export function YearlyPlanManagementPage() {
                 {impact.existingBudget ? (
                   <AppLink
                     className="yearly-allocation-budget-link"
-                    to={`/budgeting?year=${impact.year}&month=${impact.month}&scope=${scope}`}
+                    to={`/budgeting?year=${encodeURIComponent(impact.year)}&month=${encodeURIComponent(impact.month)}&scope=${encodeURIComponent(scope)}`}
                     title={`Open the ${impact.monthLabel} ${scope.toLowerCase()} budget`}
                   >
                     <time>{impact.monthLabel}</time>

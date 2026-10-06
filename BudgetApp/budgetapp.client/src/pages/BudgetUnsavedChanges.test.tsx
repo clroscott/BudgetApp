@@ -92,6 +92,50 @@ describe('monthly budget guard integration', () => {
 })
 
 describe('annual targets and independent default setting', () => {
+  it.each(['Household', 'Personal'])('links an existing monthly budget with its year, month, and %s scope', async scope => {
+    vi.mocked(getBudgetMonthOptions).mockResolvedValue([
+      { id: 'budget-a', year: 2026, month: 1, status: 'Active' },
+    ])
+    show(<YearlyPlanManagementPage />, '/budgeting/annual-targets')
+    await screen.findByLabelText('Housing overall annual target')
+    if (scope === 'Personal') {
+      fireEvent.change(screen.getByLabelText('Scope'), { target: { value: scope } })
+    }
+    const link = await screen.findByRole('link', { name: /Open existing budget/ })
+    expect(link.getAttribute('href')).toBe(`/budgeting?year=2026&month=1&scope=${scope}`)
+    fireEvent.click(link)
+    expect(window.location.pathname).toBe('/budgeting')
+    expect(new URLSearchParams(window.location.search).get('scope')).toBe(scope)
+    expect(window.confirm).not.toHaveBeenCalled()
+  })
+
+  it('encodes DOM-sourced scope text instead of letting it inject query parameters or markup', async () => {
+    vi.mocked(getBudgetMonthOptions).mockResolvedValue([
+      { id: 'budget-a', year: 2026, month: 1, status: 'Active' },
+    ])
+    show(<YearlyPlanManagementPage />, '/budgeting/annual-targets')
+    await screen.findByLabelText('Housing overall annual target')
+    const scopeSelect = screen.getByLabelText('Scope') as HTMLSelectElement
+    // A TypeScript cast does not sanitize DOM values. Exercise the exact source
+    // from the CodeQL trace, including URL delimiters and HTML-looking text.
+    const scopeText = 'Household&year=1999#"><img data-url-injection src=x onerror=alert(1)>'
+    scopeSelect.add(new Option('Unexpected scope', scopeText))
+    fireEvent.change(scopeSelect, { target: { value: scopeText } })
+    const link = await screen.findByRole('link', { name: /Open existing budget/ })
+    const url = new URL((link as HTMLAnchorElement).href)
+    expect(url.origin).toBe(window.location.origin)
+    expect(url.pathname).toBe('/budgeting')
+    const parameterNames: string[] = []
+    url.searchParams.forEach((_value, name) => parameterNames.push(name))
+    expect(parameterNames).toEqual(['year', 'month', 'scope'])
+    expect(url.searchParams.get('year')).toBe('2026')
+    expect(url.searchParams.get('month')).toBe('1')
+    expect(url.searchParams.get('scope')).toBe(scopeText)
+    expect(url.hash).toBe('')
+    expect(link.getAttribute('href')).not.toContain('<')
+    expect(document.querySelector('[data-url-injection]')).toBeNull()
+  })
+
   it('does not warn while initially loading or after loading unchanged values', async () => {
     show(<YearlyPlanManagementPage />, '/budgeting/annual-targets')
     const loadingEvent = new Event('beforeunload', { cancelable: true })

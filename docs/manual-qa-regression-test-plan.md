@@ -153,6 +153,14 @@ Run this shorter section before every merge, even when the change appears isolat
       strings, complete CSV rows, or unnecessary financial details.
 - [ ] Dependency and secret scanning are enabled and have no unresolved High/Critical
       finding accepted without a documented decision.
+- [ ] CodeQL has analyzed the current PR commit. New High/Critical findings are
+      resolved or have a documented, reviewed disposition before merging.
+- [ ] Annual-target links to existing monthly budgets open the correct year, month,
+      and Household/Personal scope. Selected CSV profile templates download from
+      the current household's internal template endpoint.
+- [ ] URL-encoding regression tests pass: delimiter/HTML-looking dropdown values
+      stay within their encoded query value or path segment, do not add markup,
+      and do not inject extra query parameters or fragments (#157 security follow-up).
 
 ## First-time user and household onboarding
 
