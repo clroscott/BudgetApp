@@ -21,6 +21,8 @@ import {
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
+import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
+import { useUnsavedNativeForm } from '../routing/useUnsavedForm'
 
 const categoryTypes: CategoryType[] = ['Expense', 'Income', 'Transfer']
 type DropPosition = 'before' | 'after'
@@ -76,6 +78,16 @@ export function CategoryManagementPage() {
   } | null>(null)
 
   const canManage = currentHousehold?.role !== 'Viewer'
+  const editedCategory = categories.flatMap(root => [root, ...root.children])
+    .find(category => category.id === editingId)
+  const confirmRenameDiscard = useUnsavedChangesGuard(
+    Boolean(editedCategory) && editingName !== editedCategory?.name,
+    'Discard your unsaved category name changes?',
+  )
+  const confirmSubcategoryDiscard = useUnsavedChangesGuard(
+    Boolean(addingToId) && subcategoryName !== '', 'Discard the new subcategory details?',
+  )
+  const createGuard = useUnsavedNativeForm('Discard the new category details you entered?')
 
   const loadCategories = useCallback(async (showLoadingState = true) => {
     if (!currentHousehold) {
@@ -131,6 +143,7 @@ export function CategoryManagementPage() {
     }))
     if (succeeded) {
       form.reset()
+      createGuard.markClean()
     }
   }
 
@@ -295,7 +308,9 @@ export function CategoryManagementPage() {
                     disabled={isSaving || !editingName.trim()}
                     onClick={() => void handleRename(category.id)}
                   >Rename everywhere</button>
-                  <button className="text-button" type="button" onClick={() => setEditingId(null)}>
+                  <button className="text-button" type="button" onClick={() => {
+                    if (confirmRenameDiscard()) setEditingId(null)
+                  }}>
                     Cancel
                   </button>
                 </div>
@@ -320,6 +335,7 @@ export function CategoryManagementPage() {
               type="button"
               disabled={isSaving}
               onClick={() => {
+                if (!confirmRenameDiscard()) return
                 setEditingId(category.id)
                 setEditingName(category.name)
               }}
@@ -330,6 +346,7 @@ export function CategoryManagementPage() {
                 type="button"
                 disabled={isSaving}
                 onClick={() => {
+                  if (addingToId === category.id || !confirmSubcategoryDiscard()) return
                   setAddingToId(category.id)
                   setSubcategoryName('')
                 }}
@@ -381,7 +398,7 @@ export function CategoryManagementPage() {
         <ErrorSummary errors={errors} />
 
         {canManage && (
-          <form className="add-category-form" onSubmit={(event) => void handleCreateRoot(event)}>
+          <form {...createGuard.formProps} className="add-category-form" onSubmit={(event) => void handleCreateRoot(event)}>
             <div>
               <label htmlFor="new-category-name">New root category</label>
               <input id="new-category-name" name="name" maxLength={100} required />
@@ -433,7 +450,9 @@ export function CategoryManagementPage() {
                             disabled={isSaving || !subcategoryName.trim()}
                             onClick={() => void handleCreateSubcategory(root.id)}
                           >Add</button>
-                          <button className="text-button" type="button" onClick={() => setAddingToId(null)}>
+                          <button className="text-button" type="button" onClick={() => {
+                            if (confirmSubcategoryDiscard()) setAddingToId(null)
+                          }}>
                             Cancel
                           </button>
                         </div>

@@ -15,6 +15,7 @@ import {
   type SaveImportProfile,
 } from '../imports/importProfileApi'
 import { AppLink } from '../routing/AppLink'
+import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 
 const maxFileSizeBytes = 10 * 1024 * 1024
 const standardCsvHeaders = new Set([
@@ -51,6 +52,9 @@ export function CsvImportPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [result, setResult] = useState<CsvImportResult | null>(null)
+  const confirmDiscard = useUnsavedChangesGuard(
+    Boolean(selectedFile) && !result, 'Leave your CSV upload or mapping before it has been imported?',
+  )
 
   useEffect(() => {
     if (!currentHousehold) {
@@ -225,7 +229,13 @@ export function CsvImportPage() {
               <span>Import into account</span>
               <select
                 value={selectedAccountId}
-                onChange={event => setSelectedAccountId(event.target.value)}
+                onChange={event => {
+                  if (mapping && !confirmDiscard()) return
+                  setSelectedAccountId(event.target.value)
+                  setInspection(null)
+                  setMapping(null)
+                  setResult(null)
+                }}
               >
                 {accounts.map(account => (
                   <option key={account.id} value={account.id}>
@@ -240,6 +250,9 @@ export function CsvImportPage() {
               <input
                 type="file"
                 accept=".csv,text/csv"
+                onClick={event => {
+                  if (mapping && !confirmDiscard()) event.preventDefault()
+                }}
                 onChange={event => {
                   setSelectedFile(event.target.files?.[0] ?? null)
                   setInspection(null)
@@ -253,7 +266,13 @@ export function CsvImportPage() {
             <label>
               <span>CSV profile</span>
               <select value={selectedProfileId}
-                onChange={event => setSelectedProfileId(event.target.value)}>
+                onChange={event => {
+                  if (mapping && !confirmDiscard()) return
+                  setSelectedProfileId(event.target.value)
+                  setInspection(null)
+                  setMapping(null)
+                  setResult(null)
+                }}>
                 <option value="">Standard format / detect automatically</option>
                 {profiles.map(profile => <option key={profile.id} value={profile.id}>
                   {profile.name}

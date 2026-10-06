@@ -246,7 +246,7 @@ export function TransactionManagementPage() {
   )
   const isEditDirty = editingTransaction !== null && editRequest !== null &&
     JSON.stringify(editRequest) !== JSON.stringify(toEditRequest(editingTransaction))
-  useUnsavedChangesGuard(
+  const confirmDiscard = useUnsavedChangesGuard(
     isEditDirty,
     'Discard the unsaved transaction changes?',
   )
@@ -266,9 +266,7 @@ export function TransactionManagementPage() {
   }
 
   const confirmDiscardEdit = () => {
-    if (isEditDirty && !window.confirm('Discard the unsaved transaction changes?')) {
-      return false
-    }
+    if (!confirmDiscard()) return false
     cancelEditing()
     return true
   }

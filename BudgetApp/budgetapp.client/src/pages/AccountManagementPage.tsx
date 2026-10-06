@@ -15,6 +15,7 @@ import { ErrorSummary } from '../components/ErrorSummary'
 import { currencies } from '../finance/currencies'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
+import { useUnsavedForm, useUnsavedNativeForm } from '../routing/useUnsavedForm'
 
 const accountTypes: AccountType[] = [
   'Chequing',
@@ -41,6 +42,8 @@ export function AccountManagementPage() {
   const [showArchived, setShowArchived] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<UpdateAccountRequest | null>(null)
+  const editGuard = useUnsavedForm(editDraft, 'Discard your unsaved account changes?')
+  const createGuard = useUnsavedNativeForm('Discard the new account details you entered?')
 
   const canManageHouseholdAccounts = currentHousehold?.role !== 'Viewer'
   const currencyOptions = currencies.includes(currentHousehold?.defaultCurrency ?? '')
@@ -106,19 +109,23 @@ export function AccountManagementPage() {
 
     if (succeeded) {
       form.reset()
+      createGuard.markClean()
     }
   }
 
   const beginEdit = (account: AccountItem) => {
+    if (editingId === account.id || !editGuard.confirmDiscard()) return
     setEditingId(account.id)
-    setEditDraft({
+    const next: UpdateAccountRequest = {
       name: account.name,
       type: account.type,
       scope: account.scope,
       currency: account.currency,
       institutionName: account.institutionName ?? '',
       lastFourDigits: account.lastFourDigits ?? '',
-    })
+    }
+    setEditDraft(next)
+    editGuard.markClean(next)
   }
 
   const handleUpdate = async (accountId: string) => {
@@ -134,6 +141,7 @@ export function AccountManagementPage() {
     if (succeeded) {
       setEditingId(null)
       setEditDraft(null)
+      editGuard.markClean(null)
     }
   }
 
@@ -247,8 +255,10 @@ export function AccountManagementPage() {
                 type="button"
                 disabled={isSaving}
                 onClick={() => {
+                  if (!editGuard.confirmDiscard()) return
                   setEditingId(null)
                   setEditDraft(null)
+                  editGuard.markClean(null)
                 }}
               >Cancel</button>
             </div>
@@ -320,7 +330,7 @@ export function AccountManagementPage() {
 
         <ErrorSummary errors={errors} />
 
-        <form className="add-account-form" onSubmit={(event) => void handleCreate(event)}>
+        <form {...createGuard.formProps} className="add-account-form" onSubmit={(event) => void handleCreate(event)}>
           <div className="account-form-heading">
             <div>
               <h2>Add account</h2>

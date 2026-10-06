@@ -87,10 +87,10 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     const stepIndex = resume && saved?.status === 'InProgress'
       ? Math.min(saved.currentStepIndex, tutorial.steps.length - 1)
       : 0
+    if (!navigate(tutorial.steps[stepIndex].route)) return
     setActiveTutorial(tutorial)
     setActiveStepIndex(stepIndex)
     await record(tutorial, 'InProgress', stepIndex)
-    navigate(tutorial.steps[stepIndex].route)
   }, [navigate, progress, record])
 
   const dismiss = useCallback(async (tutorialKey: string) => {
@@ -109,15 +109,15 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
   const moveTo = useCallback(async (stepIndex: number) => {
     if (!activeTutorial) return
     if (stepIndex >= activeTutorial.steps.length) {
+      if (!navigate('/tutorials')) return
       await record(activeTutorial, 'Completed', activeTutorial.steps.length - 1)
       setActiveTutorial(null)
-      navigate('/tutorials')
       return
     }
     const nextIndex = Math.max(0, stepIndex)
+    if (!navigate(activeTutorial.steps[nextIndex].route)) return
     setActiveStepIndex(nextIndex)
     await record(activeTutorial, 'InProgress', nextIndex)
-    navigate(activeTutorial.steps[nextIndex].route)
   }, [activeTutorial, navigate, record])
 
   const next = useCallback(

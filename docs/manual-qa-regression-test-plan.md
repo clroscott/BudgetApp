@@ -195,6 +195,52 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] The learn-only tutorial highlights the correct controls and can be completed.
 - [ ] Coming-soon tutorials are clearly unavailable rather than appearing broken.
 
+## Unsaved-change protection regression (#157)
+
+Use disposable Development or Scratch data. These are manual checks to run, not a
+record that browser testing has already passed. The shared implementation is
+described in [the unsaved-change protection guide](unsaved-change-protection.md).
+
+Repeat the relevant checks for monthly budgets, annual targets and the household
+fiscal-year default, transaction edits, staged import corrections, CSV uploads,
+accounts, categories/subcategories, categorization rules, CSV import profiles,
+recurring expenses, invitation forms, and household creation/setup.
+
+- [ ] Opening a page or an existing editor without changing values does not warn.
+- [ ] Changing a value, then returning it to its original value, removes the warning.
+- [ ] With unsaved values, try a sidebar link, section link, and Return to dashboard.
+      Cancel keeps the values, page, URL, and selection; Leave prompts once and navigates.
+- [ ] Try browser Back and Forward with unsaved values. Cancel restores the current
+      URL and values without adding duplicate history entries; subsequent Back and
+      Forward still work after leaving or saving.
+- [ ] Cancel a household switch. The header, stored household choice, and editor
+      stay in the original household. Accept a switch and verify the new household
+      loads without carrying unsaved values into it. Selecting the same household
+      does not warn.
+- [ ] Cancel sign-out and verify no logout happens. Accept sign-out and verify it
+      prompts once; a failed logout leaves the editor protected.
+- [ ] Cancel monthly budget month/year/scope changes and annual plan year/scope
+      changes. Values and selections remain unchanged. Accept and verify the newly
+      selected data loads. Selecting the existing value does not warn.
+- [ ] Cancel replacing an edited row, canceling an editor, or resetting a form.
+      Entered values remain. Accept and verify only the intended editor is discarded.
+- [ ] A successful save clears that editor's warning. A failed save retains values
+      and the warning so the user can retry. Saving one form does not clear another
+      dirty form on the same page.
+- [ ] On annual targets, saving the household fiscal-year default preserves unsaved
+      target amounts. Saving targets preserves an unsaved household default.
+- [ ] On import review, cancel row Refresh and navigation/filter/import changes
+      while corrections are unsaved. Explicitly clear a category, hide and reveal
+      that row, and verify it remains cleared. Failed bulk saves remain protected.
+- [ ] A selected CSV file is protected before upload. A successfully uploaded file
+      ready for review no longer triggers the unsaved-upload warning.
+- [ ] Refresh or close a tab after interacting with a dirty form. Where the browser
+      permits it, its native warning appears; Cancel keeps the page. Repeat after
+      saving and verify there is no unsaved-change warning. Native warning text is
+      controlled by the browser, not BudgetApp.
+- [ ] Complete or exit a tutorial with a dirty editor. Canceling navigation does not
+      advance or complete the tutorial. Normal tutorial navigation still works.
+
 ## Interface acceptance checklist
 
 Use this short checklist for every new page or substantial workflow change. Run it

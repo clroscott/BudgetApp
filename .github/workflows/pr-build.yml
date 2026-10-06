@@ -53,3 +53,7 @@ jobs:
       - name: Build client
         working-directory: BudgetApp/budgetapp.client
         run: npm run build
+
+      - name: Test client navigation and forms
+        working-directory: BudgetApp/budgetapp.client
+        run: npm test

@@ -17,6 +17,7 @@ import {
   type RecurringExpenseScope,
 } from '../recurringExpenses/recurringExpenseApi'
 import { AppLink } from '../routing/AppLink'
+import { useUnsavedForm } from '../routing/useUnsavedForm'
 
 interface ExpenseDraft {
   name: string
@@ -75,6 +76,8 @@ export function RecurringExpenseManagementPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const createGuard = useUnsavedForm(createDraft, 'Discard the new recurring expense details?')
+  const editGuard = useUnsavedForm(editDraft, 'Discard your unsaved recurring expense changes?')
 
   const load = useCallback(async () => {
     if (!currentHousehold) return
@@ -125,12 +128,17 @@ export function RecurringExpenseManagementPage() {
     const succeeded = await performChange(() => createRecurringExpense(
       currentHousehold.id, toRequest(createDraft),
     ))
-    if (succeeded) setCreateDraft(emptyDraft(defaultScope))
+    if (succeeded) {
+      const next = emptyDraft(defaultScope)
+      setCreateDraft(next)
+      createGuard.markClean(next)
+    }
   }
 
   const beginEdit = (expense: RecurringExpenseItem) => {
+    if (editingId === expense.id || !editGuard.confirmDiscard()) return
     setEditingId(expense.id)
-    setEditDraft({
+    const next: ExpenseDraft = {
       name: expense.name,
       amount: String(expense.amount),
       scope: expense.scope,
@@ -140,7 +148,9 @@ export function RecurringExpenseManagementPage() {
       expectedDayOfMonth: expense.expectedDayOfMonth?.toString() ?? '',
       startsOn: expense.startsOn,
       endsOn: expense.endsOn ?? '',
-    })
+    }
+    setEditDraft(next)
+    editGuard.markClean(next)
   }
 
   const handleUpdate = async (id: string) => {
@@ -151,11 +161,19 @@ export function RecurringExpenseManagementPage() {
     if (succeeded) {
       setEditingId(null)
       setEditDraft(null)
+      editGuard.markClean(null)
     }
   }
 
   const canChange = (expense: RecurringExpenseItem) =>
     expense.scope === 'Personal' || canManageHousehold
+
+  const cancelEdit = () => {
+    if (!editGuard.confirmDiscard()) return
+    setEditingId(null)
+    setEditDraft(null)
+    editGuard.markClean(null)
+  }
 
   const renderFields = (
     draft: ExpenseDraft,
@@ -192,7 +210,7 @@ export function RecurringExpenseManagementPage() {
       <ErrorSummary errors={errors} />
       <div className="recurring-summary"><div><span>Household monthly</span><strong>{formatMoney(monthlyTotal('Household'))}</strong></div><div><span>My personal monthly</span><strong>{formatMoney(monthlyTotal('Personal'))}</strong></div></div>
       <form className="recurring-form" onSubmit={event => void handleCreate(event)}><div className="recurring-form-heading"><div><h2>Add recurring expense</h2><p>This creates an expectation, not a transaction.</p></div><span className="currency-pill">{currentHousehold.defaultCurrency}</span></div>{renderFields(createDraft, setCreateDraft)}<button className="primary-button account-submit" type="submit" disabled={isSaving}>Add recurring expense</button></form>
-      {isLoading ? <p className="empty-state">Loading recurring expenses...</p> : visibleExpenses.length === 0 ? <div className="empty-state"><h2>No recurring expenses to show</h2><p>Add a monthly item or show deactivated items.</p></div> : <div className="recurring-list">{visibleExpenses.map(expense => <article className={`recurring-card${expense.isActive ? '' : ' inactive-row'}`} key={expense.id}>{editingId === expense.id && editDraft ? <div className="recurring-edit-form">{renderFields(editDraft, setEditDraft)}<div className="account-actions"><button type="button" disabled={isSaving || !editDraft.name.trim()} onClick={() => void handleUpdate(expense.id)}>Save changes</button><button className="text-button" type="button" disabled={isSaving} onClick={() => { setEditingId(null); setEditDraft(null) }}>Cancel</button></div></div> : <><div className="recurring-card-main"><div><div className="account-name-line"><h3>{expense.name}</h3>{!expense.isActive && <span className="status-pill">Deactivated</span>}</div><p>{expense.categoryName} → {expense.subcategoryName}</p><small>{expense.scope} · {expense.budgetMode} budget{expense.accountName ? ` · ${expense.accountName}` : ''}{expense.expectedDayOfMonth ? ` · Expected day ${expense.expectedDayOfMonth}` : ''}</small><small>From {expense.startsOn}{expense.endsOn ? ` through ${expense.endsOn}` : ''}</small></div><strong>{formatMoney(expense.amount)}<small>/month</small></strong></div>{canChange(expense) && <div className="account-actions"><button className="text-button" type="button" disabled={isSaving} onClick={() => beginEdit(expense)}>Edit</button><button className="text-button" type="button" disabled={isSaving} onClick={() => void performChange(() => setRecurringExpenseActive(currentHousehold.id, expense.id, !expense.isActive))}>{expense.isActive ? 'Deactivate' : 'Reactivate'}</button></div>}</>}</article>)}</div>}
+      {isLoading ? <p className="empty-state">Loading recurring expenses...</p> : visibleExpenses.length === 0 ? <div className="empty-state"><h2>No recurring expenses to show</h2><p>Add a monthly item or show deactivated items.</p></div> : <div className="recurring-list">{visibleExpenses.map(expense => <article className={`recurring-card${expense.isActive ? '' : ' inactive-row'}`} key={expense.id}>{editingId === expense.id && editDraft ? <div className="recurring-edit-form">{renderFields(editDraft, setEditDraft)}<div className="account-actions"><button type="button" disabled={isSaving || !editDraft.name.trim()} onClick={() => void handleUpdate(expense.id)}>Save changes</button><button className="text-button" type="button" disabled={isSaving} onClick={cancelEdit}>Cancel</button></div></div> : <><div className="recurring-card-main"><div><div className="account-name-line"><h3>{expense.name}</h3>{!expense.isActive && <span className="status-pill">Deactivated</span>}</div><p>{expense.categoryName} → {expense.subcategoryName}</p><small>{expense.scope} · {expense.budgetMode} budget{expense.accountName ? ` · ${expense.accountName}` : ''}{expense.expectedDayOfMonth ? ` · Expected day ${expense.expectedDayOfMonth}` : ''}</small><small>From {expense.startsOn}{expense.endsOn ? ` through ${expense.endsOn}` : ''}</small></div><strong>{formatMoney(expense.amount)}<small>/month</small></strong></div>{canChange(expense) && <div className="account-actions"><button className="text-button" type="button" disabled={isSaving} onClick={() => beginEdit(expense)}>Edit</button><button className="text-button" type="button" disabled={isSaving} onClick={() => void performChange(() => setRecurringExpenseActive(currentHousehold.id, expense.id, !expense.isActive))}>{expense.isActive ? 'Deactivate' : 'Reactivate'}</button></div>}</>}</article>)}</div>}
     </section>
   </main>
 }

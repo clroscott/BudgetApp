@@ -1,26 +1,16 @@
-import { useEffect } from 'react'
+import { useCallback, useLayoutEffect, useRef } from 'react'
 import { useRouter } from './useRouter'
 
 export function useUnsavedChangesGuard(isDirty: boolean, message: string) {
-  const { setNavigationBlocker } = useRouter()
+  const { registerNavigationGuard } = useRouter()
+  const current = useRef({ isDirty, message })
+  useLayoutEffect(() => { current.current = { isDirty, message } }, [isDirty, message])
+  useLayoutEffect(() => registerNavigationGuard(() =>
+    current.current.isDirty ? current.current.message : null,
+  ), [registerNavigationGuard])
 
-  useEffect(() => {
-    if (!isDirty) {
-      setNavigationBlocker(null)
-      return
-    }
-
-    const confirmNavigation = () => window.confirm(message)
-    setNavigationBlocker(confirmNavigation)
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-    }
-    window.addEventListener('beforeunload', handleBeforeUnload)
-
-    return () => {
-      setNavigationBlocker(null)
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  }, [isDirty, message, setNavigationBlocker])
+  // Local changes (switching the edited row, month, etc.) discard only this
+  // editor. Route/household changes consult every registered editor instead.
+  return useCallback(() => !current.current.isDirty ||
+    window.confirm(current.current.message), [])
 }

@@ -19,6 +19,7 @@ import {
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
+import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 
 type SectionMode = 'overall' | 'detailed'
 type Amounts = Record<string, string>
@@ -121,6 +122,7 @@ export function BudgetManagementPage() {
 
   const currentSnapshot = useMemo(() => snapshot(amounts), [amounts])
   const isDirty = Boolean(budget?.id) && currentSnapshot !== savedSnapshot
+  const confirmDiscard = useUnsavedChangesGuard(isDirty, 'Discard your unsaved budget changes?')
   const canManage = currentHousehold?.role !== 'Viewer'
   const isClosed = budget?.status === 'Closed'
   const canEdit = canManage && Boolean(budget?.id) && !isClosed
@@ -160,28 +162,29 @@ export function BudgetManagementPage() {
 
   useEffect(() => { void loadBudget() }, [loadBudget])
 
-  useEffect(() => {
-    const warn = (event: BeforeUnloadEvent) => {
-      if (!isDirty) return
-      event.preventDefault()
-    }
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [isDirty])
-
   if (!currentHousehold) return null
 
-  const confirmDiscard = () => !isDirty || window.confirm('Discard your unsaved budget changes?')
+  const discardForSelection = () => {
+    setIsLoading(true)
+    setBudget(null)
+    setAmounts({})
+    setModes({})
+    setSavedSnapshot(snapshot({}))
+  }
 
   const changePeriod = (nextYear: number, nextMonth: number) => {
-    if (!confirmDiscard()) return
     const date = new Date(nextYear, nextMonth - 1, 1)
+    if (date.getFullYear() === year && date.getMonth() + 1 === month) return
+    if (!confirmDiscard()) return
+    discardForSelection()
     setYear(date.getFullYear())
     setMonth(date.getMonth() + 1)
   }
 
   const handleScopeChange = (nextScope: BudgetScope) => {
-    if (confirmDiscard()) setScope(nextScope)
+    if (nextScope === scope || !confirmDiscard()) return
+    discardForSelection()
+    setScope(nextScope)
   }
 
   const handleCreate = async (
@@ -344,9 +347,7 @@ export function BudgetManagementPage() {
     <main className="management-page budget-page">
       <header className="app-header">
         <BrandLockup />
-        <AppLink className="header-link" to="/dashboard" onClick={event => {
-          if (!confirmDiscard()) event.preventDefault()
-        }}>Return to dashboard</AppLink>
+        <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
       </header>
 
       <div className="budget-page-layout">

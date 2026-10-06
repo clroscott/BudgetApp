@@ -28,6 +28,8 @@ import {
   type CategorizationRuleApplicationPreview,
 } from '../imports/importApi'
 import { AppLink } from '../routing/AppLink'
+import { useRouter } from '../routing/useRouter'
+import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 
 const rowsPerPage = 100
 
@@ -118,7 +120,7 @@ function DraftRow({
   const savedCategorySelection = findCategorySelection(categories, draft.selectedCategoryId)
   const initialCategorySelection = findCategorySelection(
     categories,
-    pendingUpdate?.selectedCategoryId ?? draft.selectedCategoryId,
+    pendingUpdate ? pendingUpdate.selectedCategoryId : draft.selectedCategoryId,
   )
   const [transactionDate, setTransactionDate] = useState(
     pendingUpdate?.transactionDate ?? draft.transactionDate ?? '')
@@ -137,6 +139,11 @@ function DraftRow({
   const [ruleMatchOperator, setRuleMatchOperator] =
     useState<CategorizationRuleMatchOperator>('Contains')
   const [ruleMatchValue, setRuleMatchValue] = useState('')
+  const [savedRuleSnapshot, setSavedRuleSnapshot] = useState('')
+  const confirmRuleDiscard = useUnsavedChangesGuard(
+    isRuleEditorOpen && JSON.stringify([ruleMatchOperator, ruleMatchValue]) !== savedRuleSnapshot,
+    'Discard your unsaved rule changes for this import row?',
+  )
   const editable = canEdit && !isCompleted && !draft.approvedTransactionId
   const selectedCategoryId = subcategoryId || categoryId || null
   const subcategories = categories.find(category => category.id === categoryId)?.children ?? []
@@ -185,6 +192,7 @@ function DraftRow({
   ])
 
   const resetChanges = () => {
+    if (isDirty && !window.confirm('Discard the unsaved corrections for this row?')) return
     const savedSelection = findCategorySelection(categories, draft.selectedCategoryId)
     setTransactionDate(draft.transactionDate ?? '')
     setAmount(draft.amount?.toString() ?? '')
@@ -205,6 +213,7 @@ function DraftRow({
       const currentDescription = description.trim()
       setRuleMatchOperator('Contains')
       setRuleMatchValue(currentDescription)
+      setSavedRuleSnapshot(JSON.stringify(['Contains', currentDescription]))
       setRuleCreated(false)
       setIsRuleEditorOpen(true)
     } catch (error) {
@@ -240,6 +249,7 @@ function DraftRow({
   }
 
   const closeRuleEditor = async () => {
+    if (!confirmRuleDiscard()) return
     setIsRuleEditorOpen(false)
     try {
       await onChanged()
@@ -272,6 +282,7 @@ function DraftRow({
       description: description.trim() || null,
       selectedCategoryId,
     })
+    onDirtyChange(draft.id, null)
   }
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
@@ -523,6 +534,7 @@ function DraftRow({
 
 export function ImportReviewPage() {
   const { currentHousehold } = useHouseholds()
+  const { navigate, confirmNavigation } = useRouter()
   const [imports, setImports] = useState<ImportListItem[]>([])
   const [selectedImportId, setSelectedImportId] = useState(selectedImportFromUrl)
   const [detail, setDetail] = useState<ImportReviewDetail | null>(null)
@@ -549,6 +561,7 @@ export function ImportReviewPage() {
   const [dirtyDraftUpdates, setDirtyDraftUpdates] =
     useState<Map<string, PendingDraftUpdate>>(new Map())
   const [errors, setErrors] = useState<string[]>([])
+  useUnsavedChangesGuard(dirtyDraftUpdates.size > 0, 'Discard your unsaved staged import corrections?')
 
   const filteredImports = useMemo(() => imports.filter(item => {
     if (importFilter === 'all') return true
@@ -622,12 +635,10 @@ export function ImportReviewPage() {
     setSelectedImportId(nextId)
     setDetail(null)
     setDraftPage(1)
-    window.history.replaceState(
-      null,
-      '',
-      nextId ? `/imports/review?importId=${nextId}` : '/imports/review',
-    )
-  }, [filteredImports, selectedImportId])
+    navigate(nextId ? `/imports/review?importId=${nextId}` : '/imports/review', {
+      replace: true, bypassBlocker: true,
+    })
+  }, [filteredImports, navigate, selectedImportId])
 
   useEffect(() => {
     if (!currentHousehold || !selectedImportId) {
@@ -822,8 +833,8 @@ export function ImportReviewPage() {
         detail.id,
         updates,
       )
-      setDirtyDraftUpdates(new Map())
       await refreshDetail()
+      setDirtyDraftUpdates(new Map())
       setBulkSaveMessage(
         `${result.savedRows} ${result.savedRows === 1 ? 'correction was' : 'corrections were'} saved.`,
       )
@@ -914,7 +925,8 @@ export function ImportReviewPage() {
       await discardImport(currentHousehold.id, detail.id)
       setDetail(null)
       setDraftPage(1)
-      window.history.replaceState(null, '', '/imports/review')
+      setDirtyDraftUpdates(new Map())
+      navigate('/imports/review', { replace: true, bypassBlocker: true })
       await refreshList(currentHousehold.id)
     } catch (error) {
       setErrors(getErrorMessages(error))
@@ -947,6 +959,7 @@ export function ImportReviewPage() {
             <label className="import-selector">
               <span>Show imports</span>
               <select value={importFilter} onChange={event => {
+                if (!confirmNavigation()) return
                 setImportFilter(event.target.value as 'inProgress' | 'completed' | 'all')
               }}>
                 <option value="inProgress">In progress</option>
@@ -959,10 +972,11 @@ export function ImportReviewPage() {
               <select value={selectedImportId} disabled={filteredImports.length === 0}
                 onChange={event => {
                   const id = event.target.value
+                  if (id === selectedImportId || !confirmNavigation()) return
                   setSelectedImportId(id)
                   setDetail(null)
                   setDraftPage(1)
-                  window.history.replaceState(null, '', `/imports/review?importId=${id}`)
+                  navigate(`/imports/review?importId=${id}`, { replace: true, bypassBlocker: true })
                 }}>
                 {filteredImports.length === 0 && <option value="">No matching imports</option>}
                 {filteredImports.map(item => (
@@ -1138,6 +1152,7 @@ export function ImportReviewPage() {
               <label>
                 <span>Show rows</span>
                 <select value={rowFilter} onChange={event => {
+                  if (!confirmNavigation()) return
                   setRowFilter(event.target.value as DraftRowFilter)
                   setDraftPage(1)
                 }}>
@@ -1192,13 +1207,13 @@ export function ImportReviewPage() {
               <nav className="import-pagination" aria-label="Import rows">
                 <button className="secondary-button" type="button"
                   disabled={draftPage === 1}
-                  onClick={() => setDraftPage(current => current - 1)}>
+                  onClick={() => { if (confirmNavigation()) setDraftPage(current => current - 1) }}>
                   Previous rows
                 </button>
                 <span>Page {draftPage} of {draftPageCount}</span>
                 <button className="secondary-button" type="button"
                   disabled={draftPage === draftPageCount}
-                  onClick={() => setDraftPage(current => current + 1)}>
+                  onClick={() => { if (confirmNavigation()) setDraftPage(current => current + 1) }}>
                   Next rows
                 </button>
               </nav>

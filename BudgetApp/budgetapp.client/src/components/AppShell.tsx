@@ -155,8 +155,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 aria-label="Current household"
                 value={currentHousehold?.id ?? ''}
                 onChange={event => {
-                  selectHousehold(event.target.value)
-                  setIsNavigationOpen(false)
+                  if (selectHousehold(event.target.value)) setIsNavigationOpen(false)
                 }}
               >
                 {households.map(household => (
