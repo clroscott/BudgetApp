@@ -226,6 +226,19 @@ without relying on color or indentation. The default selector has a visible,
 associated label explaining that it affects new annual plans rather than existing
 monthly budgets. Verify the same meanings in narrow and screen-reader layouts.
 
+**Implementation follow-up (#179):** The category breakdown now uses a native
+table with a scope/year/currency caption, row/column headers, and explicit header
+references for every amount. Visible hierarchy and missing/zero/negative labels
+supplement the preserved grouping and transaction links. The existing household
+default has a visible associated label and instructions; its location and storage
+remain unchanged pending #138. Thirteen automated regression cases cover the
+semantics and existing save/permission contract. An isolated sample preview
+verified desktop and 390px layouts, visible focus, and keyboard table scrolling;
+it caught and verified a fix for whole-page overflow. Actual 200% browser zoom and
+screen-reader speech remain live sign-off items in
+[the permanent QA cases](manual-qa-regression-test-plan.md#annual-financial-accessibility-regression-179).
+Details: [annual financial accessibility](annual-financial-accessibility.md).
+
 ## Recommended order and existing-board alignment
 
 1. Expand and implement #157 using UI-01; it has the clearest lost-work risk.
