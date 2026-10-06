@@ -1,4 +1,4 @@
-import { Suspense, useEffect, type ReactNode } from 'react'
+import { Fragment, Suspense, useEffect, type ReactNode } from 'react'
 import './App.css'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
@@ -9,6 +9,7 @@ import { HouseholdProvider } from './households/HouseholdProvider'
 import { useHouseholds } from './households/useHouseholds'
 import { appPages } from './routing/pageRegistry'
 import { RouterProvider } from './routing/RouterProvider'
+import { PageNavigation } from './routing/PageNavigation'
 import { useRouter } from './routing/useRouter'
 import { TutorialProvider } from './tutorials/TutorialProvider'
 
@@ -56,7 +57,7 @@ function HouseholdRequiredRoute({ children }: { children: ReactNode }) {
   }
 
   return currentHousehold
-    ? <AppShell key={currentHousehold.id}>{children}</AppShell>
+    ? <AppShell><Fragment key={currentHousehold.id}>{children}</Fragment></AppShell>
     : <Redirect to="/household/setup" />
 }
 
@@ -188,7 +189,7 @@ function App() {
       <AuthProvider>
         <HouseholdProvider>
           <TutorialProvider>
-            <AppRoutes />
+            <PageNavigation><AppRoutes /></PageNavigation>
             <BackToTopButton />
           </TutorialProvider>
         </HouseholdProvider>

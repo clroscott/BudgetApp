@@ -5,6 +5,7 @@ import { AuthContext } from '../auth/authContext'
 import { HouseholdContext } from '../households/householdContext'
 import { AppShell } from '../components/AppShell'
 import { RouterProvider } from '../routing/RouterProvider'
+import { PageNavigation } from '../routing/PageNavigation'
 import { useRouter } from '../routing/useRouter'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 import { authFixture, householdsFixture } from '../test/fixtures'
@@ -46,7 +47,7 @@ function show({ dirty = false } = {}) {
   }
   window.history.replaceState(null, '', '/tutorials')
   const contents = () => <AuthContext.Provider value={auth}><RouterProvider>
-    <HouseholdContext.Provider value={householdsFixture()}><TutorialProvider><AppShell><Page /></AppShell></TutorialProvider></HouseholdContext.Provider>
+    <HouseholdContext.Provider value={householdsFixture()}><TutorialProvider><PageNavigation><AppShell><Page /></AppShell></PageNavigation></TutorialProvider></HouseholdContext.Provider>
   </RouterProvider></AuthContext.Provider>
   const result = render(contents())
   return { ...result, controls: () => controls, setDirty: (next: boolean) => act(() => setDirty(next)),

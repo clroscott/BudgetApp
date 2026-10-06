@@ -149,7 +149,8 @@ select {
 input:focus,
 select:focus {
   border-color: var(--accent);
-  outline: 3px solid var(--accent-soft);
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .checkbox-row {
@@ -180,10 +181,41 @@ button {
   cursor: pointer;
 }
 
-button:focus-visible,
-a:focus-visible {
-  outline: 3px solid var(--accent-soft);
-  outline-offset: 2px;
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible,
+[data-page-focus-target]:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.skip-to-content {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 11000;
+  max-width: calc(100vw - 2rem);
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--accent);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--heading);
+  font-weight: 800;
+  transform: translateY(calc(-100% - 2rem));
+}
+
+.skip-to-content:focus {
+  transform: translateY(0);
+}
+
+.page-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 button:disabled {
@@ -1117,6 +1149,11 @@ a {
 .sidebar-navigation a.active {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.sidebar-navigation a:focus-visible {
+  /* Keep the ring inside the sidebar's scrolling/clipping region. */
+  outline-offset: -3px;
 }
 
 .sidebar-navigation p {
@@ -2840,6 +2877,10 @@ a {
   box-shadow: var(--shadow);
   color: var(--text);
   text-align: left;
+  box-sizing: border-box;
+  max-height: min(32rem, 70svh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .amount-calculator-heading,

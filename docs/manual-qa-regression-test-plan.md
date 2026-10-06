@@ -203,6 +203,55 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] The learn-only tutorial highlights the correct controls and can be completed.
 - [ ] Coming-soon tutorials are clearly unavailable rather than appearing broken.
 
+## Accessible page navigation regression (#178)
+
+Run in Development/Scratch with a keyboard and a supported screen reader. These
+are manual sign-off cases, not claims established by automated DOM tests. See
+[the shared behavior guide](accessible-page-navigation.md).
+
+- [ ] On first load, Tab reveals Skip to main content before sidebar/header
+      controls. Enter moves to the main heading (main landmark if no heading),
+      closes the mobile menu when open, and skips repeated navigation. Shift-Tab
+      and subsequent Tab continue in a sensible order.
+- [ ] Skip does not change the URL, append Back history, prompt about unsaved
+      edits, or discard them. Existing main IDs still work.
+- [ ] Sidebar and budgeting section navigation announce the exact current page.
+      On Annual targets/overview, Monthly budget is not also marked current.
+      Collapsed icon links retain their accessible names and visible focus.
+- [ ] Navigate between Dashboard, Accounts, Transactions, Import/Review, budgets,
+      Tutorials, Categories, and Household. Browser titles identify each page;
+      focus moves to the destination heading and the page change is announced.
+      Repeat for login/register/recovery/invitation/setup routes with disposable
+      accounts; titles must not contain query tokens or private financial values.
+- [ ] Repeat with browser Back/Forward. A canceled unsaved-change prompt keeps
+      the page/title and does not focus/announce the destination. Accepting it
+      focuses the actual destination once.
+- [ ] Change transaction filters, row pagination/filtering, year/month, or
+      Household/Personal scope. Focus stays with the operated control; no new
+      page announcement is generated merely by same-page updates/query changes.
+- [ ] Switch households from the header with clean edits, and with disposable
+      unsaved edits (Cancel and Leave). The switcher retains focus; an accepted
+      switch resets household-specific editor state and loads the correct data.
+      No old household draft or private data remains in the new editor.
+- [ ] Delay a destination's lazy page load. Focus does not land on a hidden old
+      page or jump to the loading fallback. When ready, focus reaches the new
+      heading; if the user interacted while waiting, readiness is announced
+      without stealing their chosen focus.
+- [ ] Replay Getting started. Its coach retains focus priority across route
+      changes; page navigation does not fight it or jump to a heading on Exit.
+- [ ] At 200% actual browser zoom and approximately 390px width, repeat Skip and
+      navigation with the menu open/closed and desktop sidebar collapsed. Focus
+      rings and headings are visible, not clipped by scrolling/sticky navigation;
+      all required controls remain reachable without a keyboard trap.
+- [ ] Open monthly and annual calculators using the keyboard. Calculation is
+      focused; trigger expansion/relationship and the non-modal calculator name
+      are announced. Tab can leave normally. Escape from input, keypad, Close,
+      or trigger closes and returns focus without applying/saving an amount.
+- [ ] Calculator Close returns focus. Enter evaluates only; Use result applies
+      once and returns focus. Invalid arithmetic stays open with an announced
+      error. Repeat near the bottom of a long page and at 200% zoom/narrow width;
+      Close/keypad/result controls can be reached by keyboard and scrolling.
+
 ## Tutorial resilience regression (#177)
 
 Use Development or Scratch. These are permanent manual cases, not a record of
@@ -609,6 +658,28 @@ When a feature is added or a defect is fixed:
 5. Add the exact former failure as a permanent regression check for a defect.
 6. Add or update automated tests where the behavior can be verified reliably in
    code.
+
+### Reusable interface QA for new or changed pages
+
+Apply this gate to every new or materially changed page, including Household
+settings (#138) and Account settings (#156). Record browser/assistive technology,
+viewport/zoom, role/scope, result, and a defect link for failures.
+
+- [ ] The registry label/browser title and main h1 make the page's purpose clear.
+      There is one visible main landmark; Skip reaches it and Tab then continues
+      into meaningful content.
+- [ ] Current-page state is exposed in sidebar/section navigation; accepted page
+      transitions focus/announce predictably, but local filters/saves do not steal
+      focus. Loading, failure, successful empty, and stale states are distinct.
+- [ ] Inputs have associated labels; icon-only controls have names. Keyboard and
+      screen-reader users can identify values, instructions, errors, and actions.
+- [ ] Focus remains visible at 200% zoom/narrow width. No essential action is
+      clipped or trapped; temporary interfaces have reachable dismissal and
+      deliberate focus return.
+- [ ] Dirty edits, cancellation, household switching, and Household/Personal
+      permissions preserve the right context and do not expose another user's data.
+- [ ] Test successful use, rejected/failed writes, retry, refresh, and at least one
+      keyboard/screen-reader path; add permanent automated/manual regression cases.
 
 Use this template for a new manual case:
 
