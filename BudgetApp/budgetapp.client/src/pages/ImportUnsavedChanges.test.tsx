@@ -225,8 +225,10 @@ describe('staged import edit protection', () => {
   })
   it('preserves an explicitly cleared category across row hiding and reappearance', async () => {
     show(<ImportReviewPage />)
-    await screen.findByLabelText('Description')
-    fireEvent.change(screen.getByLabelText('Category'), { target: { value: '' } })
+    const category = await screen.findByLabelText('Category') as HTMLSelectElement
+    await waitFor(() => expect(category.disabled).toBe(false))
+    fireEvent.change(category, { target: { value: '' } })
+    await screen.findByRole('button', { name: 'Save all corrections (1)' })
     vi.mocked(window.confirm).mockReturnValue(true)
     fireEvent.change(screen.getByLabelText('Show rows'), { target: { value: 'uncategorized' } })
     expect(screen.queryByLabelText('Description')).toBeNull()

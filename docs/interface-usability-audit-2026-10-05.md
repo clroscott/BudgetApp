@@ -193,6 +193,17 @@ focus/announcement without stealing focus during ordinary filter changes. All
 controls retain visible focus at supported zoom. Include calculator Escape/close
 and focus return as part of keyboard regression checks, not a forced modal redesign.
 
+**Implementation follow-up (#178):** Sidebar current-page semantics now match
+the budgeting section menu. A shared boundary adds Skip to main content, registry
+titles, ready-page focus, and polite route announcements, without moving focus
+for same-page filters/scope/household selection or competing with tutorials.
+Calculator Escape/Close/apply restores trigger focus without a modal redesign.
+Automated cases include the real app household editor boundary. Live keyboard,
+screen-reader, narrow-width, and zoom checks remain sign-off items in
+[the permanent QA cases](manual-qa-regression-test-plan.md#accessible-page-navigation-regression-178).
+The [reusable new-page checklist](manual-qa-regression-test-plan.md#reusable-interface-qa-for-new-or-changed-pages)
+also applies to #138 and #156. Details: [shared navigation behavior](accessible-page-navigation.md).
+
 ### UI-06 — Annual category values and a household default lack semantic labels
 
 **Medium. Pages:** Annual overview, Annual targets.

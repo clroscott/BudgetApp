@@ -6,6 +6,7 @@ import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 import { navigationPages } from '../routing/pageRegistry'
 import { useRouter } from '../routing/useRouter'
+import { skipNavigationEvent } from '../routing/pageFocus'
 import { AppIcon } from './AppIcon'
 import { BrandLockup } from './Brand'
 
@@ -22,6 +23,7 @@ function NavigationLinks({
   return items.map(item => (
     <AppLink
       className={currentPath === item.path ? 'active' : undefined}
+      aria-current={currentPath === item.path ? 'page' : undefined}
       data-tutorial-id={`nav-${item.id}`}
       key={item.path}
       to={item.path}
@@ -46,8 +48,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     const menu = menuRef.current
     const reveal = () => setIsNavigationOpen(true)
+    const skip = () => setIsNavigationOpen(false)
     menu?.addEventListener(revealTutorialNavigationEvent, reveal)
-    return () => menu?.removeEventListener(revealTutorialNavigationEvent, reveal)
+    window.addEventListener(skipNavigationEvent, skip)
+    return () => {
+      menu?.removeEventListener(revealTutorialNavigationEvent, reveal)
+      window.removeEventListener(skipNavigationEvent, skip)
+    }
   }, [])
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (!user) return false

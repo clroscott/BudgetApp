@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useId, useRef, useState, type KeyboardEvent } from 'react'
 import { AppIcon } from './AppIcon'
 
 function evaluateExpression(displayExpression: string): number {
@@ -88,6 +88,13 @@ export function AmountCalculator({
   const [expression, setExpression] = useState('')
   const [result, setResult] = useState<number | null>(null)
   const [error, setError] = useState('')
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const popoverId = useId()
+
+  const close = () => {
+    setIsOpen(false)
+    triggerRef.current?.focus()
+  }
 
   const open = () => {
     setExpression(value)
@@ -148,24 +155,33 @@ export function AmountCalculator({
   ]
 
   return (
-    <span className="amount-calculator">
+    <span className="amount-calculator" onKeyDown={event => {
+      if (!isOpen || event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      close()
+    }}>
       <button
         className="amount-calculator-trigger"
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         aria-label={`Open calculator for ${label}`}
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? popoverId : undefined}
+        aria-haspopup="dialog"
         title="Calculate an amount"
         onClick={open}
       ><AppIcon name="calculator" /></button>
       {isOpen && (
-        <span className="amount-calculator-popover" role="dialog" aria-label={`${label} calculator`}>
+        <span className="amount-calculator-popover" id={popoverId} role="dialog" aria-label={`${label} calculator`}>
           <span className="amount-calculator-heading">
             <strong>Calculate amount</strong>
             <button
               className="text-button"
               type="button"
               aria-label="Close calculator"
-              onClick={() => setIsOpen(false)}
+              onClick={close}
             >Close</button>
           </span>
           <label>
@@ -205,7 +221,7 @@ export function AmountCalculator({
             ))}
           </span>
           {error && <small className="amount-calculator-error" role="alert">{error}</small>}
-          {result !== null && <span className="amount-calculator-result">Result: <strong>{result}</strong></span>}
+          {result !== null && <span className="amount-calculator-result" role="status">Result: <strong>{result}</strong></span>}
           <span className="amount-calculator-actions">
             <button
               className="primary-button"
@@ -214,7 +230,7 @@ export function AmountCalculator({
               onClick={() => {
                 if (result === null) return
                 onApply(String(result))
-                setIsOpen(false)
+                close()
               }}
             >Use result</button>
           </span>
