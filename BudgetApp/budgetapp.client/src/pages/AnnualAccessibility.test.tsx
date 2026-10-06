@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAnnualBudgetOverview, type AnnualBudgetCategory, type AnnualBudgetOverview } from '../budgets/annualBudgetOverviewApi'
 import { getBudgetMonthOptions } from '../budgets/budgetApi'
-import { changeFiscalYearStartMonth, getYearlyPlan, saveYearlyPlan, allocateYearlyPlan } from '../budgets/yearlyPlanApi'
+import { getYearlyPlan } from '../budgets/yearlyPlanApi'
 import { HouseholdContext } from '../households/householdContext'
 import { RouterProvider } from '../routing/RouterProvider'
 import { annualFixture, household, householdsFixture } from '../test/fixtures'
@@ -47,7 +47,6 @@ beforeEach(() => {
   vi.mocked(getAnnualBudgetOverview).mockResolvedValue(report())
   vi.mocked(getYearlyPlan).mockResolvedValue(annualFixture())
   vi.mocked(getBudgetMonthOptions).mockResolvedValue([])
-  vi.mocked(changeFiscalYearStartMonth).mockResolvedValue({ fiscalYearStartMonth: 3 })
 })
 
 describe('annual report semantics', () => {
@@ -165,42 +164,13 @@ describe('annual report semantics', () => {
 })
 
 describe('household fiscal-year default accessibility', () => {
-  it('has a visible associated label and description that separates the default from existing plans/budgets', async () => {
-    show(true)
-    const select = await screen.findByRole('combobox', { name: 'Default fiscal-year starting month' }) as HTMLSelectElement
-    await screen.findByLabelText('Housing overall annual target')
-    expect(select.labels?.[0].textContent).toContain('Default fiscal-year starting month')
-    const description = document.getElementById(select.getAttribute('aria-describedby')!)!
-    expect(description.textContent).toContain('annual plans you have not saved')
-    expect(description.textContent).toContain('does not change saved annual plans or existing monthly budgets')
-    expect(select).not.toBe(screen.getByRole('combobox', { name: /^Fiscal year begins/ }))
-  })
-
-  it.each(['Owner', 'Editor', 'Viewer'] as const)('preserves %s permissions and does not write just by changing/reading the default', async role => {
-    show(true, role)
-    await screen.findByLabelText('Housing overall annual target')
-    const select = screen.getByRole('combobox', { name: 'Default fiscal-year starting month' }) as HTMLSelectElement
-    expect(select.disabled).toBe(role === 'Viewer')
-    if (role !== 'Viewer') {
-      select.focus()
-      fireEvent.change(select, { target: { value: '3' } })
-      expect(document.activeElement).toBe(select)
-    }
-    expect(changeFiscalYearStartMonth).not.toHaveBeenCalled()
-    expect(saveYearlyPlan).not.toHaveBeenCalled()
-    expect(allocateYearlyPlan).not.toHaveBeenCalled()
-  })
-
-  it('uses the existing household setting endpoint once and does not resave or allocate budgets', async () => {
+  it('explains the shared default and links to its single editor, separate from the current plan', async () => {
     show(true)
     await screen.findByLabelText('Housing overall annual target')
-    fireEvent.change(screen.getByRole('combobox', { name: 'Default fiscal-year starting month' }), { target: { value: '3' } })
-    vi.mocked(window.confirm).mockReturnValue(true)
-    fireEvent.click(screen.getByRole('button', { name: 'Save default' }))
-    await screen.findByText('The household fiscal-year default was updated.')
-    expect(changeFiscalYearStartMonth).toHaveBeenCalledExactlyOnceWith('household-a', 3)
-    expect(saveYearlyPlan).not.toHaveBeenCalled()
-    expect(allocateYearlyPlan).not.toHaveBeenCalled()
+    expect(screen.queryByRole('combobox', { name: 'Default fiscal-year starting month' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Save default' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'View household settings' }).getAttribute('href')).toBe('/household/settings')
+    expect(screen.getByText(/Saved plans and monthly budgets are not changed by the household default/)).toBeTruthy()
     expect((screen.getByRole('combobox', { name: /^Fiscal year begins/ }) as HTMLSelectElement).value).toBe('1')
   })
 })

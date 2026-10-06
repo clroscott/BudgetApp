@@ -29,4 +29,11 @@ public sealed class HouseholdAuthorizationService(
             throw new HouseholdAccessDeniedException();
         }
     }
+
+    public async Task RequireManageAsync(Guid householdId, Guid userId, CancellationToken cancellationToken)
+    {
+        var role = await RequireViewAsync(householdId, userId, cancellationToken);
+        if (role is not HouseholdRole.Owner and not HouseholdRole.Admin)
+            throw new HouseholdAccessDeniedException();
+    }
 }

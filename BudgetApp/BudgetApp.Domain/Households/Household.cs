@@ -122,6 +122,23 @@ public sealed class Household
         UpdatedAtUtc = updatedAtUtc;
     }
 
+    public void UpdateSettings(string name, string defaultCurrency, string timeZoneId,
+        int fiscalYearStartMonth, DateTimeOffset updatedAtUtc)
+    {
+        var normalizedName = ValidateRequiredText(name, NameMaxLength, nameof(name), "Household name");
+        var currency = ValidateCurrency(defaultCurrency);
+        var zone = ValidateRequiredText(timeZoneId, TimeZoneIdMaxLength, nameof(timeZoneId), "Time zone ID");
+        if (fiscalYearStartMonth is < 1 or > 12)
+            throw new ArgumentOutOfRangeException(nameof(fiscalYearStartMonth), "Fiscal year start month must be between 1 and 12.");
+        if (Name == normalizedName && DefaultCurrency == currency && TimeZoneId == zone && FiscalYearStartMonth == fiscalYearStartMonth)
+            return;
+        Name = normalizedName;
+        DefaultCurrency = currency;
+        TimeZoneId = zone;
+        FiscalYearStartMonth = fiscalYearStartMonth;
+        UpdatedAtUtc = updatedAtUtc;
+    }
+
     private static string ValidateRequiredText(
         string value,
         int maxLength,

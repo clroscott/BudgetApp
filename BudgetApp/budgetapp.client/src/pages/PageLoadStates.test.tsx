@@ -96,8 +96,7 @@ describe('four-page read feedback', () => {
     expect(screen.queryByText(/^Loading /)).toBeNull()
     expect(screen.queryByText(/^Will create Draft$/)).toBeNull()
     expect(screen.queryByRole('button', { name: 'Create blank budget' })).toBeNull()
-    const defaults = screen.queryByRole('button', { name: 'Save default' }) as HTMLButtonElement | null
-    if (defaults) expect(defaults.disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Save default' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Retry loading' }))
     await screen.findByRole('button', { name: 'Refresh data' })
     expect(page.loaded()).toBeTruthy()

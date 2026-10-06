@@ -135,6 +135,11 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     return true
   }, [confirmNavigation, households, updateSelection])
 
+  const updateHousehold = useCallback((household: HouseholdMembership) => {
+    setHouseholds(current => current.map(item => item.id === household.id ? household : item)
+      .sort((left, right) => left.name.localeCompare(right.name)))
+  }, [])
+
   const currentHousehold = households.find(
     household => household.id === selectedHouseholdId,
   ) ?? households[0] ?? null
@@ -145,6 +150,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     isLoading: isLoading || Boolean(user && loadedUserId !== user.id),
     initializationError,
     selectHousehold,
+    updateHousehold,
     createHousehold,
     refresh,
   }), [
@@ -156,6 +162,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     loadedUserId,
     refresh,
     selectHousehold,
+    updateHousehold,
     user,
   ])
 

@@ -160,37 +160,36 @@ describe('annual targets and independent default setting', () => {
     expect(window.confirm).toHaveBeenCalledTimes(3)
     expect(getYearlyPlan).toHaveBeenCalledTimes(1)
   })
-  it('saving the household default does not wipe unsaved target amounts', async () => {
-    const { container } = (() => {
-      window.history.replaceState(null, '', '/budgeting/annual-targets')
-      return render(<RouterProvider><HouseholdContext.Provider value={householdsFixture()}>
-        <YearlyPlanManagementPage />
-      </HouseholdContext.Provider></RouterProvider>)
-    })()
+  it('canceling the household-settings link preserves unsaved target amounts', async () => {
+    window.history.replaceState(null, '', '/budgeting/annual-targets')
+    render(<RouterProvider><HouseholdContext.Provider value={householdsFixture()}>
+      <YearlyPlanManagementPage />
+    </HouseholdContext.Provider></RouterProvider>)
     const amount = await screen.findByLabelText('Housing overall annual target')
     fireEvent.change(amount, { target: { value: '2400' } })
-    fireEvent.change(container.querySelector('.fiscal-default-panel select')!, { target: { value: '3' } })
-    vi.mocked(window.confirm).mockReturnValue(true)
-    fireEvent.click(screen.getByText('Save default'))
-    await screen.findByText('The household fiscal-year default was updated.')
+    fireEvent.click(screen.getByRole('link', { name: 'View household settings' }))
+    expect(window.location.pathname).toBe('/budgeting/annual-targets')
     expect((amount as HTMLInputElement).value).toBe('2400')
     expect(getYearlyPlan).toHaveBeenCalledTimes(1)
-    vi.mocked(window.confirm).mockClear().mockReturnValue(false)
-    fireEvent.click(screen.getByText('Return to dashboard'))
     expect(window.confirm).toHaveBeenCalledTimes(1)
   })
-  it('saving targets preserves a separately unsaved household default', async () => {
+  it('saving a plan-period edit leaves the shared default unchanged', async () => {
     window.history.replaceState(null, '', '/budgeting/annual-targets')
-    const { container } = render(<RouterProvider><HouseholdContext.Provider value={householdsFixture()}>
+    render(<RouterProvider><HouseholdContext.Provider value={householdsFixture()}>
       <YearlyPlanManagementPage />
     </HouseholdContext.Provider></RouterProvider>)
     fireEvent.change(await screen.findByLabelText('Housing overall annual target'), { target: { value: '2400' } })
-    const defaultMonth = container.querySelector('.fiscal-default-panel select') as HTMLSelectElement
-    fireEvent.change(defaultMonth, { target: { value: '3' } })
+    vi.mocked(window.confirm).mockReturnValue(true)
+    fireEvent.change(screen.getByRole('combobox', { name: /^Fiscal year begins/ }), { target: { value: '3' } })
+    vi.mocked(saveYearlyPlan).mockResolvedValue({ ...annualFixture(), fiscalYearStartMonth: 3,
+      categories: [{ ...annualFixture().categories[0], annualTargetAmount: 2400 }] })
     fireEvent.click(screen.getByText('Save annual targets'))
     await screen.findByText('Annual targets were saved.')
-    expect(defaultMonth.value).toBe('3')
+    expect((screen.getByRole('combobox', { name: /^Fiscal year begins/ }) as HTMLSelectElement).value).toBe('3')
+    expect(screen.getByText(/Household default for new annual plans: January/)).toBeTruthy()
+    expect(changeFiscalYearStartMonth).not.toHaveBeenCalled()
+    vi.mocked(window.confirm).mockClear()
     fireEvent.click(screen.getByText('Return to dashboard'))
-    expect(window.confirm).toHaveBeenCalledTimes(1)
+    expect(window.confirm).not.toHaveBeenCalled()
   })
 })

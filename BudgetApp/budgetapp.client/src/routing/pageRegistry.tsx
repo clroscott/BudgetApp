@@ -323,6 +323,13 @@ export const appPages: AppPageDefinition[] = [
     ),
   },
   {
+    id: 'household-settings',
+    path: '/household/settings',
+    label: 'Household settings',
+    access: 'household',
+    component: page(() => import('../pages/HouseholdSettingsPage'), 'HouseholdSettingsPage'),
+  },
+  {
     id: 'categories',
     path: '/settings/categories',
     label: 'Categories',

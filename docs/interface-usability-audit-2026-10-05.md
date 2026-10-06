@@ -239,6 +239,14 @@ screen-reader speech remain live sign-off items in
 [the permanent QA cases](manual-qa-regression-test-plan.md#annual-financial-accessibility-regression-179).
 Details: [annual financial accessibility](annual-financial-accessibility.md).
 
+**Household settings follow-up (#138):** The shared fiscal-default editor now
+lives in Manage household → Settings with name, time zone and safeguarded
+currency. Annual Targets retains its per-plan selector and a settings link.
+Owner/Admin-only writes are enforced through both settings and the compatibility
+fiscal endpoint. Shared storage is unchanged; default edits never rewrite
+financial history. Updated automated and live-sign-off cases are in
+[household settings regression](manual-qa-regression-test-plan.md#household-settings-regression-138).
+
 ## Recommended order and existing-board alignment
 
 1. Expand and implement #157 using UI-01; it has the clearest lost-work risk.

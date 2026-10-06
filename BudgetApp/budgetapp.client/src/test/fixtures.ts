@@ -14,6 +14,7 @@ export function householdsFixture(): HouseholdContextValue {
   return {
     currentHousehold: household, households: [household, otherHousehold], isLoading: false,
     initializationError: null, selectHousehold: vi.fn(() => true),
+    updateHousehold: vi.fn(),
     refresh: vi.fn(async () => {}), createHousehold: vi.fn(async () => household),
   }
 }

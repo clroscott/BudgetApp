@@ -1,7 +1,7 @@
 # Annual financial accessibility (#179)
 
-This updates the Annual overview category breakdown and the Annual targets
-household fiscal-year default. It does not change financial calculations,
+This covers the Annual overview category breakdown and the household fiscal-year
+default, now located in Household settings (#138). It does not change financial calculations,
 authorization, stored targets, or monthly allocation. No database migration is
 needed.
 
@@ -44,17 +44,22 @@ Its associated description explains that the default chooses the initial month
 for unsaved plans, while saved annual plans and existing monthly budgets stay
 unchanged.
 
-The control stays in its current location and uses the same household-default
-endpoint, permissions, and unsaved-change handling. There is no duplicate
-settings source. Any later relocation belongs to Household settings (#138).
+Household settings (#138) now owns this selector at Manage household → Settings.
+Annual Targets displays the loaded shared default and links to settings, while
+keeping its independent per-plan start-month control. The shared default is
+editable only by Owner/Admin; Editors can still edit annual plans. Both the new
+settings endpoint and the compatibility default endpoint use one settings
+workflow and the same Household field. See [household settings](household-settings.md).
 
 ## Verification
 
-`AnnualAccessibility.test.tsx` has 13 regression cases covering native semantics,
+`AnnualAccessibility.test.tsx` has nine regression cases covering native semantics,
 header references, grouping/hierarchy, missing versus zero budgets, signed
 amounts, deactivated/long/duplicate names, both scopes' links, empty categories,
-partial-year explanation, keyboard scroll-region access, default labeling,
-read-only permissions, and the existing one-write default save behavior.
+partial-year explanation, keyboard scroll-region access, and the shared-default
+explanation/settings link. The relocated selector's label, permissions, save,
+failure, and switching cases are covered in `HouseholdSettingsPage.test.tsx` and
+`HouseholdSettingsTests.cs`.
 
 An isolated Chromium preview rendered the actual pages/CSS using sample API
 responses with no database or email access. Desktop and a 390px frame were
