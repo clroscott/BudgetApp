@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
 import { currencies } from '../finance/currencies'
 import type { CreateHouseholdRequest } from './householdApi'
+import { useUnsavedNativeForm } from '../routing/useUnsavedForm'
 
 function getBrowserTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Vancouver'
@@ -27,6 +28,7 @@ export function HouseholdForm({
   isSubmitting: boolean
   onSubmit: (request: CreateHouseholdRequest) => Promise<void>
 }) {
+  const guard = useUnsavedNativeForm('Discard the new household details you entered?')
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
@@ -39,6 +41,7 @@ export function HouseholdForm({
 
   return (
     <form
+      {...guard.formProps}
       className="household-create-form"
       onSubmit={(event) => void handleSubmit(event)}
     >

@@ -18,6 +18,7 @@ import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
+import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 
 type SectionMode = 'overall' | 'detailed'
 type Amounts = Record<string, string>
@@ -98,18 +99,22 @@ export function YearlyPlanManagementPage() {
   const [notice, setNotice] = useState<string | null>(null)
 
   const currentSnapshot = useMemo(() => snapshot(amounts), [amounts])
-  const isDirty =
-    currentSnapshot !== savedSnapshot ||
-    planStartMonth !== savedPlanStartMonth
+  const isDirty = Boolean(plan) && (
+    currentSnapshot !== savedSnapshot || planStartMonth !== savedPlanStartMonth)
+  const isDefaultDirty = Boolean(plan) &&
+    defaultStartMonth !== plan?.householdDefaultFiscalYearStartMonth
+  const confirmDiscard = useUnsavedChangesGuard(
+    isDirty || isDefaultDirty, 'Discard your unsaved annual targets or fiscal-year default changes?',
+  )
   const canManage = currentHousehold?.role !== 'Viewer'
 
-  const applyPlan = useCallback((data: YearlyPlanData) => {
+  const applyPlan = useCallback((data: YearlyPlanData, preserveDefault = false) => {
     const state = stateFromPlan(data)
     setPlan(data)
     setAmounts(state.amounts)
     setModes(state.modes)
     setSavedSnapshot(snapshot(state.amounts))
-    setDefaultStartMonth(data.householdDefaultFiscalYearStartMonth)
+    if (!preserveDefault) setDefaultStartMonth(data.householdDefaultFiscalYearStartMonth)
     setPlanStartMonth(data.fiscalYearStartMonth)
     setSavedPlanStartMonth(data.fiscalYearStartMonth)
     setSelectedPeriods(new Set(
@@ -141,8 +146,16 @@ export function YearlyPlanManagementPage() {
 
   if (!currentHousehold) return null
 
-  const confirmDiscard = () =>
-    !isDirty || window.confirm('Discard your unsaved annual target changes?')
+  const changeSelection = (nextYear: number, nextScope: BudgetScope) => {
+    if ((nextYear === year && nextScope === scope) || !confirmDiscard()) return
+    setIsLoading(true)
+    setPlan(null)
+    setAmounts({})
+    setModes({})
+    setSavedSnapshot(snapshot({}))
+    setYear(nextYear)
+    setScope(nextScope)
+  }
 
   const setMode = (rootId: string, nextMode: SectionMode) => {
     const root = plan?.categories.find(category => category.id === rootId)
@@ -181,7 +194,7 @@ export function YearlyPlanManagementPage() {
     try {
       applyPlan(await saveYearlyPlan(
         currentHousehold.id, year, scope, planStartMonth, lines,
-      ))
+      ), isDefaultDirty)
       setNotice('Annual targets were saved.')
     } catch (error) {
       setErrors(getErrorMessages(error))
@@ -199,7 +212,10 @@ export function YearlyPlanManagementPage() {
     setErrors([])
     try {
       await changeFiscalYearStartMonth(currentHousehold.id, defaultStartMonth)
-      await load()
+      // Saving this separate setting must not reload away unsaved target lines.
+      setPlan(current => current ? {
+        ...current, householdDefaultFiscalYearStartMonth: defaultStartMonth,
+      } : current)
       setNotice('The household fiscal-year default was updated.')
     } catch (error) {
       setErrors(getErrorMessages(error))
@@ -346,7 +362,7 @@ export function YearlyPlanManagementPage() {
             max="9998"
             value={year}
             onChange={event => {
-              if (confirmDiscard()) setYear(Number(event.target.value))
+              changeSelection(Number(event.target.value), scope)
             }}
           />
         </label>
@@ -370,7 +386,7 @@ export function YearlyPlanManagementPage() {
           <select
             value={scope}
             onChange={event => {
-              if (confirmDiscard()) setScope(event.target.value as BudgetScope)
+              changeSelection(year, event.target.value as BudgetScope)
             }}
           >
             <option value="Household">Household</option>
@@ -539,7 +555,7 @@ export function YearlyPlanManagementPage() {
                 {impact.existingBudget ? (
                   <AppLink
                     className="yearly-allocation-budget-link"
-                    to={`/budgeting?year=${impact.year}&month=${impact.month}&scope=${scope}`}
+                    to={`/budgeting?year=${encodeURIComponent(impact.year)}&month=${encodeURIComponent(impact.month)}&scope=${encodeURIComponent(scope)}`}
                     title={`Open the ${impact.monthLabel} ${scope.toLowerCase()} budget`}
                   >
                     <time>{impact.monthLabel}</time>

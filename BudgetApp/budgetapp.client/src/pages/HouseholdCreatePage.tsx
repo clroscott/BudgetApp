@@ -19,7 +19,7 @@ export function HouseholdCreatePage() {
 
     try {
       await createHousehold(request)
-      navigate('/dashboard', { replace: true })
+      navigate('/dashboard', { replace: true, bypassBlocker: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
       setIsSubmitting(false)

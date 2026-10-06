@@ -16,6 +16,7 @@ import {
   type SaveImportProfile,
 } from '../imports/importProfileApi'
 import { AppLink } from '../routing/AppLink'
+import { useUnsavedForm } from '../routing/useUnsavedForm'
 
 type ImportColumnField =
   'ignore' | 'date' | 'description' | 'amount' | 'debit' | 'credit' |
@@ -78,6 +79,9 @@ export function ImportProfileManagementPage() {
   )
   const activeProfiles = profiles.filter(profile => profile.isActive)
   const inactiveProfiles = profiles.filter(profile => !profile.isActive)
+  const formGuard = useUnsavedForm({
+    form, columns: columns.map(({ header, field }) => ({ header, field })),
+  }, 'Discard your unsaved CSV profile changes?')
 
   const load = async () => {
     if (!currentHousehold) return
@@ -106,11 +110,16 @@ export function ImportProfileManagementPage() {
     setEditingId(null)
     setForm(emptyForm)
     setColumns(createDefaultColumns())
+    formGuard.markClean({
+      form: emptyForm,
+      columns: createDefaultColumns().map(({ header, field }) => ({ header, field })),
+    })
   }
 
   const edit = (profile: ImportProfile) => {
+    if (editingId === profile.id || !formGuard.confirmDiscard()) return
     setEditingId(profile.id)
-    setForm({
+    const nextForm: SaveImportProfile = {
       name: profile.name,
       headers: profile.headers,
       dateColumn: profile.dateColumn,
@@ -122,8 +131,8 @@ export function ImportProfileManagementPage() {
       subcategoryColumn: profile.subcategoryColumn,
       amountConvention: profile.amountConvention,
       defaultAccountId: profile.defaultAccountId,
-    })
-    setColumns(profile.headers.map(header => ({
+    }
+    const nextColumns: ImportProfileColumn[] = profile.headers.map(header => ({
       key: nextColumnKey++,
       header,
       field: header === profile.dateColumn ? 'date'
@@ -134,7 +143,12 @@ export function ImportProfileManagementPage() {
                 : header === profile.categoryColumn ? 'category'
                   : header === profile.subcategoryColumn ? 'subcategory'
                     : 'ignore',
-    })))
+    }))
+    setForm(nextForm)
+    setColumns(nextColumns)
+    formGuard.markClean({
+      form: nextForm, columns: nextColumns.map(({ header, field }) => ({ header, field })),
+    })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -304,7 +318,8 @@ export function ImportProfileManagementPage() {
           <div className="account-form-heading"><div>
             <h2>{editingId ? 'Edit profile' : 'Create profile'}</h2>
             <p>Name each CSV column and choose what BudgetApp should do with it.</p>
-          </div>{editingId && <button className="text-button" type="button" onClick={reset}>Cancel</button>}</div>
+          </div>{editingId && <button className="text-button" type="button"
+            onClick={() => { if (formGuard.confirmDiscard()) reset() }}>Cancel</button>}</div>
           <div className="import-profile-details-grid">
             <label><span>Profile name</span><input value={form.name} maxLength={100}
               placeholder="Example: Joint chequing CSV"

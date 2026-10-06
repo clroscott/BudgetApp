@@ -17,6 +17,7 @@ import {
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 import { useRouter } from '../routing/useRouter'
+import { useUnsavedNativeForm } from '../routing/useUnsavedForm'
 
 const formatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
@@ -30,7 +31,8 @@ export function HouseholdManagementPage() {
     refresh,
     selectHousehold,
   } = useHouseholds()
-  const { navigate } = useRouter()
+  const { navigate, confirmNavigation } = useRouter()
+  const inviteGuard = useUnsavedNativeForm('Discard the household invitation details you entered?')
   const [management, setManagement] =
     useState<HouseholdMemberManagement | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -94,7 +96,10 @@ export function HouseholdManagementPage() {
       },
     ))
 
-    if (succeeded) form.reset()
+    if (succeeded) {
+      form.reset()
+      inviteGuard.markClean()
+    }
   }
 
   const finishExit = async (operation: () => Promise<void>) => {
@@ -104,7 +109,7 @@ export function HouseholdManagementPage() {
     try {
       await operation()
       await refresh()
-      navigate(getSafeReturnPath() ?? '/dashboard', { replace: true })
+      navigate(getSafeReturnPath() ?? '/dashboard', { replace: true, bypassBlocker: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
       setIsSaving(false)
@@ -112,6 +117,7 @@ export function HouseholdManagementPage() {
   }
 
   const confirmLeave = () => {
+    if (!confirmNavigation()) return
     if (!window.confirm(
       `Leave ${currentHousehold.name}? You will lose access to its shared data.`,
     )) return
@@ -120,6 +126,7 @@ export function HouseholdManagementPage() {
   }
 
   const confirmDelete = () => {
+    if (!confirmNavigation()) return
     const enteredName = window.prompt(
       `This permanently deletes the unused household and its default setup. ` +
       `Type "${currentHousehold.name}" to continue.`,
@@ -177,8 +184,9 @@ export function HouseholdManagementPage() {
                         className="secondary-button"
                         type="button"
                         onClick={() => {
-                          selectHousehold(household.id)
-                          setNotice(`Switched to ${household.name}.`)
+                          if (selectHousehold(household.id)) {
+                            setNotice(`Switched to ${household.name}.`)
+                          }
                         }}
                       >
                         Switch
@@ -193,6 +201,7 @@ export function HouseholdManagementPage() {
 
         {management?.canManageInvitations && (
           <form
+            {...inviteGuard.formProps}
             className="household-invite-form"
             onSubmit={(event) => void handleInvite(event)}
           >

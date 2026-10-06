@@ -22,6 +22,7 @@ import {
 import { getCategories, type CategoryItem } from '../categories/categoryApi'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
+import { useUnsavedForm } from '../routing/useUnsavedForm'
 
 const operatorOptions: Array<{
   value: CategorizationRuleMatchOperator
@@ -76,6 +77,7 @@ export function CategorizationRuleManagementPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const formGuard = useUnsavedForm(form, 'Discard your unsaved categorization rule changes?')
 
   const canManage = currentHousehold?.role !== 'Viewer'
 
@@ -122,6 +124,7 @@ export function CategorizationRuleManagementPage() {
   const resetForm = () => {
     setEditingId(null)
     setForm(emptyForm)
+    formGuard.markClean(emptyForm)
   }
 
   const toRequest = (): SaveCategorizationRuleRequest => ({
@@ -157,15 +160,18 @@ export function CategorizationRuleManagementPage() {
   }
 
   const startEditing = (rule: CategorizationRuleItem) => {
+    if (editingId === rule.id || !formGuard.confirmDiscard()) return
     const selection = findCategorySelection(categories, rule.targetCategoryId)
     setEditingId(rule.id)
-    setForm({
+    const next: RuleForm = {
       name: rule.name,
       matchOperator: rule.matchOperator,
       matchValue: rule.matchValue,
       accountId: rule.accountId ?? '',
       ...selection,
-    })
+    }
+    setForm(next)
+    formGuard.markClean(next)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -413,7 +419,7 @@ export function CategorizationRuleManagementPage() {
                   className="secondary-button"
                   type="button"
                   disabled={isSaving}
-                  onClick={resetForm}
+                  onClick={() => { if (formGuard.confirmDiscard()) resetForm() }}
                 >Cancel</button>
               )}
             </div>

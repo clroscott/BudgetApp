@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useAuth } from '../auth/useAuth'
+import { useRouter } from '../routing/useRouter'
 import {
   createHousehold as createHouseholdRequest,
   getHouseholds,
@@ -20,6 +21,7 @@ import {
 
 export function HouseholdProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
+  const { confirmNavigation } = useRouter()
   const [households, setHouseholds] = useState<HouseholdMembership[]>([])
   const [selectedHouseholdId, setSelectedHouseholdId] = useState<string | null>(
     null,
@@ -125,11 +127,13 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
   const selectHousehold = useCallback((householdId: string) => {
     if (!households.some(item => item.id === householdId)) {
-      return
+      return false
     }
-
+    if (householdId === selectedHouseholdIdRef.current) return true
+    if (!confirmNavigation()) return false
     updateSelection(householdId)
-  }, [households, updateSelection])
+    return true
+  }, [confirmNavigation, households, updateSelection])
 
   const currentHousehold = households.find(
     household => household.id === selectedHouseholdId,

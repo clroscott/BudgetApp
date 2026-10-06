@@ -21,7 +21,7 @@ const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
 export function HouseholdSetupPage() {
   const { user, logout } = useAuth()
   const { createHousehold, refresh } = useHouseholds()
-  const { navigate } = useRouter()
+  const { navigate, confirmNavigation } = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isLoadingInvitations, setIsLoadingInvitations] = useState(true)
@@ -59,7 +59,7 @@ export function HouseholdSetupPage() {
 
     try {
       await createHousehold(request)
-      navigate('/dashboard', { replace: true })
+      navigate('/dashboard', { replace: true, bypassBlocker: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {
@@ -68,12 +68,13 @@ export function HouseholdSetupPage() {
   }
 
   const handleLogout = async () => {
+    if (!confirmNavigation()) return
     setIsSigningOut(true)
     setErrors([])
 
     try {
       await logout()
-      navigate('/login', { replace: true })
+      navigate('/login', { replace: true, bypassBlocker: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
       setIsSigningOut(false)
@@ -81,13 +82,14 @@ export function HouseholdSetupPage() {
   }
 
   const handleAcceptInvitation = async (invitationId: string) => {
+    if (!confirmNavigation()) return
     setAcceptingInvitationId(invitationId)
     setErrors([])
 
     try {
       const household = await acceptPendingHouseholdInvitation(invitationId)
       await refresh(household.id)
-      navigate('/dashboard', { replace: true })
+      navigate('/dashboard', { replace: true, bypassBlocker: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
       setAcceptingInvitationId(null)
