@@ -31,6 +31,7 @@ export interface TransactionListResult {
   pageSize: number
   totalCount: number
   totalPages: number
+  totalsByCurrency: Record<string, number>
 }
 
 export interface TransactionQuery {

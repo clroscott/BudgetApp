@@ -443,6 +443,28 @@ instructions and the privacy contract.
 - [ ] Months with no budget are distinguishable from months budgeted at zero.
 - [ ] Draft, Active, and Closed month statuses display correctly.
 - [ ] Links open the relevant monthly budget or filtered transaction view.
+- [ ] Click annual total, parent category, subcategory, individual month, and
+      uncategorized spending links in both Household and Personal scopes. Active
+      filters preserve period, inclusion, currency, and category/spending rules.
+- [ ] Use more than 100 matching transactions. Matched amount covers every page
+      and reconciles with the clicked report amount; changing pages does not
+      change that total. CSV export includes all matching rows exactly once.
+- [ ] Include refunds, income, transfers, excluded/voided rows, deactivated
+      categories, and mixed currencies. Drill-downs retain the report rules,
+      and clearing currency shows separate totals rather than one combined sum.
+- [ ] Edit filter controls without applying: results/export retain active filters
+      and the page explains the pending change. Apply or Reset: the view is marked
+      as changed. Restore report filters returns to the original matching set.
+- [ ] Unsaved transaction/inclusion edits are protected when restoring report
+      filters, changing pages, switching household, or returning to the report.
+- [ ] Return to Annual overview preserves year and scope. A different household
+      does not claim to match the original report. After another user edits saved
+      transactions, reloading the report reconciles the latest totals.
+- [ ] Empty results show a zero for the selected currency. A failed list/refresh
+      hides unreliable totals and offers Retry without silently clearing filters
+      or discarding another row's unsaved choices.
+- [ ] A shared private-account row remains redacted for other members in list
+      and export; private-only rows do not contribute to their matching totals.
 - [ ] Empty-category, empty-budget, and empty-transaction years render safely.
 
 ## Dashboard and activity history

@@ -52,11 +52,13 @@ public sealed record TransactionListResult(
     int Page,
     int PageSize,
     int TotalCount,
-    int TotalPages);
+    int TotalPages,
+    IReadOnlyDictionary<string, decimal> TotalsByCurrency);
 
 public sealed record TransactionQueryResult(
     IReadOnlyList<TransactionRecord> Items,
-    int TotalCount);
+    int TotalCount,
+    IReadOnlyDictionary<string, decimal> TotalsByCurrency);
 
 public sealed record TransactionExportRecord(
     string AccountName,

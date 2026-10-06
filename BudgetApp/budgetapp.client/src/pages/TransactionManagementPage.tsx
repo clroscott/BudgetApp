@@ -10,6 +10,7 @@ import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
+import { annualReportReturnLink, readAnnualReportContext, transactionFilterKey } from '../transactions/reportContext'
 import {
   downloadTransactionsCsv,
   getTransactions,
@@ -185,7 +186,11 @@ export function TransactionManagementPage() {
   const { confirmNavigation } = useRouter()
   const { currentHousehold } = useHouseholds()
   const initialFilters = useMemo(createInitialFilters, [])
+  const reportContext = useMemo(() => readAnnualReportContext(
+    window.location.search, buildTransactionQuery(initialFilters, 1),
+  ), [initialFilters])
   const [transactions, setTransactions] = useState<TransactionItem[]>([])
+  const [totalsByCurrency, setTotalsByCurrency] = useState<Record<string, number>>({})
   const [accounts, setAccounts] = useState<AccountItem[]>([])
   const [categories, setCategories] = useState<CategoryItem[]>([])
   const [filters, setFilters] = useState<TransactionFilters>(initialFilters)
@@ -202,6 +207,9 @@ export function TransactionManagementPage() {
   const [editRequest, setEditRequest] = useState<UpdateTransactionRequest | null>(null)
   const [editBaseline, setEditBaseline] = useState<UpdateTransactionRequest | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [totalsUnavailable, setTotalsUnavailable] = useState(false)
+  const [reloadGeneration, setReloadGeneration] = useState(0)
   const [isSaving, setIsSaving] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
@@ -219,9 +227,12 @@ export function TransactionManagementPage() {
       setFilters(current => {
         const selectedId = current.subcategoryId || current.categoryId
         if (!selectedId || selectedId === uncategorizedFilterValue) return current
+        const selection = findCategorySelection(categoryItems, selectedId)
+        // A missing category must not silently turn a report link into "all categories".
+        if (!selection.categoryId) return current
         return {
           ...current,
-          ...findCategorySelection(categoryItems, selectedId),
+          ...selection,
         }
       })
     }).catch(error => {
@@ -234,11 +245,14 @@ export function TransactionManagementPage() {
     if (!currentHousehold) return
     let isCurrent = true
     setIsLoading(true)
+    setLoadFailed(false)
     setErrors([])
     void getTransactions(currentHousehold.id, appliedQuery)
       .then(result => {
         if (!isCurrent) return
         setTransactions(result.items)
+        setTotalsByCurrency(result.totalsByCurrency)
+        setTotalsUnavailable(false)
         setPagination({
           page: result.page,
           pageSize: result.pageSize,
@@ -247,13 +261,16 @@ export function TransactionManagementPage() {
         })
       })
       .catch(error => {
-        if (isCurrent) setErrors(getErrorMessages(error))
+        if (isCurrent) {
+          setErrors(getErrorMessages(error))
+          setLoadFailed(true)
+        }
       })
       .finally(() => {
         if (isCurrent) setIsLoading(false)
       })
     return () => { isCurrent = false }
-  }, [appliedQuery, currentHousehold])
+  }, [appliedQuery, currentHousehold, reloadGeneration])
 
   const isEditDirty = editRequest !== null && editBaseline !== null &&
     JSON.stringify(editRequest) !== JSON.stringify(editBaseline)
@@ -268,6 +285,22 @@ export function TransactionManagementPage() {
   const editCategorySelection = findCategorySelection(categories, editRequest?.categoryId ?? null)
   const editSubcategories = categories.find(category =>
     category.id === editCategorySelection.categoryId)?.children ?? []
+  const matchesReport = reportContext !== null &&
+    reportContext.householdId === currentHousehold?.id &&
+    transactionFilterKey(appliedQuery) === transactionFilterKey(reportContext.query)
+  let pendingFilterChanges = false
+  try {
+    pendingFilterChanges = transactionFilterKey(buildTransactionQuery(filters, 1)) !==
+      transactionFilterKey(appliedQuery)
+  } catch {
+    pendingFilterChanges = true
+  }
+  const activeCategory = appliedQuery.uncategorizedOnly ? 'Uncategorized only'
+    : appliedQuery.categoryId
+      ? findCategorySelection(categories, appliedQuery.categoryId).categoryId
+        ? categoryLabel(categories, appliedQuery.categoryId)
+        : 'Selected category (unavailable)'
+      : 'All categories'
 
   if (!currentHousehold) return null
 
@@ -320,6 +353,21 @@ export function TransactionManagementPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const restoreReportFilters = () => {
+    if (!reportContext || !confirmNavigation()) return
+    cancelEditing()
+    const selection = findCategorySelection(categories, reportContext.query.categoryId ?? null)
+    setFilters({ ...initialFilters, ...(selection.categoryId ? selection : {}) })
+    setAppliedQuery(reportContext.query)
+    setErrors([])
+  }
+
+  const retrySearch = () => {
+    if (!confirmNavigation()) return
+    cancelEditing()
+    setReloadGeneration(current => current + 1)
+  }
+
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!editingId || !editRequest) return
@@ -344,7 +392,9 @@ export function TransactionManagementPage() {
       await updateTransaction(currentHousehold.id, editingId, normalizedRequest)
       cancelEditing()
       try { await refreshSavedTransaction(editingId) }
-      catch { setErrors(['Transaction saved, but the list could not be refreshed. Reload before editing again.']) }
+      catch {
+        setErrors(['Transaction saved, but the list could not be refreshed. Retry the search before comparing totals.'])
+      }
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {
@@ -353,12 +403,21 @@ export function TransactionManagementPage() {
   }
 
   const refreshSavedTransaction = async (id: string) => {
-    const result = await getTransactions(currentHousehold.id, appliedQuery)
+    let result
+    try {
+      result = await getTransactions(currentHousehold.id, appliedQuery)
+    } catch (error) {
+      // Do not unmount other unsaved row editors, but never present stale totals.
+      setTotalsUnavailable(true)
+      throw error
+    }
     const saved = result.items.find(transaction => transaction.id === id)
     // Refresh only this row: never unmount another editor with unsaved choices.
     setTransactions(current => current.flatMap(transaction =>
       transaction.id === id ? saved ? [saved] : [] : [transaction]))
     setPagination(result)
+    setTotalsByCurrency(result.totalsByCurrency)
+    setTotalsUnavailable(false)
   }
 
   const handleExport = async () => {
@@ -407,6 +466,27 @@ export function TransactionManagementPage() {
         </div>
 
         <ErrorSummary errors={errors} />
+
+        {reportContext && <aside className="transaction-report-context" aria-label="Annual report context">
+          <strong>{matchesReport ? 'Annual overview drill-down'
+            : 'View changed — no longer matches the original report filters'}</strong>
+          <p>{matchesReport
+            ? 'These are the spending transactions behind the report amount, including expense refunds.'
+            : 'Filters or the household have changed. These results should not be compared with the original report amount.'}
+            {' '}Totals use the latest saved transactions, not a frozen report snapshot.</p>
+          {reportContext.householdId !== currentHousehold.id &&
+            <p>Switch back to the original household to restore this drill-down.</p>}
+          <div className="transaction-filter-actions">
+            <AppLink to={annualReportReturnLink(reportContext.year, reportContext.scope)}>
+              {reportContext.householdId === currentHousehold.id
+                ? 'Return to Annual overview' : 'Annual overview for the current household'}
+            </AppLink>
+            {!matchesReport && reportContext.householdId === currentHousehold.id &&
+              <button className="secondary-button" type="button" onClick={restoreReportFilters}>
+                Restore report filters
+              </button>}
+          </div>
+        </aside>}
 
         <form className="transaction-filter-panel" onSubmit={handleApplyFilters}>
           <div className="transaction-filter-grid">
@@ -511,6 +591,9 @@ export function TransactionManagementPage() {
               })}>
                 <option value="">All categories</option>
                 <option value={uncategorizedFilterValue}>Uncategorized only</option>
+                {filters.categoryId && filters.categoryId !== uncategorizedFilterValue &&
+                  !filterCategories.some(category => category.id === filters.categoryId) &&
+                  <option value={filters.categoryId}>Selected category (unavailable)</option>}
                 {filterCategories.map(category => (
                   <option key={category.id} value={category.id}>
                     {category.name}{category.isActive ? '' : ' (deactivated)'}
@@ -555,13 +638,64 @@ export function TransactionManagementPage() {
           </div>
         </form>
 
-        {!isLoading && (
+        {reportContext && <section className="transaction-active-filters" aria-label="Active report filters">
+          <h2>Active filters</h2>
+          <dl>
+            <div><dt>Household</dt><dd>{currentHousehold.name}</dd></div>
+            <div><dt>Budget inclusion</dt><dd>{appliedQuery.budgetInclusion || 'All visible transactions'}</dd></div>
+            <div><dt>Period</dt><dd>{appliedQuery.fromDate ?? 'Any start date'} – {appliedQuery.toDate ?? 'Any end date'}</dd></div>
+            <div><dt>Category</dt><dd>{activeCategory}{appliedQuery.categoryId &&
+              !findCategorySelection(categories, appliedQuery.categoryId).subcategoryId
+              ? ' (including subcategories)' : ''}</dd></div>
+            <div><dt>Currency</dt><dd>{appliedQuery.currency || 'All currencies, totaled separately'}</dd></div>
+            <div><dt>Transaction rules</dt><dd>{appliedQuery.spendingOnly
+              ? 'Spending and expense refunds' : 'All transaction types'};
+              {' '}{appliedQuery.budgetInclusion
+                ? appliedQuery.budgetInclusion === 'NotIncluded'
+                  ? 'not included in budgets; voided transactions omitted'
+                  : 'budget-included only; excluded and voided transactions omitted'
+                : 'includes excluded and voided transactions'}</dd></div>
+            {appliedQuery.accountId && <div><dt>Account</dt><dd>
+              {accounts.find(account => account.id === appliedQuery.accountId)?.name ?? 'Selected account'}
+            </dd></div>}
+            {appliedQuery.categoryType && <div><dt>Category type</dt><dd>{appliedQuery.categoryType}</dd></div>}
+            {appliedQuery.description && <div><dt>Description contains</dt><dd>{appliedQuery.description}</dd></div>}
+          </dl>
+          {pendingFilterChanges && <p role="status">
+            Filter edits are not applied yet. Results and export still use the active filters.
+          </p>}
+        </section>}
+
+        {!isLoading && !loadFailed && totalsUnavailable && <div className="transaction-matching-totals" role="status">
+          <p>Matching totals could not be refreshed after saving. Retry the search before comparing amounts.</p>
+          <button className="secondary-button" type="button" onClick={retrySearch}>Retry search</button>
+        </div>}
+        {!isLoading && !loadFailed && !totalsUnavailable && <section className="transaction-matching-totals"
+          aria-label="Matching totals across all pages" aria-live="polite">
+          <h2>Matched amount</h2>
+          <p>All {pagination.totalCount} matching transactions, across every page.</p>
+          <div>{Object.entries(totalsByCurrency).sort(([a], [b]) => a.localeCompare(b))
+            .map(([currency, amount]) => <strong key={currency}>{currency} {formatAmount(amount, currency)}</strong>)}
+            {Object.keys(totalsByCurrency).length === 0 && (appliedQuery.currency
+              ? <strong>{appliedQuery.currency} {formatAmount(0, appliedQuery.currency)}</strong>
+              : <span>No matching amounts</span>)}
+          </div>
+          <small>Positive is spending; negative is income, a refund, or a credit. Currencies are never combined.</small>
+        </section>}
+
+        {!isLoading && !loadFailed && (
           <p className="transaction-result-summary">
             Showing {firstResult}–{lastResult} of {pagination.totalCount} matching transactions
           </p>
         )}
 
-        {isLoading ? (
+        {loadFailed ? (
+          <div className="empty-state">
+            <h2>Could not load matching transactions</h2>
+            <p>No reliable matching total is available. Your filters have been kept.</p>
+            <button className="secondary-button" type="button" onClick={retrySearch}>Retry search</button>
+          </div>
+        ) : isLoading ? (
           <p className="empty-state">Loading transactions...</p>
         ) : transactions.length === 0 ? (
           <div className="empty-state">
@@ -718,7 +852,7 @@ export function TransactionManagementPage() {
           </div>
         )}
 
-        {pagination.totalPages > 1 && (
+        {!loadFailed && pagination.totalPages > 1 && (
           <nav className="transaction-pagination" aria-label="Transaction result pages">
             <button className="secondary-button" type="button"
               disabled={pagination.page <= 1 || isLoading}

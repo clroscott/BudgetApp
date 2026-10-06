@@ -24,7 +24,7 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
         CancellationToken cancellationToken,
         string? budgetInclusion = null, string? currency = null, bool spendingOnly = false)
     {
-        var query =
+        var filtered =
             from transaction in dbContext.Transactions.AsNoTracking()
             join account in dbContext.Accounts.AsNoTracking()
                 on transaction.AccountId equals account.Id
@@ -64,6 +64,13 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
                       transaction.Description.ToUpper().Contains(descriptionSearch.ToUpper()))
             orderby transaction.TransactionDate descending,
                 transaction.Id descending
+            select new { transaction, account, category };
+
+        var query =
+            from row in filtered
+            let transaction = row.transaction
+            let account = row.account
+            let category = row.category
             select new TransactionRecord(
                 transaction.Id,
                 account.Scope == AccountScope.Personal && account.OwnerUserId != userId ? null : account.Id,
@@ -91,12 +98,23 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
                     transaction.IncludeInHouseholdBudget == null && account.OwnerUserId == userId && account.Scope == AccountScope.Personal),
                 transaction.UpdatedAtUtc);
 
-        var totalCount = await query.CountAsync(cancellationToken);
+        var totalCount = await filtered.CountAsync(cancellationToken);
+        // Aggregate entity fields before the DTO constructor, so EF can translate
+        // GROUP BY/SUM on SQL Server instead of evaluating a record in the query.
+        var amounts = filtered.Select(row => new { row.account.Currency, row.transaction.Amount });
+        // Keep exact decimal totals. SQL Server aggregates in SQL; the isolated
+        // SQLite test provider cannot SUM decimal, so it groups this light projection in memory.
+        var totals = dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite"
+            ? (await amounts.ToListAsync(cancellationToken)).GroupBy(record => record.Currency)
+                .ToDictionary(group => group.Key, group => group.Sum(record => record.Amount))
+            : await amounts.GroupBy(record => record.Currency)
+                .Select(group => new { Currency = group.Key, Amount = group.Sum(record => record.Amount) })
+                .ToDictionaryAsync(group => group.Currency, group => group.Amount, cancellationToken);
         var items = await query
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);
-        return new TransactionQueryResult(items, totalCount);
+        return new TransactionQueryResult(items, totalCount, totals);
     }
 
     public async Task<IReadOnlyList<TransactionExportRecord>> ListVisibleForExportAsync(

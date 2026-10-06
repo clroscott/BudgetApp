@@ -6,7 +6,7 @@ import {
   type AnnualBudgetOverview,
 } from '../budgets/annualBudgetOverviewApi'
 import type { BudgetScope } from '../budgets/budgetApi'
-import { transactionLink } from '../budgets/transactionDrilldown'
+import { annualOverviewSelection, transactionLink } from '../budgets/transactionDrilldown'
 import { BrandLockup } from '../components/Brand'
 import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import { ErrorSummary } from '../components/ErrorSummary'
@@ -19,8 +19,8 @@ const monthNames = Array.from({ length: 12 }, (_, index) =>
 
 export function AnnualBudgetOverviewPage() {
   const { currentHousehold } = useHouseholds()
-  const [year, setYear] = useState(new Date().getFullYear())
-  const [scope, setScope] = useState<BudgetScope>('Household')
+  const [year, setYear] = useState(() => annualOverviewSelection(window.location.search).year)
+  const [scope, setScope] = useState<BudgetScope>(() => annualOverviewSelection(window.location.search).scope)
   const [overview, setOverview] = useState<AnnualBudgetOverview | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errors, setErrors] = useState<string[]>([])
@@ -106,7 +106,7 @@ export function AnnualBudgetOverviewPage() {
           <Summary label="Budgeted" value={formatAmount(overview.annualBudgetedAmount)}
             detail={`${overview.budgetedMonthCount} of 12 months have budgets`} />
           <Summary label="Actual spending" value={formatAmount(overview.actualSpendingAmount)}
-            link={transactionLink(year, scope, overview.currency)} detail="Official, budget-included transactions" />
+            link={transactionLink(overview.year, overview.scope, overview.currency, undefined, undefined, currentHousehold.id)} detail="Official, budget-included transactions" />
           <Summary label="Remaining"
             value={overview.remainingAmount === null
               ? 'No budgets'
@@ -124,7 +124,7 @@ export function AnnualBudgetOverviewPage() {
           <p className="budget-actual-warning">
             <strong>{formatAmount(overview.uncategorizedSpendingAmount)} uncategorized</strong>
             {' '}is included in spending totals but not in a category row.{' '}
-            <AppLink to={`${transactionLink(year, scope, overview.currency)}&uncategorizedOnly=true`}>
+            <AppLink to={`${transactionLink(overview.year, overview.scope, overview.currency, undefined, undefined, currentHousehold.id)}&uncategorizedOnly=true`}>
               Review transactions
             </AppLink>
           </p>}
@@ -173,7 +173,7 @@ export function AnnualBudgetOverviewPage() {
                   <AppLink to={`/budgeting?year=${year}&month=${month.month}&scope=${scope}`}>
                     {month.budgetId ? 'Open budget' : 'Budget month'}
                   </AppLink>
-                  <AppLink to={transactionLink(year, scope, overview.currency, undefined, month.month)}>
+                  <AppLink to={transactionLink(overview.year, overview.scope, overview.currency, undefined, month.month, currentHousehold.id)}>
                     Transactions
                   </AppLink>
                 </div>
@@ -206,8 +206,8 @@ export function AnnualBudgetOverviewPage() {
                 <CategoryRow
                   key={category.id}
                   category={category}
-                  year={year}
-                  scope={scope} currency={overview.currency}
+                  year={overview.year}
+                  scope={overview.scope} currency={overview.currency} householdId={currentHousehold.id}
                   formatAmount={formatAmount}
                 />)}
             </div>
@@ -241,7 +241,7 @@ function Summary({
 function CategoryRow({
   category,
   year,
-  scope, currency,
+  scope, currency, householdId,
   formatAmount,
   depth = 0,
 }: {
@@ -249,13 +249,14 @@ function CategoryRow({
   year: number
   scope: BudgetScope
   currency: string
+  householdId: string
   formatAmount: (amount: number) => string
   depth?: number
 }) {
   const row = (
     <div className={`annual-category-row ${depth > 0 ? 'annual-category-child' : 'annual-category-parent'}`}>
       <span style={{ '--category-depth': depth } as CSSProperties}>
-        <AppLink to={transactionLink(year, scope, currency, category.id)}>{category.name}</AppLink>
+        <AppLink to={transactionLink(year, scope, currency, category.id, undefined, householdId)}>{category.name}</AppLink>
         {!category.isActive && <small>Deactivated</small>}
       </span>
       <strong>{category.budgetedAmount === null
@@ -277,7 +278,7 @@ function CategoryRow({
         key={child.id}
         category={child}
         year={year}
-        scope={scope} currency={currency}
+        scope={scope} currency={currency} householdId={householdId}
         formatAmount={formatAmount}
         depth={depth + 1}
       />)
