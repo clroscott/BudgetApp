@@ -1574,6 +1574,56 @@ a {
   max-width: 68rem;
 }
 
+.transaction-report-context,
+.transaction-active-filters,
+.transaction-matching-totals {
+  margin-bottom: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface);
+}
+
+.transaction-report-context {
+  border-inline-start: 4px solid var(--accent);
+}
+
+.transaction-report-context p,
+.transaction-matching-totals p {
+  margin: 0.4rem 0;
+}
+
+.transaction-active-filters h2,
+.transaction-matching-totals h2 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.transaction-active-filters dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.transaction-active-filters dt {
+  color: var(--muted-text);
+  font-size: 0.8rem;
+}
+
+.transaction-active-filters dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.transaction-matching-totals > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  margin-bottom: 0.4rem;
+  font-size: 1.25rem;
+}
+
 .transaction-filter-panel {
   margin-bottom: 1rem;
   padding: 1.25rem;

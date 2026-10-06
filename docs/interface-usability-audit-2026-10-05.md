@@ -98,6 +98,13 @@ uncategorized links retain their intended meaning. Authorization still applies
 server-side, including exports if they use the new filters. Manual filter changes
 remain possible and clearly indicate when the view no longer matches the report.
 
+**Implementation follow-up (#175):** Budget-inclusion/currency/spending filters
+were introduced with #182. Drill-down context, all-page matching totals, report
+selection on return, restoration/change indicators, and reconciliation/privacy
+tests are now implemented. See [annual-report drill-downs](annual-report-drilldowns.md)
+and the regression checklist for manual sign-off. The evidence above records
+the original audited revision, not the updated behavior.
+
 ### UI-03 — Failed requests look like loading or legitimately empty data
 
 **Medium. Pages:** Annual overview, Annual targets, Monthly budget, Household.

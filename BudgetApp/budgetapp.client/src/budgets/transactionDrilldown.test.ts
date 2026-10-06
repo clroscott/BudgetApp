@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { transactionLink } from './transactionDrilldown'
+import { annualOverviewSelection, transactionLink } from './transactionDrilldown'
 
 describe('annual budget transaction links', () => {
   it('preserves scope, currency, category and spending semantics', () => {
@@ -18,5 +18,17 @@ describe('annual budget transaction links', () => {
     const link = new URL(transactionLink(1, 'Household', 'CAD', undefined, 2), 'https://example.test')
     expect(link.searchParams.get('fromDate')).toBe('0001-02-01')
     expect(link.searchParams.get('toDate')).toBe('0001-02-28')
+  })
+  it('records the originating household and year without putting a financial amount in the URL', () => {
+    const link = new URL(transactionLink(2026, 'Personal', 'CAD', undefined, 7, 'household-a'), 'https://example.test')
+    expect(link.searchParams.get('report')).toBe('annual-overview')
+    expect(link.searchParams.get('reportYear')).toBe('2026')
+    expect(link.searchParams.get('reportHouseholdId')).toBe('household-a')
+    expect(link.searchParams.has('amount')).toBe(false)
+  })
+  it('restores the selected report year and scope and ignores invalid selection values', () => {
+    expect(annualOverviewSelection('?year=2024&scope=Personal')).toEqual({ year: 2024, scope: 'Personal' })
+    expect(annualOverviewSelection('?year=0&scope=Other')).toEqual({ year: new Date().getFullYear(), scope: 'Household' })
+    expect(annualOverviewSelection('?year=99999')).toEqual({ year: new Date().getFullYear(), scope: 'Household' })
   })
 })

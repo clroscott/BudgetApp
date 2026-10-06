@@ -72,7 +72,8 @@ public sealed class TransactionManagementService(
             page,
             PageSize,
             result.TotalCount,
-            totalPages);
+            totalPages,
+            result.TotalsByCurrency);
     }
 
     public async Task UpdateAsync(
