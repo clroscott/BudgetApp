@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import {
   getBudgetMonthOptions,
@@ -83,6 +83,7 @@ function planPeriod(startYear: number, startMonth: number) {
 
 export function YearlyPlanManagementPage() {
   const { currentHousehold } = useHouseholds()
+  const defaultMonthId = useId()
   const [year, setYear] = useState(new Date().getFullYear())
   const [scope, setScope] = useState<BudgetScope>('Household')
   const [plan, setPlan] = useState<YearlyPlanData | null>(null)
@@ -420,20 +421,24 @@ export function YearlyPlanManagementPage() {
       <section className="panel fiscal-default-panel">
         <div>
           <h2>Household fiscal-year default</h2>
-          <p>
+          <p id={`${defaultMonthId}-help`}>
             Chooses the initial month shown for annual plans you have not saved
             yet. You can still change the month above before saving each plan.
+            {' '}This default does not change saved annual plans or existing monthly budgets.
           </p>
         </div>
-        <select
-          value={loadState.hasData ? defaultStartMonth : ''}
-          disabled={!canManage || isSaving}
-          onChange={event => setDefaultStartMonth(Number(event.target.value))}
-        >
-          {!loadState.hasData && <option value="">Unavailable</option>}
-          {monthNames.map((name, index) =>
-            <option key={name} value={index + 1}>{name}</option>)}
-        </select>
+        <label className="fiscal-default-month" htmlFor={defaultMonthId}>
+          <span>Default fiscal-year starting month</span>
+          <select id={defaultMonthId} aria-describedby={`${defaultMonthId}-help`}
+            value={loadState.hasData ? defaultStartMonth : ''}
+            disabled={!canManage || isSaving}
+            onChange={event => setDefaultStartMonth(Number(event.target.value))}
+          >
+            {!loadState.hasData && <option value="">Unavailable</option>}
+            {monthNames.map((name, index) =>
+              <option key={name} value={index + 1}>{name}</option>)}
+          </select>
+        </label>
         <button
           className="secondary-button"
           disabled={

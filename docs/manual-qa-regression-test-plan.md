@@ -561,6 +561,44 @@ instructions and the privacy contract.
       and export; private-only rows do not contribute to their matching totals.
 - [ ] Empty-category, empty-budget, and empty-transaction years render safely.
 
+## Annual financial accessibility regression (#179)
+
+Use Development/Scratch fixtures and record the browser, screen reader/version,
+viewport, and actual browser zoom. See
+[the annual accessibility guide](annual-financial-accessibility.md). Automated
+semantic tests do not replace live screen-reader or zoom sign-off.
+
+- [ ] In both Household and Personal Annual overview, navigate the category table
+      with a screen reader. Its caption identifies scope, year, and currency;
+      every amount announces the correct category and Budgeted / Actual /
+      Remaining / Average actual per month measure.
+- [ ] Check root and subcategory rows without relying on color or indentation.
+      Children identify their parent path, and root totals explain that they
+      include subcategories. Duplicate names remain associated with the correct
+      row. Deactivated and long category names remain understandable.
+- [ ] Compare missing budgets with saved zero budgets: No budget is not a zero,
+      and missing remaining is explained rather than an unexplained dash.
+      Negative actual/average values have their sign and Negative amount text;
+      negative remaining has its sign and Over budget text.
+- [ ] Category links remain keyboard reachable and open transactions with the
+      correct category, year, budget inclusion, currency, and household context.
+      Report values still reconcile; the presentation does not alter calculations
+      or combine overlapping Household and Personal totals.
+- [ ] At approximately 390px width and at actual 200% browser zoom, the page stays
+      within the viewport. Focus the named category-table region and scroll
+      sideways with arrow keys to reach every column; focus remains visible,
+      headers remain available, and long names do not overlap amounts. Tab and
+      Shift-Tab can enter/leave the region and reach its category links.
+- [ ] Empty category responses and future/partial-year average explanations remain
+      clear. Existing loading, stale, failure, and Retry states still work.
+- [ ] On Annual targets, Default fiscal-year starting month has a visible label
+      and announces its explanation. It is clearly distinct from Fiscal year
+      begins for the current plan. Read-only users cannot save the default.
+- [ ] Change the household default with the keyboard, verify unsaved-change
+      protection, then save once. New unsaved plans use it; the selected saved
+      annual plan and existing monthly budgets do not change. No allocation or
+      annual-target write occurs as a side effect.
+
 ## Dashboard and activity history
 
 - [ ] Dashboard panels load, rearrange, and retain their saved layout.
