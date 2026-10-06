@@ -3,6 +3,9 @@ import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
 import { getCategories, type CategoryItem, type CategoryType } from '../categories/categoryApi'
 import { BrandLockup } from '../components/Brand'
+import { budgetInclusionLabel } from '../transactions/budgetInclusion'
+import { BudgetInclusionEditor } from '../components/BudgetInclusionEditor'
+import { useRouter } from '../routing/useRouter'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
@@ -31,6 +34,9 @@ interface TransactionFilters {
   categoryId: string
   subcategoryId: string
   description: string
+  budgetInclusion: string
+  currency: string
+  spendingOnly: boolean
 }
 
 interface PaginationState {
@@ -57,6 +63,7 @@ function createDefaultFilters(): TransactionFilters {
   const today = new Date()
   return {
     accountId: '',
+    budgetInclusion: '', currency: '', spendingOnly: false,
     dateMode: 'pastDays',
     pastDays: '30',
     specificDate: formatLocalDate(today),
@@ -77,6 +84,9 @@ function createInitialFilters(): TransactionFilters {
   const toDate = search.get('toDate') ?? ''
   const categoryId = search.get('categoryId') ?? ''
   const uncategorizedOnly = search.get('uncategorizedOnly') === 'true'
+  defaults.budgetInclusion = search.get('budgetInclusion') ?? ''
+  defaults.currency = search.get('currency') ?? ''
+  defaults.spendingOnly = search.get('spendingOnly') === 'true'
   if (!fromDate || !toDate) return defaults
 
   return {
@@ -91,6 +101,9 @@ function createInitialFilters(): TransactionFilters {
 function buildTransactionQuery(filters: TransactionFilters, page: number): TransactionQuery {
   const query: TransactionQuery = {
     accountId: filters.accountId || undefined,
+    budgetInclusion: filters.budgetInclusion || undefined,
+    currency: filters.currency || undefined,
+    spendingOnly: filters.spendingOnly || undefined,
     categoryType: filters.categoryType || undefined,
     categoryId: filters.categoryId === uncategorizedFilterValue
       ? undefined
@@ -160,7 +173,7 @@ function toEditRequest(transaction: TransactionItem): UpdateTransactionRequest {
     description: transaction.description,
     merchantName: transaction.merchantName,
     notes: transaction.notes,
-    isExcludedFromBudget: transaction.isExcludedFromBudget,
+    updatedAtUtc: transaction.updatedAtUtc,
   }
 }
 
@@ -169,6 +182,7 @@ function formatAmount(amount: number, currency: string) {
 }
 
 export function TransactionManagementPage() {
+  const { confirmNavigation } = useRouter()
   const { currentHousehold } = useHouseholds()
   const initialFilters = useMemo(createInitialFilters, [])
   const [transactions, setTransactions] = useState<TransactionItem[]>([])
@@ -186,6 +200,7 @@ export function TransactionManagementPage() {
   })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editRequest, setEditRequest] = useState<UpdateTransactionRequest | null>(null)
+  const [editBaseline, setEditBaseline] = useState<UpdateTransactionRequest | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
@@ -240,12 +255,8 @@ export function TransactionManagementPage() {
     return () => { isCurrent = false }
   }, [appliedQuery, currentHousehold])
 
-  const editingTransaction = useMemo(
-    () => transactions.find(transaction => transaction.id === editingId) ?? null,
-    [editingId, transactions],
-  )
-  const isEditDirty = editingTransaction !== null && editRequest !== null &&
-    JSON.stringify(editRequest) !== JSON.stringify(toEditRequest(editingTransaction))
+  const isEditDirty = editRequest !== null && editBaseline !== null &&
+    JSON.stringify(editRequest) !== JSON.stringify(editBaseline)
   const confirmDiscard = useUnsavedChangesGuard(
     isEditDirty,
     'Discard the unsaved transaction changes?',
@@ -263,6 +274,7 @@ export function TransactionManagementPage() {
   const cancelEditing = () => {
     setEditingId(null)
     setEditRequest(null)
+    setEditBaseline(null)
   }
 
   const confirmDiscardEdit = () => {
@@ -276,12 +288,14 @@ export function TransactionManagementPage() {
     if (!confirmDiscardEdit()) return
     setEditingId(transaction.id)
     setEditRequest(toEditRequest(transaction))
+    setEditBaseline(toEditRequest(transaction))
     setErrors([])
   }
 
   const handleApplyFilters = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!confirmDiscardEdit()) return
+    if (!confirmNavigation()) return
+    cancelEditing()
     setErrors([])
     try {
       setAppliedQuery(buildTransactionQuery(filters, 1))
@@ -291,7 +305,8 @@ export function TransactionManagementPage() {
   }
 
   const handleResetFilters = () => {
-    if (!confirmDiscardEdit()) return
+    if (!confirmNavigation()) return
+    cancelEditing()
     const defaults = createDefaultFilters()
     setFilters(defaults)
     setAppliedQuery(buildTransactionQuery(defaults, 1))
@@ -299,7 +314,8 @@ export function TransactionManagementPage() {
   }
 
   const changePage = (page: number) => {
-    if (!confirmDiscardEdit()) return
+    if (!confirmNavigation()) return
+    cancelEditing()
     setAppliedQuery(current => ({ ...current, page }))
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -326,20 +342,23 @@ export function TransactionManagementPage() {
     }
     try {
       await updateTransaction(currentHousehold.id, editingId, normalizedRequest)
-      setTransactions(current => current.map(transaction =>
-        transaction.id === editingId
-          ? {
-              ...transaction,
-              ...normalizedRequest,
-              categoryName: categoryLabel(categories, normalizedRequest.categoryId),
-            }
-          : transaction))
       cancelEditing()
+      try { await refreshSavedTransaction(editingId) }
+      catch { setErrors(['Transaction saved, but the list could not be refreshed. Reload before editing again.']) }
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const refreshSavedTransaction = async (id: string) => {
+    const result = await getTransactions(currentHousehold.id, appliedQuery)
+    const saved = result.items.find(transaction => transaction.id === id)
+    // Refresh only this row: never unmount another editor with unsaved choices.
+    setTransactions(current => current.flatMap(transaction =>
+      transaction.id === id ? saved ? [saved] : [] : [transaction]))
+    setPagination(result)
   }
 
   const handleExport = async () => {
@@ -381,6 +400,8 @@ export function TransactionManagementPage() {
             <p className="eyebrow">Household activity</p>
             <h1>Transactions</h1>
             <p>Search and edit transactions in BudgetApp while preserving their import history.</p>
+            <p>One transaction can count in your Personal budget, the Household budget, or both.
+              Account ownership and private import files do not change.</p>
           </div>
           <AppLink to="/import">Import CSV</AppLink>
         </div>
@@ -389,6 +410,24 @@ export function TransactionManagementPage() {
 
         <form className="transaction-filter-panel" onSubmit={handleApplyFilters}>
           <div className="transaction-filter-grid">
+            <label><span>Currency</span>
+              <input value={filters.currency} maxLength={3} placeholder="All currencies"
+                onChange={event => setFilters({ ...filters, currency: event.target.value.toUpperCase() })} />
+            </label>
+            <label className="checkbox-row"><input type="checkbox" checked={filters.spendingOnly}
+              onChange={event => setFilters({ ...filters, spendingOnly: event.target.checked })} />
+              Spending only (includes expense refunds)</label>
+            <label>
+              <span>Budget inclusion</span>
+              <select value={filters.budgetInclusion} onChange={event =>
+                setFilters({ ...filters, budgetInclusion: event.target.value })}>
+                <option value="">All visible transactions</option>
+                <option value="Personal">My personal budget (including shared expenses)</option>
+                <option value="Household">Household budget (including personal-account expenses)</option>
+                <option value="PersonalAndHousehold">Personal + Household</option>
+                <option value="NotIncluded">Not included in my budgets</option>
+              </select>
+            </label>
             <label>
               <span>Account</span>
               <select value={filters.accountId} onChange={event =>
@@ -548,7 +587,7 @@ export function TransactionManagementPage() {
                     {formatAmount(transaction.amount, transaction.currency)}
                   </strong>
                   <div className="transaction-flags">
-                    {transaction.isExcludedFromBudget && <span>Excluded</span>}
+                    <span>{budgetInclusionLabel(transaction.includeInHouseholdBudget ?? false, transaction.includeInPersonalBudget ?? false)}</span>
                     {transaction.isVoided && <span>Voided</span>}
                   </div>
                   {transaction.canEdit ? (
@@ -558,6 +597,10 @@ export function TransactionManagementPage() {
                     </button>
                   ) : <small>View only</small>}
                 </article>
+
+                <BudgetInclusionEditor key={transaction.id} householdId={currentHousehold.id}
+                  transaction={transaction} disabled={editingId === transaction.id}
+                  onSaved={() => refreshSavedTransaction(transaction.id)} />
 
                 {editingId === transaction.id && editRequest && (
                   <form className="transaction-edit-form transaction-inline-edit"
@@ -662,14 +705,8 @@ export function TransactionManagementPage() {
                       </label>
                     </div>
 
-                    <label className="checkbox-row">
-                      <input type="checkbox" checked={editRequest.isExcludedFromBudget}
-                        onChange={event => setEditRequest({
-                          ...editRequest,
-                          isExcludedFromBudget: event.target.checked,
-                        })} />
-                      <span>Exclude this transaction from budget totals</span>
-                    </label>
+                    <p>Budget inclusion is edited separately using “Include in budgets”.
+                      Financial corrections affect every budget that includes this transaction.</p>
 
                     <button className="primary-button" type="submit" disabled={isSaving}>
                       {isSaving ? 'Saving...' : 'Save transaction'}

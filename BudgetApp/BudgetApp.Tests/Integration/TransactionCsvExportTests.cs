@@ -55,7 +55,7 @@ public sealed class TransactionCsvExportTests(BudgetAppWebApplicationFactory fac
         var csv = await response.Content.ReadAsStringAsync();
         Assert.Contains(
             "Transaction Date,Description,Amount,Currency,Account,Category," +
-            "Subcategory,Budget Treatment,Notes",
+            "Subcategory,Budget Treatment,Included in Budgets,Notes",
             csv);
         Assert.Contains("\"'=SUM(1,1)\"", csv);
         Assert.Contains("'@Formula Note", csv);

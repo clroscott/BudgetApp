@@ -28,7 +28,9 @@ public sealed class TransactionsController(
         [FromQuery] bool uncategorizedOnly,
         [FromQuery] string? description,
         CancellationToken cancellationToken,
-        [FromQuery] int page = 1)
+        [FromQuery] int page = 1,
+        [FromQuery] string? budgetInclusion = null, [FromQuery] string? currency = null,
+        [FromQuery] bool spendingOnly = false)
     {
         if (!TryGetUserId(out var userId))
         {
@@ -48,7 +50,7 @@ public sealed class TransactionsController(
                 uncategorizedOnly,
                 description,
                 page,
-                cancellationToken));
+                cancellationToken, budgetInclusion, currency, spendingOnly));
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -66,7 +68,9 @@ public sealed class TransactionsController(
         [FromQuery] Guid? categoryId,
         [FromQuery] bool uncategorizedOnly,
         [FromQuery] string? description,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery] string? budgetInclusion = null, [FromQuery] string? currency = null,
+        [FromQuery] bool spendingOnly = false)
     {
         if (!TryGetUserId(out var userId))
         {
@@ -85,7 +89,7 @@ public sealed class TransactionsController(
                 categoryId,
                 uncategorizedOnly,
                 description,
-                cancellationToken);
+                cancellationToken, budgetInclusion, currency, spendingOnly);
             logger.LogInformation(
                 "User {UserId} exported {TransactionCount} visible transactions " +
                 "from household {HouseholdId}",
@@ -126,7 +130,7 @@ public sealed class TransactionsController(
                 request.MerchantName,
                 request.Notes,
                 request.IsExcludedFromBudget,
-                cancellationToken);
+                cancellationToken, request.UpdatedAtUtc);
             logger.LogInformation(
                 "User {UserId} updated transaction {TransactionId} in household {HouseholdId}",
                 userId,
@@ -134,10 +138,34 @@ public sealed class TransactionsController(
                 householdId);
             return NoContent();
         }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            return Conflict(new ProblemDetails { Title = "Transaction changed elsewhere", Detail = "Reload before saving." });
+        }
         catch (Exception exception) when (IsExpected(exception))
         {
             return MapException(exception);
         }
+    }
+
+    [HttpPut("{transactionId:guid}/budget-inclusion")]
+    public async Task<IActionResult> UpdateBudgetInclusion(
+        Guid householdId, Guid transactionId, UpdateBudgetInclusionRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        try
+        {
+            await transactionManagementService.UpdateBudgetInclusionAsync(
+                householdId, userId, transactionId, request.IncludeInHouseholdBudget,
+                request.IncludeInPersonalBudget, request.UpdatedAtUtc, cancellationToken);
+            return NoContent();
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            return Conflict(new ProblemDetails { Title = "Transaction changed elsewhere", Detail = "Reload before saving." });
+        }
+        catch (Exception exception) when (IsExpected(exception)) { return MapException(exception); }
     }
 
     private bool TryGetUserId(out Guid userId) =>
@@ -154,6 +182,7 @@ public sealed class TransactionsController(
     {
         var (status, title) = exception switch
         {
+            TransactionConflictException => (StatusCodes.Status409Conflict, "Transaction changed elsewhere"),
             HouseholdAccessDeniedException =>
                 (StatusCodes.Status403Forbidden, "Household access denied"),
             TransactionNotFoundException =>
@@ -181,4 +210,9 @@ public sealed record UpdateTransactionRequest(
     string Description,
     [param: StringLength(Transaction.MerchantNameMaxLength)] string? MerchantName,
     [param: StringLength(Transaction.NotesMaxLength)] string? Notes,
-    bool IsExcludedFromBudget);
+    bool? IsExcludedFromBudget,
+    DateTimeOffset? UpdatedAtUtc = null);
+
+public sealed record UpdateBudgetInclusionRequest(
+    bool? IncludeInHouseholdBudget, bool IncludeInPersonalBudget,
+    DateTimeOffset UpdatedAtUtc);

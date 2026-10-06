@@ -21,7 +21,8 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
         string? descriptionSearch,
         int skip,
         int take,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? budgetInclusion = null, string? currency = null, bool spendingOnly = false)
     {
         var query =
             from transaction in dbContext.Transactions.AsNoTracking()
@@ -31,8 +32,26 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
                 on transaction.CategoryId equals category.Id into categories
             from category in categories.DefaultIfEmpty()
             where transaction.HouseholdId == householdId &&
-                  (account.Scope == AccountScope.Household || account.OwnerUserId == userId) &&
-                  (!accountId.HasValue || transaction.AccountId == accountId.Value) &&
+                  (account.Scope == AccountScope.Household || account.OwnerUserId == userId ||
+                   transaction.IncludeInHouseholdBudget == true && !transaction.IsExcludedFromBudget) &&
+                  (!accountId.HasValue || (account.Scope == AccountScope.Household || account.OwnerUserId == userId) && transaction.AccountId == accountId.Value) &&
+                  (currency == null || account.Currency == currency) &&
+                  (!spendingOnly || category != null && category.Type == CategoryType.Expense ||
+                   category == null && transaction.Amount > 0) &&
+                  (budgetInclusion == null ||
+                   !transaction.IsVoided && (
+                    budgetInclusion == "NotIncluded" &&
+                     (transaction.IsExcludedFromBudget ||
+                      !(transaction.IncludeInHouseholdBudget ?? account.Scope == AccountScope.Household) &&
+                      !transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) &&
+                      !(transaction.IncludeInHouseholdBudget == null && account.Scope == AccountScope.Personal && account.OwnerUserId == userId)) ||
+                    !transaction.IsExcludedFromBudget &&
+                     ((budgetInclusion == "Household" || budgetInclusion == "PersonalAndHousehold") &&
+                       (transaction.IncludeInHouseholdBudget ?? account.Scope == AccountScope.Household) &&
+                       (budgetInclusion != "PersonalAndHousehold" || transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId)) ||
+                      budgetInclusion == "Personal" &&
+                       (transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) ||
+                        transaction.IncludeInHouseholdBudget == null && account.Scope == AccountScope.Personal && account.OwnerUserId == userId)))) &&
                   (!fromDate.HasValue || transaction.TransactionDate >= fromDate.Value) &&
                   (!toDate.HasValue || transaction.TransactionDate <= toDate.Value) &&
                   (!categoryType.HasValue ||
@@ -47,23 +66,30 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
                 transaction.Id descending
             select new TransactionRecord(
                 transaction.Id,
-                account.Id,
-                account.Name,
+                account.Scope == AccountScope.Personal && account.OwnerUserId != userId ? null : account.Id,
+                account.Scope == AccountScope.Personal && account.OwnerUserId != userId ? "Shared expense (private account)" : account.Name,
                 account.Currency,
                 transaction.CategoryId,
                 category == null ? null : category.Name,
                 transaction.TransactionDate,
-                transaction.PostedDate,
+                account.Scope == AccountScope.Personal && account.OwnerUserId != userId ? null : transaction.PostedDate,
                 transaction.Amount,
                 transaction.Description,
-                transaction.MerchantName,
-                transaction.Notes,
+                account.Scope == AccountScope.Personal && account.OwnerUserId != userId ? null : transaction.MerchantName,
+                account.Scope == AccountScope.Personal && account.OwnerUserId != userId ? null : transaction.Notes,
                 transaction.Source.ToString(),
                 transaction.ReviewStatus.ToString(),
-                transaction.IsExcludedFromBudget,
+                transaction.IsExcludedFromBudget ||
+                    !(transaction.IncludeInHouseholdBudget ?? account.Scope == AccountScope.Household) &&
+                    !transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) &&
+                    !(transaction.IncludeInHouseholdBudget == null && account.Scope == AccountScope.Personal && account.OwnerUserId == userId),
                 transaction.IsVoided,
                 account.Scope == AccountScope.Personal,
-                account.OwnerUserId);
+                account.OwnerUserId,
+                !transaction.IsExcludedFromBudget && (transaction.IncludeInHouseholdBudget ?? account.Scope == AccountScope.Household),
+                !transaction.IsExcludedFromBudget && (transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) ||
+                    transaction.IncludeInHouseholdBudget == null && account.OwnerUserId == userId && account.Scope == AccountScope.Personal),
+                transaction.UpdatedAtUtc);
 
         var totalCount = await query.CountAsync(cancellationToken);
         var items = await query
@@ -90,9 +116,27 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
                 on category.ParentCategoryId equals parentCategory.Id into parentCategories
             from parentCategory in parentCategories.DefaultIfEmpty()
             where transaction.HouseholdId == householdId &&
-                  (account.Scope == AccountScope.Household || account.OwnerUserId == userId) &&
+                  (account.Scope == AccountScope.Household || account.OwnerUserId == userId ||
+                   transaction.IncludeInHouseholdBudget == true && !transaction.IsExcludedFromBudget) &&
                   (!criteria.AccountId.HasValue ||
-                      transaction.AccountId == criteria.AccountId.Value) &&
+                      (account.Scope == AccountScope.Household || account.OwnerUserId == userId) && transaction.AccountId == criteria.AccountId.Value) &&
+                  (criteria.Currency == null || account.Currency == criteria.Currency) &&
+                  (!criteria.SpendingOnly || category != null && category.Type == CategoryType.Expense ||
+                   category == null && transaction.Amount > 0) &&
+                  (criteria.BudgetInclusion == null ||
+                   !transaction.IsVoided && (
+                    criteria.BudgetInclusion == "NotIncluded" &&
+                     (transaction.IsExcludedFromBudget ||
+                      !(transaction.IncludeInHouseholdBudget ?? account.Scope == AccountScope.Household) &&
+                      !transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) &&
+                      !(transaction.IncludeInHouseholdBudget == null && account.Scope == AccountScope.Personal && account.OwnerUserId == userId)) ||
+                    !transaction.IsExcludedFromBudget &&
+                     ((criteria.BudgetInclusion == "Household" || criteria.BudgetInclusion == "PersonalAndHousehold") &&
+                       (transaction.IncludeInHouseholdBudget ?? account.Scope == AccountScope.Household) &&
+                       (criteria.BudgetInclusion != "PersonalAndHousehold" || transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId)) ||
+                      criteria.BudgetInclusion == "Personal" &&
+                       (transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) ||
+                        transaction.IncludeInHouseholdBudget == null && account.Scope == AccountScope.Personal && account.OwnerUserId == userId)))) &&
                   (!criteria.FromDate.HasValue ||
                       transaction.TransactionDate >= criteria.FromDate.Value) &&
                   (!criteria.ToDate.HasValue ||
@@ -110,7 +154,7 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
             orderby transaction.TransactionDate,
                 transaction.Id
             select new TransactionExportRecord(
-                account.Name,
+                account.Scope == AccountScope.Personal && account.OwnerUserId != userId ? "Shared expense (private account)" : account.Name,
                 account.Currency,
                 category == null
                     ? null
@@ -123,8 +167,14 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
                 transaction.TransactionDate,
                 transaction.Amount,
                 transaction.Description,
-                transaction.Notes,
-                transaction.IsExcludedFromBudget))
+                account.Scope == AccountScope.Personal && account.OwnerUserId != userId ? null : transaction.Notes,
+                transaction.IsExcludedFromBudget ||
+                    !(transaction.IncludeInHouseholdBudget ?? account.Scope == AccountScope.Household) &&
+                    !transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) &&
+                    !(transaction.IncludeInHouseholdBudget == null && account.Scope == AccountScope.Personal && account.OwnerUserId == userId),
+                !transaction.IsExcludedFromBudget && (transaction.IncludeInHouseholdBudget ?? account.Scope == AccountScope.Household),
+                !transaction.IsExcludedFromBudget && (transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) ||
+                    transaction.IncludeInHouseholdBudget == null && account.OwnerUserId == userId && account.Scope == AccountScope.Personal)))
             .ToListAsync(cancellationToken);
     }
 
@@ -134,7 +184,7 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
         CancellationToken cancellationToken)
     {
         return await (
-            from transaction in dbContext.Transactions
+            from transaction in dbContext.Transactions.Include(item => item.PersonalBudgetInclusions)
             join account in dbContext.Accounts
                 on transaction.AccountId equals account.Id
             where transaction.HouseholdId == householdId && transaction.Id == transactionId

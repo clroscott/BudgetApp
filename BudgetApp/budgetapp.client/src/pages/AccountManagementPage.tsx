@@ -242,7 +242,8 @@ export function AccountManagementPage() {
               </label>
             </div>
             <p className="field-help">
-              Changing scope also changes who can see this account. Reports will keep currencies separate.
+              Changing scope also changes who can see this account. Saved transaction budget inclusion
+              does not change automatically. Reports keep currencies separate.
             </p>
             <div className="account-actions">
               <button
@@ -317,6 +318,8 @@ export function AccountManagementPage() {
             <p className="eyebrow">Household</p>
             <h1>Accounts</h1>
             <p>Manage shared accounts and your personal accounts in {currentHousehold.name}.</p>
+            <p>Account scope controls account privacy. “Include in budgets” on a transaction
+              controls which budgets count it, without sharing the whole account.</p>
           </div>
           <label className="checkbox-row">
             <input

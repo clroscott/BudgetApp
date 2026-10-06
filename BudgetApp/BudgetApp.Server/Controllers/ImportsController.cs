@@ -206,7 +206,7 @@ public sealed class ImportsController(
                 request.Amount,
                 request.Description,
                 request.SelectedCategoryId,
-                cancellationToken);
+                cancellationToken, request.IncludeInHouseholdBudget, request.IncludeInPersonalBudget);
             return NoContent();
         }
         catch (Exception exception) when (IsExpected(exception))
@@ -235,7 +235,7 @@ public sealed class ImportsController(
                     draft.TransactionDate,
                     draft.Amount,
                     draft.Description,
-                    draft.SelectedCategoryId)).ToList(),
+                    draft.SelectedCategoryId, draft.IncludeInHouseholdBudget, draft.IncludeInPersonalBudget)).ToList(),
                 cancellationToken);
             return Ok(new BulkUpdateImportDraftsResponse(savedRows));
         }
@@ -428,7 +428,9 @@ public sealed record UpdateImportDraftRequest(
     DateOnly? TransactionDate,
     decimal? Amount,
     [param: StringLength(500)] string? Description,
-    Guid? SelectedCategoryId);
+    Guid? SelectedCategoryId,
+    bool? IncludeInHouseholdBudget = null,
+    bool? IncludeInPersonalBudget = null);
 
 public sealed record BulkUpdateImportDraftsRequest(
     [param: Required, MinLength(1)]
@@ -439,7 +441,9 @@ public sealed record BulkUpdateImportDraftItemRequest(
     DateOnly? TransactionDate,
     decimal? Amount,
     [param: StringLength(500)] string? Description,
-    Guid? SelectedCategoryId);
+    Guid? SelectedCategoryId,
+    bool? IncludeInHouseholdBudget = null,
+    bool? IncludeInPersonalBudget = null);
 
 public sealed record BulkUpdateImportDraftsResponse(int SavedRows);
 

@@ -28,7 +28,8 @@ public sealed class TransactionManagementService(
         bool uncategorizedOnly,
         string? descriptionSearch,
         int page,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? budgetInclusion = null, string? currency = null, bool spendingOnly = false)
     {
         if (page < 1)
         {
@@ -42,7 +43,7 @@ public sealed class TransactionManagementService(
             categoryType,
             categoryId,
             uncategorizedOnly,
-            descriptionSearch);
+            descriptionSearch, budgetInclusion, currency, spendingOnly);
 
         var role = await authorizationService.RequireViewAsync(
             householdId,
@@ -60,7 +61,7 @@ public sealed class TransactionManagementService(
             criteria.DescriptionSearch,
             (page - 1) * PageSize,
             PageSize,
-            cancellationToken);
+            cancellationToken, criteria.BudgetInclusion, criteria.Currency, criteria.SpendingOnly);
         var totalPages = result.TotalCount == 0
             ? 0
             : (int)Math.Ceiling(result.TotalCount / (double)PageSize);
@@ -85,8 +86,9 @@ public sealed class TransactionManagementService(
         string description,
         string? merchantName,
         string? notes,
-        bool isExcludedFromBudget,
-        CancellationToken cancellationToken)
+        bool? isExcludedFromBudget,
+        CancellationToken cancellationToken,
+        DateTimeOffset? expectedUpdatedAtUtc = null)
     {
         var role = await authorizationService.RequireViewAsync(
             householdId,
@@ -99,6 +101,11 @@ public sealed class TransactionManagementService(
 
         RequireEditPermission(access, role, userId);
         var transaction = access.Transaction;
+        if (expectedUpdatedAtUtc.HasValue && transaction.UpdatedAtUtc != expectedUpdatedAtUtc)
+            throw new TransactionConflictException();
+        if (transaction.IncludeInHouseholdBudget.HasValue &&
+            isExcludedFromBudget.HasValue && isExcludedFromBudget != transaction.IsExcludedFromBudget)
+            throw new InvalidOperationException("Use Include in budgets to change budget inclusion.");
         var previousCategoryId = transaction.CategoryId;
         var previousDate = transaction.TransactionDate;
         var previousAmount = transaction.Amount;
@@ -126,7 +133,7 @@ public sealed class TransactionManagementService(
             description,
             merchantName,
             notes,
-            isExcludedFromBudget,
+            isExcludedFromBudget ?? transaction.IsExcludedFromBudget,
             userId,
             timeProvider.GetUtcNow());
 
@@ -176,6 +183,51 @@ public sealed class TransactionManagementService(
             transaction.Id,
             $"Updated transaction '{transaction.Description}'.",
             details));
+        if (access.IsPersonalAccount && transaction.IncludeInHouseholdBudget == true &&
+            !transaction.IsExcludedFromBudget)
+            auditWriter?.Record(new AuditEventInput(
+                householdId, userId, AuditVisibility.Household, null, AuditActions.Updated,
+                AuditEntityTypes.Transaction, transaction.Id,
+                "A shared personal-account transaction was updated.",
+                new Dictionary<string, string?> {
+                    ["Date"] = transaction.TransactionDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    ["Amount"] = transaction.Amount.ToString("0.####", CultureInfo.InvariantCulture),
+                    ["Description"] = transaction.Description
+                }));
+        await transactionRepository.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateBudgetInclusionAsync(
+        Guid householdId, Guid userId, Guid transactionId, bool? includeHousehold,
+        bool includePersonal, DateTimeOffset expectedUpdatedAtUtc, CancellationToken cancellationToken)
+    {
+        var role = await authorizationService.RequireViewAsync(householdId, userId, cancellationToken);
+        var access = await transactionRepository.GetForUpdateAsync(householdId, transactionId, cancellationToken)
+            ?? throw new TransactionNotFoundException();
+        var transaction = access.Transaction;
+        var ownsAccount = access.AccountOwnerUserId == userId;
+        if (access.IsPersonalAccount && !ownsAccount &&
+            (transaction.IncludeInHouseholdBudget != true || transaction.IsExcludedFromBudget))
+            throw new TransactionNotFoundException();
+        if (transaction.UpdatedAtUtc != expectedUpdatedAtUtc) throw new TransactionConflictException();
+        transaction.InitializeBudgetInclusion(!access.IsPersonalAccount, access.AccountOwnerUserId);
+        var previousHousehold = !transaction.IsExcludedFromBudget && transaction.IncludeInHouseholdBudget == true;
+        if (includeHousehold.HasValue && includeHousehold.Value != previousHousehold &&
+            (role == HouseholdRole.Viewer || access.IsPersonalAccount && !ownsAccount))
+            throw new HouseholdAccessDeniedException();
+        transaction.SetBudgetInclusionForUser(userId, includeHousehold ?? previousHousehold, includePersonal, timeProvider.GetUtcNow());
+        auditWriter?.Record(new AuditEventInput(
+            householdId, userId, AuditVisibility.Personal, userId, AuditActions.Updated,
+            AuditEntityTypes.Transaction, transaction.Id, "Changed personal budget inclusion.",
+            new Dictionary<string, string?> { ["Included in my personal budget"] = includePersonal ? "Yes" : "No" }));
+        if (previousHousehold != transaction.IncludeInHouseholdBudget)
+            auditWriter?.Record(new AuditEventInput(
+                householdId, userId, AuditVisibility.Household, null, AuditActions.Updated,
+                AuditEntityTypes.Transaction, transaction.Id,
+                transaction.IncludeInHouseholdBudget == true
+                    ? "An expense was included in the Household budget."
+                    : "An expense was removed from the Household budget.",
+                new Dictionary<string, string?> { ["Amount"] = transaction.Amount.ToString("0.####", CultureInfo.InvariantCulture) }));
         await transactionRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -243,5 +295,9 @@ public sealed class TransactionManagementService(
             record.IsVoided,
             record.IsPersonalAccount
                 ? record.AccountOwnerUserId == userId
-                : role != HouseholdRole.Viewer);
+                : role != HouseholdRole.Viewer,
+            record.IncludeInHouseholdBudget,
+            record.IncludeInPersonalBudget,
+            role != HouseholdRole.Viewer && (!record.IsPersonalAccount || record.AccountOwnerUserId == userId),
+            record.UpdatedAtUtc);
 }

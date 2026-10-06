@@ -30,6 +30,7 @@ import {
 import { AppLink } from '../routing/AppLink'
 import { useRouter } from '../routing/useRouter'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
+import { previewBulkBudgetInclusion, type BudgetInclusionPreset, type PendingDraftUpdate } from '../imports/importBudgetInclusion'
 
 const rowsPerPage = 100
 
@@ -80,13 +81,7 @@ interface DraftRowProps {
   onDirtyChange: (draftId: string, update: PendingDraftUpdate | null) => void
   onRemove: (draftId: string, sourceRowNumber: number) => Promise<void>
   onError: (error: unknown) => void
-}
-
-interface PendingDraftUpdate {
-  transactionDate: string
-  amount: string
-  description: string
-  selectedCategoryId: string | null
+  onBusyChange: (draftId: string, busy: boolean) => void
 }
 
 type DraftRowFilter =
@@ -116,6 +111,7 @@ function DraftRow({
   onDirtyChange,
   onRemove,
   onError,
+  onBusyChange,
 }: DraftRowProps) {
   const savedCategorySelection = findCategorySelection(categories, draft.selectedCategoryId)
   const initialCategorySelection = findCategorySelection(
@@ -130,6 +126,8 @@ function DraftRow({
     pendingUpdate?.description ?? draft.description ?? '')
   const [categoryId, setCategoryId] = useState(initialCategorySelection.categoryId)
   const [subcategoryId, setSubcategoryId] = useState(initialCategorySelection.subcategoryId)
+  const [includeHousehold, setIncludeHousehold] = useState(pendingUpdate?.includeInHouseholdBudget ?? draft.includeInHouseholdBudget ?? true)
+  const [includePersonal, setIncludePersonal] = useState(pendingUpdate?.includeInPersonalBudget ?? draft.includeInPersonalBudget ?? false)
   const [isBusy, setIsBusy] = useState(false)
   const [isRuleEditorOpen, setIsRuleEditorOpen] = useState(false)
   const [isCreatingRule, setIsCreatingRule] = useState(false)
@@ -146,12 +144,18 @@ function DraftRow({
   )
   const editable = canEdit && !isCompleted && !draft.approvedTransactionId
   const selectedCategoryId = subcategoryId || categoryId || null
+  useEffect(() => {
+    onBusyChange(draft.id, isBusy || isCreatingRule || isFillingRuleMatches)
+    return () => onBusyChange(draft.id, false)
+  }, [draft.id, isBusy, isCreatingRule, isFillingRuleMatches, onBusyChange])
   const subcategories = categories.find(category => category.id === categoryId)?.children ?? []
   const isDirty =
     transactionDate !== (draft.transactionDate ?? '') ||
     amount !== (draft.amount?.toString() ?? '') ||
     description !== (draft.description ?? '') ||
-    selectedCategoryId !== draft.selectedCategoryId
+    selectedCategoryId !== draft.selectedCategoryId ||
+    includeHousehold !== (draft.includeInHouseholdBudget ?? true) ||
+    includePersonal !== (draft.includeInPersonalBudget ?? false)
 
   useEffect(() => {
     if (pendingUpdate) return
@@ -165,14 +169,25 @@ function DraftRow({
     setDescription(draft.description ?? '')
     setCategoryId(refreshedSelection.categoryId)
     setSubcategoryId(refreshedSelection.subcategoryId)
+    setIncludeHousehold(draft.includeInHouseholdBudget ?? true)
+    setIncludePersonal(draft.includeInPersonalBudget ?? false)
   }, [
     categories,
     draft.amount,
     draft.description,
     draft.selectedCategoryId,
     draft.transactionDate,
+    draft.includeInHouseholdBudget, draft.includeInPersonalBudget,
     pendingUpdate,
   ])
+
+  useEffect(() => {
+    // Bulk choices update the parent cache. Sync only these controls so pending
+    // date/amount/description/category edits and rule editors stay intact.
+    setIncludeHousehold(pendingUpdate?.includeInHouseholdBudget ?? draft.includeInHouseholdBudget ?? true)
+    setIncludePersonal(pendingUpdate?.includeInPersonalBudget ?? draft.includeInPersonalBudget ?? false)
+  }, [pendingUpdate?.includeInHouseholdBudget, pendingUpdate?.includeInPersonalBudget,
+    draft.includeInHouseholdBudget, draft.includeInPersonalBudget])
 
   useEffect(() => {
     onDirtyChange(draft.id, isDirty ? {
@@ -180,6 +195,7 @@ function DraftRow({
       amount,
       description,
       selectedCategoryId,
+      includeInHouseholdBudget: includeHousehold, includeInPersonalBudget: includePersonal,
     } : null)
   }, [
     amount,
@@ -188,7 +204,7 @@ function DraftRow({
     isDirty,
     onDirtyChange,
     selectedCategoryId,
-    transactionDate,
+    transactionDate, includeHousehold, includePersonal,
   ])
 
   const resetChanges = () => {
@@ -199,6 +215,8 @@ function DraftRow({
     setDescription(draft.description ?? '')
     setCategoryId(savedSelection.categoryId)
     setSubcategoryId(savedSelection.subcategoryId)
+    setIncludeHousehold(draft.includeInHouseholdBudget ?? true)
+    setIncludePersonal(draft.includeInPersonalBudget ?? false)
   }
 
   const openRuleEditor = async () => {
@@ -281,6 +299,7 @@ function DraftRow({
       amount: parsedAmount,
       description: description.trim() || null,
       selectedCategoryId,
+      includeInHouseholdBudget: includeHousehold, includeInPersonalBudget: includePersonal,
     })
     onDirtyChange(draft.id, null)
   }
@@ -383,6 +402,19 @@ function DraftRow({
             </select>
           </label>
         </div>
+        <fieldset className="budget-inclusion-controls" disabled={!editable || isBusy}>
+          <legend>Include in budgets</legend>
+          <label className="checkbox-row"><input type="checkbox" checked={includePersonal}
+            disabled={draft.canChangePersonalInclusion === false}
+            onChange={event => setIncludePersonal(event.target.checked)} />My personal budget</label>
+          <label className="checkbox-row"><input type="checkbox" checked={includeHousehold}
+            disabled={draft.canChangeHouseholdInclusion === false}
+            onChange={event => setIncludeHousehold(event.target.checked)} />Household budget</label>
+          <small>The full amount counts in each selected budget, with only one transaction.
+            Household inclusion shares the expense, not your private account or CSV file.</small>
+          {draft.canChangePersonalInclusion === false && <small>Another reviewer has chosen their
+            Personal budget for this row. You can add it to yours after the import is completed.</small>}
+        </fieldset>
         <div className="import-row-footer">
           <div className="import-row-badges">
             <span>{draft.reviewDecision}</span>
@@ -555,11 +587,15 @@ export function ImportReviewPage() {
   const [ruleApplicationMessage, setRuleApplicationMessage] = useState('')
   const [isSavingAll, setIsSavingAll] = useState(false)
   const [bulkSaveMessage, setBulkSaveMessage] = useState('')
+  const [bulkBudgetPreset, setBulkBudgetPreset] = useState<BudgetInclusionPreset | ''>('')
+  const [bulkBudgetScope, setBulkBudgetScope] = useState<'matching' | 'page'>('matching')
+  const [bulkBudgetMessage, setBulkBudgetMessage] = useState('')
   const [bulkDecision, setBulkDecision] = useState<
     'Approved' | 'Excluded' | 'Pending' | null
   >(null)
   const [dirtyDraftUpdates, setDirtyDraftUpdates] =
     useState<Map<string, PendingDraftUpdate>>(new Map())
+  const [busyDraftIds, setBusyDraftIds] = useState<Set<string>>(new Set())
   const [errors, setErrors] = useState<string[]>([])
   useUnsavedChangesGuard(dirtyDraftUpdates.size > 0, 'Discard your unsaved staged import corrections?')
 
@@ -577,6 +613,15 @@ export function ImportReviewPage() {
       const updated = new Map(current)
       if (update) updated.set(draftId, update)
       else updated.delete(draftId)
+      return updated
+    })
+  }, [])
+  const handleBusyChange = useCallback((id: string, busy: boolean) => {
+    setBusyDraftIds(current => {
+      if (current.has(id) === busy) return current
+      const updated = new Set(current)
+      if (busy) updated.add(id)
+      else updated.delete(id)
       return updated
     })
   }, [])
@@ -648,6 +693,9 @@ export function ImportReviewPage() {
     let isCurrent = true
     setDirtyDraftUpdates(new Map())
     setBulkSaveMessage('')
+    setBulkBudgetPreset('')
+    setBulkBudgetScope('matching')
+    setBulkBudgetMessage('')
     setIsLoading(true)
     setErrors([])
     void getImport(currentHousehold.id, selectedImportId)
@@ -741,12 +789,38 @@ export function ImportReviewPage() {
     (draftPage - 1) * rowsPerPage,
     draftPage * rowsPerPage,
   )
+  const bulkBudgetDrafts = bulkBudgetScope === 'page' ? visibleDrafts : filteredDrafts
+  const bulkBudgetPreview = previewBulkBudgetInclusion(bulkBudgetDrafts, dirtyDraftUpdates, bulkBudgetPreset)
+  const bulkActionsBusy = isLoading || isSavingAll || isCompleting || isDiscarding ||
+    bulkDecision !== null || applyingRuleMode !== null || busyDraftIds.size > 0
 
   useEffect(() => {
     setDraftPage(current => Math.min(current, draftPageCount))
   }, [draftPageCount])
 
   if (!currentHousehold) return null
+
+  const handleBulkBudgetInclusion = () => {
+    if (!detail?.canEdit || detail.status !== 'ReadyForReview' || bulkActionsBusy ||
+      bulkBudgetPreview.changes.size === 0) return
+    const label = { Personal: 'My personal budget only', Household: 'Household budget only',
+      PersonalAndHousehold: 'Personal + Household', Neither: 'Neither budget' }[bulkBudgetPreset as BudgetInclusionPreset]
+    const count = bulkBudgetPreview.changes.size
+    if (!window.confirm(`Set ${label} on ${count} staged ${count === 1 ? 'row' : 'rows'}? ` +
+      'Existing corrections will be kept. Choices are not saved until you use Save all corrections.' +
+      ((bulkBudgetPreset === 'Household' || bulkBudgetPreset === 'PersonalAndHousehold')
+        ? ' Household inclusion shares each transaction’s date, amount, category, and description when the import is completed.' : ''))) return
+    setDirtyDraftUpdates(current => {
+      const updated = new Map(current)
+      for (const [id, change] of bulkBudgetPreview.changes) {
+        if (change) updated.set(id, change)
+        else updated.delete(id)
+      }
+      return updated
+    })
+    setBulkBudgetMessage(`Budget choices applied to ${count} ${count === 1 ? 'row' : 'rows'}. Use Save all corrections to save any pending changes.`)
+    setBulkSaveMessage('')
+  }
 
   const handleDuplicates = async () => {
     if (!detail) return
@@ -821,6 +895,8 @@ export function ImportReviewPage() {
         amount: parsedAmount,
         description: update.description.trim() || null,
         selectedCategoryId: update.selectedCategoryId,
+        includeInHouseholdBudget: update.includeInHouseholdBudget,
+        includeInPersonalBudget: update.includeInPersonalBudget,
       })
     }
 
@@ -1032,7 +1108,7 @@ export function ImportReviewPage() {
                       <button
                         className="primary-button"
                         type="button"
-                        disabled={!hasUnsavedRows || isSavingAll}
+                        disabled={!hasUnsavedRows || bulkActionsBusy}
                         onClick={() => void handleSaveAllCorrections()}>
                         {isSavingAll
                           ? 'Saving corrections...'
@@ -1171,6 +1247,37 @@ export function ImportReviewPage() {
                 Showing <strong>{filteredDrafts.length}</strong> of {detail.totalRows} rows
               </span>
             </div>
+            {detail.canEdit && detail.status === 'ReadyForReview' && <section
+              className="import-bulk-budget-panel" aria-label="Bulk budget tools">
+              <div className="import-bulk-budget-controls">
+                <label><span>Bulk budget inclusion</span>
+                  <select value={bulkBudgetPreset} disabled={bulkActionsBusy}
+                    onChange={event => { setBulkBudgetPreset(event.target.value as BudgetInclusionPreset | ''); setBulkBudgetMessage('') }}>
+                    <option value="">Choose budget inclusion…</option>
+                    <option value="Personal">My personal budget only</option>
+                    <option value="Household">Household budget only</option>
+                    <option value="PersonalAndHousehold">Personal + Household</option>
+                    <option value="Neither">Neither budget (keep the transaction)</option>
+                  </select>
+                </label>
+                <label><span>Apply to</span>
+                  <select value={bulkBudgetScope} disabled={bulkActionsBusy}
+                    onChange={event => { setBulkBudgetScope(event.target.value as 'matching' | 'page'); setBulkBudgetMessage('') }}>
+                    <option value="matching">All matching rows ({filteredDrafts.length}), across pages</option>
+                    <option value="page">Current page ({visibleDrafts.length})</option>
+                  </select>
+                </label>
+                <button className="secondary-button" type="button"
+                  disabled={bulkActionsBusy || bulkBudgetPreview.changes.size === 0}
+                  onClick={handleBulkBudgetInclusion}>Apply budget choices ({bulkBudgetPreview.changes.size})</button>
+              </div>
+              <p className="field-help">Keeps your existing corrections. Changes are staged, then saved with
+                “Save all corrections”. Saving changed approved rows returns them to Pending for review.</p>
+              {bulkBudgetPreset && <p className="field-help">{bulkBudgetPreview.changes.size} rows would change;
+                {' '}{bulkBudgetPreview.unchanged} already match; {bulkBudgetPreview.skipped} excluded, linked,
+                or permission-protected rows will be skipped.</p>}
+              {bulkBudgetMessage && <p className="field-help" role="status">{bulkBudgetMessage}</p>}
+            </section>}
             {filteredDrafts.length === 0 ? (
               <p className="empty-state">No rows match this filter.</p>
             ) : <>
@@ -1190,7 +1297,7 @@ export function ImportReviewPage() {
                     draft={draft}
                     categories={categories}
                     pendingUpdate={dirtyDraftUpdates.get(draft.id) ?? null}
-                    canEdit={detail.canEdit}
+                    canEdit={detail.canEdit && !bulkActionsBusy}
                     isCompleted={detail.status === 'Completed'}
                     onChanged={refreshDetail}
                     onRuleCreated={handleRuleCreated}
@@ -1198,6 +1305,7 @@ export function ImportReviewPage() {
                     onDirtyChange={handleDirtyChange}
                     onRemove={handleRemoveDraft}
                     onError={error => setErrors(getErrorMessages(error))}
+                    onBusyChange={handleBusyChange}
                   />
                 ))}
               </div>

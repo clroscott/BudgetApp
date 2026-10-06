@@ -41,6 +41,10 @@ export interface ImportDraftItem {
   possibleMatchingTransactionId: string | null
   reviewDecision: string
   isDuplicateAcknowledged: boolean
+  includeInHouseholdBudget?: boolean
+  includeInPersonalBudget?: boolean
+  canChangePersonalInclusion?: boolean
+  canChangeHouseholdInclusion?: boolean
   approvedTransactionId: string | null
 }
 
@@ -63,6 +67,8 @@ export interface ImportDraftUpdate {
   amount: number | null
   description: string | null
   selectedCategoryId: string | null
+  includeInHouseholdBudget?: boolean
+  includeInPersonalBudget?: boolean
 }
 
 export function uploadCsvImport(
@@ -144,6 +150,8 @@ export function updateImportDraft(
     amount: number | null
     description: string | null
     selectedCategoryId: string | null
+    includeInHouseholdBudget?: boolean
+    includeInPersonalBudget?: boolean
   },
 ): Promise<void> {
   return apiPut(

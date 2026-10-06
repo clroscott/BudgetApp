@@ -68,6 +68,107 @@ beforeEach(() => {
 })
 
 describe('staged import edit protection', () => {
+  it('bulk choices preserve row corrections, support cancellation, and save through the existing bulk endpoint', async () => {
+    show(<ImportReviewPage />)
+    const input = await screen.findByLabelText('Description') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'My correction' } })
+    fireEvent.change(screen.getByLabelText('Bulk budget inclusion'), { target: { value: 'PersonalAndHousehold' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (1)' }))
+    expect((screen.getByLabelText('My personal budget') as HTMLInputElement).checked).toBe(false)
+    vi.mocked(window.confirm).mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (1)' }))
+    await waitFor(() => expect((screen.getByLabelText('My personal budget') as HTMLInputElement).checked).toBe(true))
+    expect(input.value).toBe('My correction')
+    expect(bulkUpdateImportDrafts).not.toHaveBeenCalled()
+    const saved = detail()
+    saved.drafts[0] = { ...saved.drafts[0], description: 'My correction', includeInHouseholdBudget: true, includeInPersonalBudget: true }
+    vi.mocked(getImport).mockResolvedValue(saved)
+    vi.mocked(bulkUpdateImportDrafts).mockRejectedValueOnce(new Error('Bulk save failed'))
+    fireEvent.click(screen.getByRole('button', { name: 'Save all corrections (1)' }))
+    await screen.findByText('Bulk save failed')
+    expect(input.value).toBe('My correction')
+    expect((screen.getByLabelText('My personal budget') as HTMLInputElement).checked).toBe(true)
+    vi.mocked(bulkUpdateImportDrafts).mockResolvedValue({ savedRows: 1 })
+    fireEvent.click(screen.getByRole('button', { name: 'Save all corrections (1)' }))
+    await screen.findByText('1 correction was saved.')
+    expect(bulkUpdateImportDrafts).toHaveBeenLastCalledWith('household-a', 'import-a', [
+      expect.objectContaining({ draftId: 'row-a', description: 'My correction', includeInHouseholdBudget: true, includeInPersonalBudget: true }),
+    ])
+  })
+  it('bulk choices honor the row filter and skip excluded or permission-protected rows', async () => {
+    const batch = detail()
+    batch.totalRows = 4
+    batch.drafts = [batch.drafts[0],
+      { ...batch.drafts[0], id: 'approved', reviewDecision: 'Approved' },
+      { ...batch.drafts[0], id: 'excluded', reviewDecision: 'Excluded' },
+      { ...batch.drafts[0], id: 'protected', canChangePersonalInclusion: false }]
+    vi.mocked(getImport).mockResolvedValue(batch)
+    show(<ImportReviewPage />)
+    await screen.findByLabelText('Bulk budget inclusion')
+    fireEvent.change(screen.getByLabelText('Show rows'), { target: { value: 'pending' } })
+    fireEvent.change(screen.getByLabelText('Bulk budget inclusion'), { target: { value: 'Personal' } })
+    vi.mocked(window.confirm).mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (1)' }))
+    await screen.findByRole('button', { name: 'Save all corrections (1)' })
+    vi.mocked(bulkUpdateImportDrafts).mockResolvedValue({ savedRows: 1 })
+    fireEvent.click(screen.getByRole('button', { name: 'Save all corrections (1)' }))
+    await waitFor(() => expect(bulkUpdateImportDrafts).toHaveBeenCalledWith('household-a', 'import-a', [
+      expect.objectContaining({ draftId: 'row-a', includeInHouseholdBudget: false, includeInPersonalBudget: true }),
+    ]))
+  })
+  it('supports current-page and all-matching choices across pagination', async () => {
+    const batch = detail()
+    batch.totalRows = 101
+    batch.drafts = Array.from({ length: 101 }, (_, index) => ({ ...batch.drafts[0], id: `row-${index}`, sourceRowNumber: index + 2 }))
+    vi.mocked(getImport).mockResolvedValue(batch)
+    show(<ImportReviewPage />)
+    await screen.findByLabelText('Bulk budget inclusion')
+    fireEvent.change(screen.getByLabelText('Apply to'), { target: { value: 'page' } })
+    fireEvent.change(screen.getByLabelText('Bulk budget inclusion'), { target: { value: 'PersonalAndHousehold' } })
+    vi.mocked(window.confirm).mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (100)' }))
+    await screen.findByRole('button', { name: 'Save all corrections (100)' })
+    fireEvent.click(screen.getByRole('button', { name: 'Next rows' }))
+    expect((await screen.findByLabelText('My personal budget') as HTMLInputElement).checked).toBe(false)
+    fireEvent.change(screen.getByLabelText('Apply to'), { target: { value: 'matching' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (1)' }))
+    await screen.findByRole('button', { name: 'Save all corrections (101)' })
+    vi.mocked(bulkUpdateImportDrafts).mockResolvedValue({ savedRows: 101 })
+    fireEvent.click(screen.getByRole('button', { name: 'Save all corrections (101)' }))
+    await waitFor(() => expect(bulkUpdateImportDrafts).toHaveBeenCalledOnce())
+    const updates = vi.mocked(bulkUpdateImportDrafts).mock.calls[0][2]
+    expect(updates).toHaveLength(101)
+    expect(new Set(updates.map(update => update.draftId)).size).toBe(101)
+    expect(updates.every(update => update.includeInPersonalBudget && update.includeInHouseholdBudget)).toBe(true)
+  })
+  it('does not offer bulk controls for completed imports', async () => {
+    const completed = detail()
+    completed.status = 'Completed'
+    vi.mocked(getImports).mockResolvedValue([{ ...listItem, status: 'Completed' }])
+    vi.mocked(getImport).mockResolvedValue(completed)
+    show(<ImportReviewPage />)
+    await screen.findByRole('heading', { name: 'No matching imports' })
+    fireEvent.change(screen.getByLabelText('Show imports'), { target: { value: 'completed' } })
+    await screen.findByText('Completed imports are retained to preserve the history of official transactions.')
+    expect(screen.queryByLabelText('Bulk budget inclusion')).toBeNull()
+  })
+  it('protects and bulk-saves budget inclusion choices without duplicating rows', async () => {
+    show(<ImportReviewPage />)
+    await screen.findByLabelText('Description')
+    fireEvent.click(screen.getByLabelText('My personal budget'))
+    fireEvent.click(screen.getByText('Leave page'))
+    expect(window.confirm).toHaveBeenCalledOnce()
+    const saved = detail()
+    saved.drafts[0].includeInPersonalBudget = true
+    saved.drafts[0].includeInHouseholdBudget = true
+    vi.mocked(getImport).mockResolvedValue(saved)
+    vi.mocked(bulkUpdateImportDrafts).mockResolvedValue({ savedRows: 1 })
+    fireEvent.click(screen.getByRole('button', { name: 'Save all corrections (1)' }))
+    await screen.findByText('1 correction was saved.')
+    expect(bulkUpdateImportDrafts).toHaveBeenCalledWith('household-a', 'import-a', [
+      expect.objectContaining({ draftId: 'row-a', includeInHouseholdBudget: true, includeInPersonalBudget: true }),
+    ])
+  })
   it('canceled route/import/filter changes keep corrections and the selected import', async () => {
     show(<ImportReviewPage />)
     const input = await screen.findByLabelText('Description') as HTMLInputElement

@@ -40,7 +40,7 @@ export const tutorialDefinitions: TutorialDefinition[] = [
       {
         title: 'Open Accounts',
         body:
-          'Accounts determine where transactions come from and whether activity is household or personal.',
+          'Accounts determine where transactions come from and who can see the account. During import review or later on Transactions, choose which budgets count each transaction.',
         route: '/dashboard',
         targetId: 'nav-accounts',
         advance: 'click',

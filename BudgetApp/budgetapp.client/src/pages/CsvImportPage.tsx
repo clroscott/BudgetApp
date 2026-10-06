@@ -210,6 +210,8 @@ export function CsvImportPage() {
             <p className="eyebrow">Transactions</p>
             <h1>Import CSV</h1>
             <p>Upload bank transactions into a review area before they affect your budget.</p>
+            <p>During review, choose “My personal budget”, “Household budget”, or both for each row.
+              Upload each transaction only once.</p>
           </div>
         </div>
 

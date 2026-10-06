@@ -345,6 +345,7 @@ export function YearlyPlanManagementPage() {
           <h1>Annual targets</h1>
           <p>
             Set annual category targets, then copy them into independent monthly drafts.
+            Personal and Household targets remain separate even when a transaction counts in both budgets.
           </p>
         </div>
       </div>

@@ -34,7 +34,13 @@ BudgetApp uses two financial scopes:
 - **Household:** shared financial data owned by a household.
 - **Personal:** financial data owned by one user within a household.
 
-An `Account` declares its scope. Transaction scope normally derives from its account. A `BudgetMonth` declares its own scope because a household and each household member may have separate budgets for the same month.
+An `Account` declares its scope for account privacy. Transactions default their
+budget inclusion from that account, but can explicitly count in Household and/or
+the current user's Personal budget without duplicating the record. Personal
+inclusion is stored per user. A `BudgetMonth` declares its own scope because a
+household and each member may have separate budgets for the same month. See
+[transaction budget inclusion](transaction-budget-inclusion.md) for sharing and
+authorization boundaries.
 
 For version 1, categories belong to the household and are reused across personal and household data. This avoids separate copies such as “Clayton Groceries,” “Partner Groceries,” and “Household Groceries.” Account, transaction, and budget scope determine how category totals are interpreted.
 

@@ -5,7 +5,9 @@ public sealed record ImportDraftUpdateInput(
     DateOnly? TransactionDate,
     decimal? Amount,
     string? Description,
-    Guid? SelectedCategoryId);
+    Guid? SelectedCategoryId,
+    bool? IncludeInHouseholdBudget = null,
+    bool? IncludeInPersonalBudget = null);
 
 public sealed record ImportListItem(
     Guid Id,
@@ -36,7 +38,11 @@ public sealed record ImportDraftItem(
     Guid? PossibleMatchingTransactionId,
     string ReviewDecision,
     bool IsDuplicateAcknowledged,
-    Guid? ApprovedTransactionId);
+    Guid? ApprovedTransactionId,
+    bool IncludeInHouseholdBudget,
+    bool IncludeInPersonalBudget,
+    bool CanChangePersonalInclusion,
+    bool CanChangeHouseholdInclusion);
 
 public sealed record ImportReviewDetail(
     Guid Id,
