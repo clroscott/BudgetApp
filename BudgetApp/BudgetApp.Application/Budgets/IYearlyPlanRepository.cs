@@ -1,5 +1,4 @@
 using BudgetApp.Domain.Budgeting;
-using BudgetApp.Domain.Households;
 
 namespace BudgetApp.Application.Budgets;
 
@@ -21,10 +20,6 @@ public interface IYearlyPlanRepository
         CancellationToken cancellationToken);
 
     Task<YearlyPlanDefaults?> GetDefaultsAsync(
-        Guid householdId,
-        CancellationToken cancellationToken);
-
-    Task<Household?> GetHouseholdForUpdateAsync(
         Guid householdId,
         CancellationToken cancellationToken);
 

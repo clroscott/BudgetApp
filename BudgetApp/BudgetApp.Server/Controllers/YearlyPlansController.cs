@@ -10,7 +10,7 @@ namespace BudgetApp.Server.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/households/{householdId:guid}/yearly-plans")]
-public sealed class YearlyPlansController(YearlyPlanService service) : ControllerBase
+public sealed class YearlyPlansController(YearlyPlanService service, HouseholdSettingsService settingsService) : ControllerBase
 {
     [HttpGet("{fiscalYearStartYear:int}")]
     public Task<ActionResult<YearlyPlanPageModel>> Get(
@@ -53,7 +53,7 @@ public sealed class YearlyPlansController(YearlyPlanService service) : Controlle
         try
         {
             return Ok(new ChangeFiscalYearStartMonthResponse(
-                await service.ChangeDefaultStartMonthAsync(
+                await settingsService.ChangeDefaultStartMonthAsync(
                     householdId,
                     userId,
                     request.FiscalYearStartMonth,

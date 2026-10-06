@@ -3,6 +3,7 @@ import { getErrorMessages } from '../auth/errorMessages'
 import { getSafeReturnPath } from '../auth/returnPath'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { PageLoadFeedback } from '../components/PageLoadFeedback'
+import { HouseholdSectionNav } from '../components/HouseholdSectionNav'
 import { usePageLoad } from './usePageLoad'
 import {
   deleteUnusedHousehold,
@@ -165,6 +166,7 @@ export function HouseholdManagementPage() {
           </AppLink>
         </header>
 
+        <HouseholdSectionNav current="members" />
         <ErrorSummary errors={errors} />
         {notice && <div className="success-summary" role="status">{notice}</div>}
         {exitCompleted && <button className="secondary-button" type="button" disabled={isSaving}

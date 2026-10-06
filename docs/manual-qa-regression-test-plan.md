@@ -189,6 +189,57 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] A Viewer can view allowed information but cannot perform owner/member writes.
 - [ ] Direct API or copied-URL access cannot cross household boundaries.
 
+## Household settings regression (#138)
+
+Open Manage household → Settings. Use Development/Scratch and disposable
+households; currency changes are permitted only before financial setup/data.
+See [household settings](household-settings.md). The automated integration suite
+uses SQLite; also run the conflict/race cases on the normal SQL Server test app.
+
+- [ ] Name, time zone, default fiscal-year starting month, and default currency
+      display the selected household's current settings. The header and section
+      navigation clearly identify the household and active page.
+- [ ] Owner and Admin can save; Editor and Viewer can view but not save. Direct
+      PUT requests, including yearly-plans/default-start-month, enforce the same
+      permissions. An outsider, former member, or unauthenticated user cannot
+      read or change the household. Editor annual/monthly budget editing still works.
+- [ ] An unused household with only categories can change currency. Accounts
+      (including private/archived ones), staged imports, saved monthly budgets,
+      annual plans, transactions, and recurring expenses lock it. The UI explains
+      the disabled control without exposing private financial details.
+- [ ] Load settings for an unused household, then create financial data in another
+      tab before saving a currency change. The server rejects the whole settings
+      save; no partial name/fiscal update or activity event is left behind.
+- [ ] Save valid name/time-zone/fiscal changes with locked currency. Existing
+      transaction dates/amounts, account currencies, monthly budgets, annual plan
+      periods/targets, and recurring expenses remain unchanged. A new unsaved
+      annual plan uses the new default; a saved plan retains its own start month.
+- [ ] Invalid/blank/long names, unsupported currency/time-zone IDs, invalid months,
+      and missing/stale versions fail safely and preserve entered values.
+- [ ] Successful saves create one household-visible activity event with only the
+      changed settings. Failed, denied, stale, and unchanged saves create no event.
+- [ ] Save from two tabs with the same version: the stale write cannot overwrite
+      the first. Repeat a previously committed request and verify no duplicate
+      change/event. Check simultaneous submissions in SQL Server too.
+- [ ] Dirty route/tab changes, sign-out, household switching, Refresh, Cancel, and
+      browser unload warn. Cancel keeps values and household selection. Confirmed
+      household switching loads the new household without carrying old edits over.
+- [ ] A failed save retains edits and protection. A conflict/permission response
+      requires a confirmed reload before another save. Rapid clicks/Enter while
+      saving do not issue multiple writes; Retry loading issues reads only.
+- [ ] Initial read failure stops Loading and offers Retry without displaying an
+      empty settings form. Refresh failure marks retained settings stale and
+      disables writes. Revoked read access hides retained settings. A genuinely
+      unselected household receives a clear next step without requesting settings.
+- [ ] Successful saves update the header/household switcher without changing the
+      selected household, forcing focus away, or reloading away the editor.
+- [ ] All labels and help text are associated with controls. Check keyboard-only
+      selection, saving/canceling, skip navigation, section navigation and heading
+      focus; also check screen-reader output, narrow widths and actual 200% zoom.
+- [ ] Annual Targets has only its per-plan start-month editor and a shared-default
+      explanation/settings link. Canceling that link preserves annual edits; there
+      is no second household-default form or storage source.
+
 ## Navigation, layout, and tutorials
 
 - [ ] Sidebar items are reachable at normal desktop height.
@@ -329,8 +380,9 @@ recurring expenses, invitation forms, and household creation/setup.
 - [ ] A successful save clears that editor's warning. A failed save retains values
       and the warning so the user can retry. Saving one form does not clear another
       dirty form on the same page.
-- [ ] On annual targets, saving the household fiscal-year default preserves unsaved
-      target amounts. Saving targets preserves an unsaved household default.
+- [ ] On Annual targets, cancel navigating to Household settings with unsaved
+      target amounts; all edits remain. Saving a per-plan start-month change does
+      not alter the household default. Shared-default editing is only in settings.
 - [ ] On import review, cancel row Refresh and navigation/filter/import changes
       while corrections are unsaved. Explicitly clear a category, hide and reveal
       that row, and verify it remains cleared. Failed bulk saves remain protected.
@@ -591,9 +643,10 @@ semantic tests do not replace live screen-reader or zoom sign-off.
       Shift-Tab can enter/leave the region and reach its category links.
 - [ ] Empty category responses and future/partial-year average explanations remain
       clear. Existing loading, stale, failure, and Retry states still work.
-- [ ] On Annual targets, Default fiscal-year starting month has a visible label
+- [ ] In Household settings, Default fiscal-year starting month has a visible label
       and announces its explanation. It is clearly distinct from Fiscal year
-      begins for the current plan. Read-only users cannot save the default.
+      begins for the current plan on Annual Targets. Editor/Viewer users cannot
+      save the shared default, including through the compatibility endpoint.
 - [ ] Change the household default with the keyboard, verify unsaved-change
       protection, then save once. New unsaved plans use it; the selected saved
       annual plan and existing monthly budgets do not change. No allocation or

@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost } from '../api/apiClient'
+import { apiDelete, apiGet, apiPost, apiPut } from '../api/apiClient'
 
 export interface HouseholdMembership {
   id: string
@@ -12,6 +12,25 @@ export interface CreateHouseholdRequest {
   name: string
   defaultCurrency: string
   timeZoneId: string
+}
+
+export interface HouseholdSettings extends CreateHouseholdRequest {
+  id: string
+  fiscalYearStartMonth: number
+  version: string
+  canEdit: boolean
+  canChangeCurrency: boolean
+  currencyLockedReason: string | null
+}
+
+export type HouseholdSettingsValues = CreateHouseholdRequest & { fiscalYearStartMonth: number }
+
+export function getHouseholdSettings(householdId: string): Promise<HouseholdSettings> {
+  return apiGet(`/api/households/${encodeURIComponent(householdId)}/settings`)
+}
+
+export function saveHouseholdSettings(householdId: string, request: HouseholdSettingsValues & { version: string }): Promise<HouseholdSettings> {
+  return apiPut(`/api/households/${encodeURIComponent(householdId)}/settings`, request)
 }
 
 export function getHouseholds(): Promise<HouseholdMembership[]> {

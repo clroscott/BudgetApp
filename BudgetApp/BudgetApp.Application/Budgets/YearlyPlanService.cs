@@ -122,35 +122,6 @@ public sealed class YearlyPlanService(
         return BuildModel(plan, fiscalYearStartYear, parsedScope, defaults, categories);
     }
 
-    public async Task<int> ChangeDefaultStartMonthAsync(
-        Guid householdId,
-        Guid userId,
-        int startMonth,
-        CancellationToken cancellationToken)
-    {
-        await authorizationService.RequireEditAsync(householdId, userId, cancellationToken);
-        var household = await yearlyPlanRepository.GetHouseholdForUpdateAsync(
-            householdId,
-            cancellationToken) ?? throw new HouseholdAccessDeniedException();
-        var previous = household.FiscalYearStartMonth;
-        household.ChangeFiscalYearStartMonth(startMonth, timeProvider.GetUtcNow());
-        auditWriter?.Record(new AuditEventInput(
-            householdId,
-            userId,
-            AuditVisibility.Household,
-            null,
-            AuditActions.Updated,
-            AuditEntityTypes.Household,
-            householdId,
-            "Changed the default fiscal year start month.",
-            new Dictionary<string, string?>
-            {
-                ["Fiscal year start month"] = $"{previous} → {startMonth}"
-            }));
-        await yearlyPlanRepository.SaveChangesAsync(cancellationToken);
-        return household.FiscalYearStartMonth;
-    }
-
     public async Task<YearlyAllocationResult> AllocateAsync(
         Guid householdId,
         Guid userId,

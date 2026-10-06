@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import {
   getBudgetMonthOptions,
@@ -7,7 +7,6 @@ import {
 } from '../budgets/budgetApi'
 import {
   allocateYearlyPlan,
-  changeFiscalYearStartMonth,
   getYearlyPlan,
   saveYearlyPlan,
   type YearlyPlanData,
@@ -83,7 +82,6 @@ function planPeriod(startYear: number, startMonth: number) {
 
 export function YearlyPlanManagementPage() {
   const { currentHousehold } = useHouseholds()
-  const defaultMonthId = useId()
   const [year, setYear] = useState(new Date().getFullYear())
   const [scope, setScope] = useState<BudgetScope>('Household')
   const [plan, setPlan] = useState<YearlyPlanData | null>(null)
@@ -91,7 +89,6 @@ export function YearlyPlanManagementPage() {
   const [amounts, setAmounts] = useState<Amounts>({})
   const [modes, setModes] = useState<Modes>({})
   const [savedSnapshot, setSavedSnapshot] = useState('')
-  const [defaultStartMonth, setDefaultStartMonth] = useState(1)
   const [planStartMonth, setPlanStartMonth] = useState(1)
   const [savedPlanStartMonth, setSavedPlanStartMonth] = useState(1)
   const [selectedPeriods, setSelectedPeriods] = useState<Set<string>>(new Set())
@@ -105,20 +102,17 @@ export function YearlyPlanManagementPage() {
   const currentSnapshot = useMemo(() => snapshot(amounts), [amounts])
   const isDirty = Boolean(plan) && (
     currentSnapshot !== savedSnapshot || planStartMonth !== savedPlanStartMonth)
-  const isDefaultDirty = Boolean(plan) &&
-    defaultStartMonth !== plan?.householdDefaultFiscalYearStartMonth
   const confirmDiscard = useUnsavedChangesGuard(
-    isDirty || isDefaultDirty, 'Discard your unsaved annual targets or fiscal-year default changes?',
+    isDirty, 'Discard your unsaved annual targets or plan-period changes?',
   )
   const canManage = currentHousehold?.role !== 'Viewer' && loadState.isFresh && !isSaving
 
-  const applyPlan = useCallback((data: YearlyPlanData, preserveDefault = false) => {
+  const applyPlan = useCallback((data: YearlyPlanData) => {
     const state = stateFromPlan(data)
     setPlan(data)
     setAmounts(state.amounts)
     setModes(state.modes)
     setSavedSnapshot(snapshot(state.amounts))
-    if (!preserveDefault) setDefaultStartMonth(data.householdDefaultFiscalYearStartMonth)
     setPlanStartMonth(data.fiscalYearStartMonth)
     setSavedPlanStartMonth(data.fiscalYearStartMonth)
     setSelectedPeriods(new Set(
@@ -193,30 +187,8 @@ export function YearlyPlanManagementPage() {
     try {
       applyPlan(await saveYearlyPlan(
         currentHousehold.id, year, scope, planStartMonth, lines,
-      ), isDefaultDirty)
+      ))
       setNotice('Annual targets were saved.')
-    } catch (error) {
-      setErrors(getErrorMessages(error))
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleDefaultMonth = async () => {
-    if (!canManage) return
-    if (!window.confirm(
-      `Use ${monthNames[defaultStartMonth - 1]} as the default start for new yearly plans? ` +
-      'Existing yearly plans will not change.',
-    )) return
-    setIsSaving(true)
-    setErrors([])
-    try {
-      await changeFiscalYearStartMonth(currentHousehold.id, defaultStartMonth)
-      // Saving this separate setting must not reload away unsaved target lines.
-      setPlan(current => current ? {
-        ...current, householdDefaultFiscalYearStartMonth: defaultStartMonth,
-      } : current)
-      setNotice('The household fiscal-year default was updated.')
     } catch (error) {
       setErrors(getErrorMessages(error))
     } finally {
@@ -418,39 +390,12 @@ export function YearlyPlanManagementPage() {
         </div>
       </section>
 
-      <section className="panel fiscal-default-panel">
-        <div>
-          <h2>Household fiscal-year default</h2>
-          <p id={`${defaultMonthId}-help`}>
-            Chooses the initial month shown for annual plans you have not saved
-            yet. You can still change the month above before saving each plan.
-            {' '}This default does not change saved annual plans or existing monthly budgets.
-          </p>
-        </div>
-        <label className="fiscal-default-month" htmlFor={defaultMonthId}>
-          <span>Default fiscal-year starting month</span>
-          <select id={defaultMonthId} aria-describedby={`${defaultMonthId}-help`}
-            value={loadState.hasData ? defaultStartMonth : ''}
-            disabled={!canManage || isSaving}
-            onChange={event => setDefaultStartMonth(Number(event.target.value))}
-          >
-            {!loadState.hasData && <option value="">Unavailable</option>}
-            {monthNames.map((name, index) =>
-              <option key={name} value={index + 1}>{name}</option>)}
-          </select>
-        </label>
-        <button
-          className="secondary-button"
-          disabled={
-            !canManage ||
-            isSaving ||
-            defaultStartMonth === plan?.householdDefaultFiscalYearStartMonth
-          }
-          onClick={() => void handleDefaultMonth()}
-        >
-          Save default
-        </button>
-      </section>
+      <p className="field-help">
+        Household default for new annual plans: {loadState.hasData && plan
+          ? monthNames[plan.householdDefaultFiscalYearStartMonth - 1] : 'Unavailable'}.
+        {' '}The start month above belongs to this plan. Saved plans and monthly budgets are not changed by the household default.
+        {' '}<AppLink to="/household/settings">View household settings</AppLink> (Owners and Admins can change defaults).
+      </p>
 
       {loadState.hasData && plan && (
         <section className="yearly-target-sections">

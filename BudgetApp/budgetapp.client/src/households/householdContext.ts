@@ -10,6 +10,7 @@ export interface HouseholdContextValue {
   isLoading: boolean
   initializationError: string | null
   selectHousehold: (householdId: string) => boolean
+  updateHousehold: (household: HouseholdMembership) => void
   createHousehold: (
     request: CreateHouseholdRequest,
   ) => Promise<HouseholdMembership>

@@ -12,7 +12,10 @@ date range. For example, FY 2027 with an April start covers April 1, 2027 throug
 March 31, 2028.
 
 Each `YearlyPlan` stores its own fiscal start month. Changing the household
-default affects only plans that have not yet been saved.
+default affects only plans that have not yet been saved. Owner/Admin edits this
+shared default in Manage household → Settings; other members can view it.
+Annual Targets links there and shows its loaded default, but retains its separate
+per-plan start-month editor. See [household settings](household-settings.md).
 
 Before first save, the annual-target page shows a **Fiscal year begins** selector
 beside the starting year. Changing it immediately updates the displayed date

@@ -1,6 +1,5 @@
 using BudgetApp.Application.Budgets;
 using BudgetApp.Domain.Budgeting;
-using BudgetApp.Domain.Households;
 using BudgetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -55,13 +54,6 @@ public sealed class YearlyPlanRepository(BudgetAppDbContext dbContext) :
                 household.DefaultCurrency,
                 household.FiscalYearStartMonth))
             .SingleOrDefaultAsync(cancellationToken);
-
-    public Task<Household?> GetHouseholdForUpdateAsync(
-        Guid householdId,
-        CancellationToken cancellationToken) =>
-        dbContext.Households.SingleOrDefaultAsync(
-            household => household.Id == householdId && household.IsActive,
-            cancellationToken);
 
     public async Task AddAsync(YearlyPlan plan, CancellationToken cancellationToken) =>
         await dbContext.YearlyPlans.AddAsync(plan, cancellationToken);

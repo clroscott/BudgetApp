@@ -2,24 +2,14 @@ import type { FormEvent } from 'react'
 import { currencies } from '../finance/currencies'
 import type { CreateHouseholdRequest } from './householdApi'
 import { useUnsavedNativeForm } from '../routing/useUnsavedForm'
+import { timeZoneOptions } from './timeZoneOptions'
 
 function getBrowserTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Vancouver'
 }
 
-function getSupportedTimeZones(fallback: string[]): string[] {
-  if (typeof Intl.supportedValuesOf !== 'function') {
-    return fallback
-  }
-
-  return Intl.supportedValuesOf('timeZone')
-}
-
 const browserTimeZone = getBrowserTimeZone()
-const supportedTimeZones = getSupportedTimeZones([browserTimeZone])
-const timeZones = supportedTimeZones.includes(browserTimeZone)
-  ? supportedTimeZones
-  : [browserTimeZone, ...supportedTimeZones]
+const timeZones = timeZoneOptions(browserTimeZone)
 
 export function HouseholdForm({
   isSubmitting,
@@ -85,7 +75,7 @@ export function HouseholdForm({
         ))}
       </select>
       <p id="household-timezone-help" className="field-help">
-        This controls monthly boundaries and future forecasts.
+        Stores the household's preferred time zone. It does not change transaction dates.
       </p>
 
       <button className="primary-button" type="submit" disabled={isSubmitting}>

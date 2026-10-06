@@ -63,6 +63,8 @@ public static class DependencyInjection
         services.AddScoped<IYearlyPlanRepository, YearlyPlanRepository>();
         services.AddScoped<YearlyPlanService>();
         services.AddScoped<IHouseholdRepository, HouseholdRepository>();
+        services.AddScoped<IHouseholdSettingsRepository, HouseholdSettingsRepository>();
+        services.AddScoped<HouseholdSettingsService>();
         services.AddScoped<IHouseholdInvitationRepository, HouseholdInvitationRepository>();
         services.AddScoped<IHouseholdLifecycleRepository, HouseholdLifecycleRepository>();
         services.AddSingleton<
