@@ -3738,6 +3738,8 @@ a {
   background: var(--surface);
   box-shadow: 0 1.25rem 4rem rgba(0, 0, 0, 0.3);
   pointer-events: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .tutorial-coach-card h2 {
@@ -3769,6 +3771,25 @@ a {
 
 .tutorial-coach-actions {
   margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.tutorial-recovery {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.tutorial-recovery p {
+  margin: 0;
+}
+
+.tutorial-target-focus {
+  margin-top: 0.75rem;
+}
+
+.tutorial-coach-card :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .tutorial-coach-actions > span {

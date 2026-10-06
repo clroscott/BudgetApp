@@ -203,6 +203,51 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] The learn-only tutorial highlights the correct controls and can be completed.
 - [ ] Coming-soon tutorials are clearly unavailable rather than appearing broken.
 
+## Tutorial resilience regression (#177)
+
+Use Development or Scratch. These are permanent manual cases, not a record of
+completed browser testing. See [the implementation guide](tutorial-resilience.md).
+Only tutorial progress metadata may change during the existing Learn-only tour.
+
+- [ ] Start/replay Getting started with the mobile menu closed at 760px, 800px,
+      and 880px. Each required navigation link becomes visible and clickable.
+      Repeat after resizing during a step; no hidden link is accepted as ready.
+- [ ] Run with the desktop sidebar collapsed. Icon links remain reachable and
+      named; the tour does not change the saved collapse preference.
+- [ ] Repeat at actual browser 200% zoom, including a short/narrow viewport.
+      Coach content can scroll; Exit, Back, and recovery actions remain reachable;
+      the required target is not covered by the coach when interacting with it.
+- [ ] Complete the tour with only Tab, Shift-Tab, Enter/Space, and Escape. Focus
+      starts at the coach heading, reaches both coach and highlighted link, and
+      does not escape to household switching, sign-out, forms, or other links.
+- [ ] Use Read highlighted area / Go to highlighted control. Focus moves without
+      clicking or saving. Informational headings are readable; Customize and form
+      controls in Learn-only spotlights cannot be operated.
+- [ ] With a screen reader, hear step instructions/recovery feedback and reach
+      the intended highlighted area and coach region. Unrelated inert background
+      actions are absent from normal browse/control navigation. No false modal
+      announcement hides the intended target.
+- [ ] On disposable preview data, use the browser element inspector to hide or
+      remove the current target (or delay a lazy page). After five seconds, waiting
+      stops and explained Retry target / Skip step / Exit controls appear. Restore
+      the element: the tour recovers automatically. Repeat after a target had
+      already been found. Retry never invokes a save, import, invite, or deletion.
+- [ ] Back changes route/step and focuses the new coach. Exit and Escape release
+      background controls and restore launch focus, or the current page heading if
+      the launcher was removed. Replay does not receive delayed focus from Exit.
+- [ ] With a dirty editor, attempt a required navigation click; Cancel prompts
+      once, retains edits and the step, and does not advance. Leave advances normally.
+      Test Back and Finish route guards too. Prefer disposable edits.
+- [ ] Block only `/api/tutorial-progress` requests. A failed progress save is
+      explained; Exit/Escape/Finish still dismiss the overlay immediately. No
+      financial/configuration request is sent by recovery or Learn-only steps.
+- [ ] Finish returns to Tutorials and records completion when connected. Exit
+      can resume its checkpoint; Replay starts at step one. Planned guided tours
+      remain Coming soon rather than accidentally becoming enabled.
+- [ ] When guided tours are added, missing required actions expose Retry/Exit
+      without Skip; only explicitly skippable information can be skipped. Recovery
+      must never execute the intended financial/setup action automatically.
+
 ## Unsaved-change protection regression (#157)
 
 Use disposable Development or Scratch data. These are manual checks to run, not a

@@ -7,6 +7,8 @@ export interface TutorialStep {
   route: string
   targetId: string
   advance: TutorialAdvance
+  // Guided recovery can skip informational steps only, never required actions.
+  canSkipWhenUnavailable?: boolean
 }
 
 export interface TutorialDefinition {
