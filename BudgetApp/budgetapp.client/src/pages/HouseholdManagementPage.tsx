@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { getSafeReturnPath } from '../auth/returnPath'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { PageLoadFeedback } from '../components/PageLoadFeedback'
+import { usePageLoad } from './usePageLoad'
 import {
   deleteUnusedHousehold,
   leaveHousehold,
@@ -35,24 +37,20 @@ export function HouseholdManagementPage() {
   const inviteGuard = useUnsavedNativeForm('Discard the household invitation details you entered?')
   const [management, setManagement] =
     useState<HouseholdMemberManagement | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
+  const [exitCompleted, setExitCompleted] = useState(false)
+  const loadState = usePageLoad(currentHousehold?.id ?? '')
+  const { run } = loadState
+  const canChange = loadState.isFresh && !isSaving && !exitCompleted
 
   const load = useCallback(async () => {
     if (!currentHousehold) return
 
-    setIsLoading(true)
     setErrors([])
-    try {
-      setManagement(await getHouseholdMembers(currentHousehold.id))
-    } catch (error) {
-      setErrors(getErrorMessages(error))
-    } finally {
-      setIsLoading(false)
-    }
-  }, [currentHousehold])
+    return await run(() => getHouseholdMembers(currentHousehold.id), setManagement)
+  }, [currentHousehold, run])
 
   useEffect(() => {
     void load()
@@ -66,6 +64,7 @@ export function HouseholdManagementPage() {
       : ['Editor', 'Viewer']
 
   const runChange = async (change: () => Promise<{ emailDelivered?: boolean }>) => {
+    if (!canChange) return false
     setIsSaving(true)
     setErrors([])
     setNotice(null)
@@ -103,17 +102,33 @@ export function HouseholdManagementPage() {
   }
 
   const finishExit = async (operation: () => Promise<void>) => {
+    if (!canChange) return
     setIsSaving(true)
     setErrors([])
     setNotice(null)
+    let committed = false
     try {
       await operation()
+      committed = true
+      inviteGuard.markClean()
+      setExitCompleted(true)
       await refresh()
       navigate(getSafeReturnPath() ?? '/dashboard', { replace: true, bypassBlocker: true })
     } catch (error) {
+      if (committed) setNotice('Household change saved, but your household list could not be refreshed. Retry loading the list; do not repeat the change.')
       setErrors(getErrorMessages(error))
       setIsSaving(false)
     }
+  }
+
+  const retryExitRefresh = async () => {
+    if (isSaving) return
+    setIsSaving(true)
+    setErrors([])
+    try {
+      await refresh()
+      navigate(getSafeReturnPath() ?? '/dashboard', { replace: true, bypassBlocker: true })
+    } catch (error) { setErrors(getErrorMessages(error)); setIsSaving(false) }
   }
 
   const confirmLeave = () => {
@@ -152,6 +167,11 @@ export function HouseholdManagementPage() {
 
         <ErrorSummary errors={errors} />
         {notice && <div className="success-summary" role="status">{notice}</div>}
+        {exitCompleted && <button className="secondary-button" type="button" disabled={isSaving}
+          onClick={() => void retryExitRefresh()}>Retry household list</button>}
+        {exitCompleted && isSaving && <p role="status">Refreshing your household list…</p>}
+        {!exitCompleted && <PageLoadFeedback subject="household details" status={loadState.status} errors={loadState.errors}
+          disabled={isSaving} onReload={() => void load()} />}
 
         <section className="household-management-section">
           <div className="household-section-heading">
@@ -164,6 +184,8 @@ export function HouseholdManagementPage() {
             </div>
             <span className="status-pill">{households.length}</span>
           </div>
+
+          {exitCompleted && <p>Your household list may be out of date until it is refreshed.</p>}
 
           <div className="household-member-list">
             {households.map(household => {
@@ -183,6 +205,7 @@ export function HouseholdManagementPage() {
                       <button
                         className="secondary-button"
                         type="button"
+                        disabled={exitCompleted}
                         onClick={() => {
                           if (selectHousehold(household.id)) {
                             setNotice(`Switched to ${household.name}.`)
@@ -199,7 +222,7 @@ export function HouseholdManagementPage() {
           </div>
         </section>
 
-        {management?.canManageInvitations && (
+        {!exitCompleted && loadState.hasData && management?.canManageInvitations && (
           <form
             {...inviteGuard.formProps}
             className="household-invite-form"
@@ -219,11 +242,12 @@ export function HouseholdManagementPage() {
                 autoComplete="email"
                 maxLength={256}
                 required
+                disabled={!canChange}
               />
             </label>
             <label>
               <span>Role</span>
-              <select name="role" defaultValue="Editor">
+              <select name="role" defaultValue="Editor" disabled={!canChange}>
                 {availableRoles.map(role => (
                   <option key={role} value={role}>{role}</option>
                 ))}
@@ -232,7 +256,7 @@ export function HouseholdManagementPage() {
             <button
               className="primary-button"
               type="submit"
-              disabled={isSaving}
+              disabled={!canChange}
             >
               {isSaving ? 'Saving…' : 'Send invitation'}
             </button>
@@ -243,20 +267,18 @@ export function HouseholdManagementPage() {
           </form>
         )}
 
-        <section className="household-management-section">
+        {!exitCompleted && <section className="household-management-section">
           <div className="household-section-heading">
             <div>
               <h2>Members</h2>
               <p>People who currently have access to this household.</p>
             </div>
             <span className="status-pill">
-              {management?.members.length ?? 0}
+              {loadState.hasData ? management?.members.length ?? 0 : '—'}
             </span>
           </div>
 
-          {isLoading ? (
-            <p className="empty-state">Loading household members…</p>
-          ) : management?.members.length ? (
+          {!loadState.hasData ? null : management?.members.length ? (
             <div className="household-member-list">
               {management.members.map(member => (
                 <article className="household-member-row" key={member.userId}>
@@ -272,11 +294,12 @@ export function HouseholdManagementPage() {
               ))}
             </div>
           ) : (
-            <p className="empty-state">No household members were found.</p>
+            <p className="empty-state">{loadState.isFresh ? 'No household members were found.'
+              : 'No members were listed in the last successful response. The current list is unavailable.'}</p>
           )}
-        </section>
+        </section>}
 
-        {management?.canManageInvitations && (
+        {!exitCompleted && loadState.hasData && management?.canManageInvitations && (
           <section className="household-management-section">
             <div className="household-section-heading">
               <div>
@@ -313,7 +336,7 @@ export function HouseholdManagementPage() {
                             <button
                               className="text-button"
                               type="button"
-                              disabled={isSaving}
+                              disabled={!canChange}
                               onClick={() => void runChange(() =>
                                 resendHouseholdInvitation(
                                   currentHousehold.id,
@@ -325,7 +348,7 @@ export function HouseholdManagementPage() {
                             <button
                               className="danger-button"
                               type="button"
-                              disabled={isSaving}
+                              disabled={!canChange}
                               onClick={() => void runChange(async () => {
                                 await revokeHouseholdInvitation(
                                   currentHousehold.id,
@@ -344,12 +367,13 @@ export function HouseholdManagementPage() {
                 })}
               </div>
             ) : (
-              <p className="empty-state">No invitations have been created.</p>
+              <p className="empty-state">{loadState.isFresh ? 'No invitations have been created.'
+                : 'No invitations were listed in the last successful response. The current list is unavailable.'}</p>
             )}
           </section>
         )}
 
-        {management && (
+        {!exitCompleted && loadState.hasData && management && (
           <section className="household-management-section household-exit-section">
             <div className="household-section-heading">
               <div>
@@ -374,7 +398,7 @@ export function HouseholdManagementPage() {
                 <button
                   className="danger-button"
                   type="button"
-                  disabled={isSaving}
+                  disabled={!canChange}
                   onClick={confirmLeave}
                 >
                   Leave household
@@ -394,7 +418,7 @@ export function HouseholdManagementPage() {
                 <button
                   className="danger-button"
                   type="button"
-                  disabled={isSaving}
+                  disabled={!canChange}
                   onClick={confirmDelete}
                 >
                   Delete unused household

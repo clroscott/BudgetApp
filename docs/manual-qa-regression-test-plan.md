@@ -482,6 +482,41 @@ instructions and the privacy contract.
 
 ## Persistence, errors, and recovery
 
+### Page-load feedback — Annual overview, Annual targets, Monthly budget, Household
+
+Repeat these checks on each of the four pages. Use a disposable Development
+household and browser request blocking/offline controls; do not use Production
+or real invitation recipients for failure injection.
+
+- [ ] Delay the initial read: Loading is announced; unknown counts/totals are not
+      presented as zero, and no unknown-budget creation/replacement is offered.
+- [ ] Fail the initial read: Loading stops, "Could not load" appears with Retry
+      loading, and the page does not also claim no budgets/targets/members exist.
+- [ ] Restore connectivity and Retry: the current selection loads without any
+      save, email, draft-creation, allocation, or deletion request being repeated.
+- [ ] Load a genuinely empty response: appropriate empty/zero states appear and
+      creation is offered only where the successful response permits it.
+- [ ] After a successful load, fail Refresh data: retained information is marked
+      as potentially out of date; editing/write actions are unavailable; Retry
+      restores fresh data. Repeat with a previously empty response.
+- [ ] On monthly budgets and annual targets, enter changes before Refresh:
+      canceling the discard prompt preserves values; failed saves preserve values
+      and navigation protection. Household email/role survive read refreshes.
+- [ ] Fail the existing-budget list on annual targets: no "Will create Draft"
+      preview or replacement action is available based on the unknown list.
+- [ ] Allow an invitation, allocation, or draft deletion to succeed, then fail its
+      refresh: acknowledged success is clear; retry issues reads, not another write.
+- [ ] Allow leaving/deleting a disposable household to succeed, then fail the
+      membership-list refresh: retry the list without repeating the exit operation.
+- [ ] Delay an old month/year/scope/household read, change selection, and let the
+      newer read finish first: the delayed response does not replace current data.
+- [ ] Revoke access while data is displayed: a denied refresh hides the records,
+      rather than retaining a stale authorized-looking view.
+- [ ] Test status/error announcements and retry buttons with keyboard and screen
+      reader. Repeat at narrow width; no broad layout changes are expected.
+
+### General persistence and recovery
+
 - [ ] Saved changes survive browser refresh.
 - [ ] Saved changes survive application restart.
 - [ ] Switching households and returning does not leak or lose state.

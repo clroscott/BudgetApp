@@ -1,5 +1,4 @@
 import { useEffect, useState, type CSSProperties } from 'react'
-import { getErrorMessages } from '../auth/errorMessages'
 import {
   getAnnualBudgetOverview,
   type AnnualBudgetCategory,
@@ -9,7 +8,8 @@ import type { BudgetScope } from '../budgets/budgetApi'
 import { annualOverviewSelection, transactionLink } from '../budgets/transactionDrilldown'
 import { BrandLockup } from '../components/Brand'
 import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
-import { ErrorSummary } from '../components/ErrorSummary'
+import { PageLoadFeedback } from '../components/PageLoadFeedback'
+import { usePageLoad } from './usePageLoad'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 
@@ -22,28 +22,14 @@ export function AnnualBudgetOverviewPage() {
   const [year, setYear] = useState(() => annualOverviewSelection(window.location.search).year)
   const [scope, setScope] = useState<BudgetScope>(() => annualOverviewSelection(window.location.search).scope)
   const [overview, setOverview] = useState<AnnualBudgetOverview | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [errors, setErrors] = useState<string[]>([])
+  const loadState = usePageLoad(`${currentHousehold?.id}/${year}/${scope}`)
+  const { run } = loadState
+  const [reloadVersion, setReloadVersion] = useState(0)
 
   useEffect(() => {
     if (!currentHousehold) return
-    let isCurrent = true
-    setIsLoading(true)
-    setErrors([])
-    void getAnnualBudgetOverview(currentHousehold.id, year, scope)
-      .then(result => {
-        if (isCurrent) setOverview(result)
-      })
-      .catch(error => {
-        if (!isCurrent) return
-        setOverview(null)
-        setErrors(getErrorMessages(error))
-      })
-      .finally(() => {
-        if (isCurrent) setIsLoading(false)
-      })
-    return () => { isCurrent = false }
-  }, [currentHousehold, scope, year])
+    void run(() => getAnnualBudgetOverview(currentHousehold.id, year, scope), setOverview)
+  }, [currentHousehold, scope, year, run, reloadVersion])
 
   if (!currentHousehold) return null
 
@@ -98,10 +84,9 @@ export function AnnualBudgetOverviewPage() {
         </label>
       </section>
 
-      <ErrorSummary errors={errors} />
-      {isLoading || !overview ? (
-        <p className="empty-state">Loading annual overview…</p>
-      ) : <>
+      <PageLoadFeedback subject="annual overview" status={loadState.status} errors={loadState.errors}
+        onReload={() => setReloadVersion(version => version + 1)} />
+      {loadState.hasData && overview && <>
         <section className="annual-summary-grid" aria-label="Annual summary">
           <Summary label="Budgeted" value={formatAmount(overview.annualBudgetedAmount)}
             detail={`${overview.budgetedMonthCount} of 12 months have budgets`} />
