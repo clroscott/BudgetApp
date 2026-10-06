@@ -2,6 +2,7 @@ namespace BudgetApp.Domain.Transactions;
 
 public sealed class Transaction
 {
+    private readonly List<TransactionPersonalBudgetInclusion> _personalBudgetInclusions = [];
     public const decimal MaxAbsoluteAmount = 999_999_999_999_999.9999m;
     public const int DescriptionMaxLength = 250;
     public const int OriginalDescriptionMaxLength = 500;
@@ -98,6 +99,37 @@ public sealed class Transaction
     public TransactionReviewStatus ReviewStatus { get; private set; }
 
     public bool IsExcludedFromBudget { get; private set; }
+
+    // Null retains account-derived defaults for legacy callers; migration/imports
+    // persist an explicit choice so later account edits cannot reclassify history.
+    public bool? IncludeInHouseholdBudget { get; private set; }
+
+    public IReadOnlyCollection<TransactionPersonalBudgetInclusion> PersonalBudgetInclusions =>
+        _personalBudgetInclusions;
+
+    public void InitializeBudgetInclusion(bool isHouseholdAccount, Guid? accountOwnerUserId)
+    {
+        if (IncludeInHouseholdBudget.HasValue) return;
+        IncludeInHouseholdBudget = !IsExcludedFromBudget && isHouseholdAccount;
+        if (!IsExcludedFromBudget && !isHouseholdAccount && accountOwnerUserId.HasValue)
+            _personalBudgetInclusions.Add(new TransactionPersonalBudgetInclusion(Id, accountOwnerUserId.Value));
+    }
+
+    public void SetBudgetInclusionForUser(
+        Guid userId, bool? includeHousehold, bool includePersonal, DateTimeOffset now)
+    {
+        if (!IncludeInHouseholdBudget.HasValue)
+            throw new InvalidOperationException("Initialize budget inclusion before changing it.");
+        ValidateRequiredId(userId, nameof(userId), "User ID");
+        if (includeHousehold.HasValue) IncludeInHouseholdBudget = includeHousehold.Value;
+        var existing = _personalBudgetInclusions.SingleOrDefault(item => item.UserId == userId);
+        if (includePersonal && existing is null)
+            _personalBudgetInclusions.Add(new TransactionPersonalBudgetInclusion(Id, userId));
+        else if (!includePersonal && existing is not null)
+            _personalBudgetInclusions.Remove(existing);
+        IsExcludedFromBudget = IncludeInHouseholdBudget != true && _personalBudgetInclusions.Count == 0;
+        RecordModification(userId, now);
+    }
 
     public bool IsVoided { get; private set; }
 

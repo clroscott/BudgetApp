@@ -93,6 +93,9 @@ public sealed class CsvImportService(
                 importFile.Id,
                 now))
             .ToList();
+        foreach (var draft in drafts)
+            draft.SetBudgetInclusion(account.Scope == AccountScope.Household,
+                account.Scope == AccountScope.Personal ? account.OwnerUserId : null, now);
         var validRows = drafts.Count(draft =>
             draft.ValidationStatus == ImportDraftValidationStatus.Valid);
         var invalidRows = drafts.Count - validRows;

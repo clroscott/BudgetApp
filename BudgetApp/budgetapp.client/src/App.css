@@ -1812,6 +1812,36 @@ a {
   margin-bottom: 0.35rem;
 }
 
+.transaction-inline-edit > summary {
+  padding: 0.65rem 0;
+  color: var(--accent);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.budget-inclusion-controls {
+  min-width: 0;
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.budget-inclusion-controls legend {
+  padding: 0 0.3rem;
+  font-weight: 600;
+}
+
+.budget-inclusion-controls p,
+.budget-inclusion-controls small {
+  display: block;
+  max-width: 70ch;
+  margin: 0.5rem 0;
+  color: var(--muted-text);
+  font-size: 0.85rem;
+}
+
 .transaction-pagination {
   display: flex;
   align-items: center;
@@ -2132,6 +2162,32 @@ a {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
   border-top: 1px solid var(--border);
+}
+
+.import-bulk-budget-panel {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.7rem;
+  background: var(--surface);
+}
+
+.import-bulk-budget-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.65rem 1rem;
+}
+
+.import-bulk-budget-controls label {
+  display: grid;
+  flex: 1 1 15rem;
+  min-width: 0;
+  gap: 0.4rem;
+}
+
+.import-bulk-budget-controls select {
+  width: 100%;
 }
 
 .import-control-undo span {

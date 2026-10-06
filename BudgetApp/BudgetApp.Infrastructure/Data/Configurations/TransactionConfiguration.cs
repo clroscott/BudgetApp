@@ -28,6 +28,9 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
 
         builder.HasKey(transaction => transaction.Id);
 
+        builder.HasMany(transaction => transaction.PersonalBudgetInclusions)
+            .WithOne().HasForeignKey(item => item.TransactionId).OnDelete(DeleteBehavior.Cascade);
+
         builder.HasIndex(transaction => new
         {
             transaction.HouseholdId,

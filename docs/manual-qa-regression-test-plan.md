@@ -345,7 +345,8 @@ initial findings and pending live tasks.
 - [ ] Navigating away from an unsaved edit asks for confirmation.
 - [ ] Choosing Stay preserves the edit; choosing Leave discards it.
 - [ ] Excluded and voided/reversal behavior is represented correctly.
-- [ ] Personal transactions remain visible only to the personal-account owner.
+- [ ] Private personal transactions remain visible only to their account owner;
+      explicitly Household-included transactions expose only the shared projection.
 - [ ] CSV export contains only transactions matching the active search and filters.
 - [ ] Export columns are human-readable and spreadsheet-safe.
 - [ ] Export does not expose internal IDs or unrelated household/personal data.
@@ -366,6 +367,64 @@ initial findings and pending live tasks.
 - [ ] Actual, remaining, uncategorized, and currency-mismatch values are plausible.
 - [ ] Draft activation, return to Draft, closure, and reopening obey their rules.
 - [ ] Deleting a Draft requires confirmation and does not delete transactions.
+
+## Transaction budget inclusion (#182)
+
+Use fictional CAD 1,200 rent in a personal account owned by User A. User B must
+belong to the same household. Verify against a separate Household and Personal
+monthly budget; the planned amounts do not need to match.
+
+- [ ] Apply `AddTransactionBudgetInclusion` to Development/Scratch; verify existing
+      Household/Personal totals and excluded transactions remain unchanged.
+- [ ] Import rows initially use the source account's old default: Household only
+      or the account owner's Personal only.
+- [ ] During review, select Personal + Household; save individually and using
+      Save all corrections; choices survive refresh, row filters, and pagination.
+- [ ] Bulk budget inclusion supports Personal only, Household only, both, and
+      neither. Verify current-page versus all-matching scope across more than
+      100 rows, cancellation, preview counts, and keeping typed corrections.
+      Apply stages changes; Save all corrections persists them. Excluded,
+      linked, and permission-protected rows are skipped, and changed approved
+      rows require review again. A failed bulk save keeps the staged choices.
+- [ ] Category rules preserve inclusion choices. Approval/completion creates only
+      one transaction; repeating completion or re-uploading does not bypass the
+      existing duplicate safeguards.
+- [ ] An approved row with neither budget selected still creates a ledger row.
+      An excluded review row creates no transaction.
+- [ ] The same CAD 1,200 counts once in A's Personal and once in Household actuals;
+      no split amount or duplicate category line appears.
+- [ ] Change inclusion later on Transactions; monthly, prior-month/history, and
+      annual totals update; planned budgets, annual targets, and statuses do not.
+- [ ] Repeat with Draft, Active, and Closed budgets. Closed actuals remain live,
+      consistent with existing reporting behavior.
+- [ ] User B sees only the shared date, amount, currency, category, description,
+      source/status and generic private-account label. Private account ID/name,
+      notes, merchant, posted date, account details, raw CSV/import are unavailable.
+- [ ] B cannot change A's financial details or Household inclusion, even as Admin.
+      B can add/remove the visible transaction from B's own Personal budget without
+      changing A's Personal selection.
+- [ ] A Viewer can choose their own Personal inclusion but cannot change Household
+      inclusion, including on a personal account they own.
+- [ ] Unsharing a private expense hides it from B and B's Personal reports; B's
+      stored inclusion choice does not grant access to private data.
+- [ ] A shared-account row selected for Personal belongs to the selecting reviewer,
+      not whichever member completes the import. Other reviewers cannot reassign
+      that choice; after completion they can independently add their own choice.
+- [ ] Budget/currency/spending/date/category filters and annual drill-downs reconcile
+      with the report. Expense refunds, income, uncategorized rows, voided rows,
+      currency mismatches, and deactivated categories retain the existing rules.
+- [ ] List pagination and CSV export contain one row per transaction; exports
+      display inclusion and redact private source details.
+- [ ] Changing account scope does not automatically rewrite saved inclusion.
+- [ ] Failed saves retain edits; route/filter/page/household changes warn; Reset
+      requires confirmation. Saving one row does not discard another row's choices.
+- [ ] Two-tab saves return a reload conflict rather than overwriting newer choices.
+- [ ] Household Activity contains safe shared change summaries; Personal choices
+      and private notes/account information do not leak into household activity.
+- [ ] Test checkbox, save, reset, and reload controls with keyboard and narrow layout.
+
+See [transaction budget inclusion](transaction-budget-inclusion.md) for rollout
+instructions and the privacy contract.
 
 ## Annual targets and annual overview
 

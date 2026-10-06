@@ -109,6 +109,18 @@ public sealed class ImportTransactionDraft
 
     public Guid? ApprovedTransactionId { get; private set; }
 
+    public bool? IncludeInHouseholdBudget { get; private set; }
+    public Guid? PersonalBudgetUserId { get; private set; }
+
+    public void SetBudgetInclusion(bool household, Guid? personalUserId, DateTimeOffset now)
+    {
+        EnsureNotLinked();
+        if (personalUserId == Guid.Empty) throw new ArgumentException("A personal budget user is required.");
+        IncludeInHouseholdBudget = household;
+        PersonalBudgetUserId = personalUserId;
+        UpdatedAtUtc = now;
+    }
+
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public DateTimeOffset UpdatedAtUtc { get; private set; }

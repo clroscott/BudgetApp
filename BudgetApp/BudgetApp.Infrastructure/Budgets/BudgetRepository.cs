@@ -132,8 +132,13 @@ internal sealed class BudgetRepository(BudgetAppDbContext dbContext) : IBudgetRe
                   !transaction.IsVoided &&
                   !transaction.IsExcludedFromBudget &&
                   (scope == BudgetScope.Household
-                      ? account.Scope == AccountScope.Household
-                      : account.Scope == AccountScope.Personal && account.OwnerUserId == userId) &&
+                      ? transaction.IncludeInHouseholdBudget == true ||
+                        transaction.IncludeInHouseholdBudget == null && account.Scope == AccountScope.Household
+                      : (account.Scope == AccountScope.Household || account.OwnerUserId == userId ||
+                         transaction.IncludeInHouseholdBudget == true) &&
+                        (transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) ||
+                         transaction.IncludeInHouseholdBudget == null &&
+                         account.Scope == AccountScope.Personal && account.OwnerUserId == userId)) &&
                   (category == null || category.Type == CategoryType.Expense)
             select new
             {
@@ -183,8 +188,13 @@ internal sealed class BudgetRepository(BudgetAppDbContext dbContext) : IBudgetRe
                   category.Type == CategoryType.Expense &&
                   account.Currency == currency &&
                   (scope == BudgetScope.Household
-                      ? account.Scope == AccountScope.Household
-                      : account.Scope == AccountScope.Personal && account.OwnerUserId == userId)
+                      ? transaction.IncludeInHouseholdBudget == true ||
+                        transaction.IncludeInHouseholdBudget == null && account.Scope == AccountScope.Household
+                      : (account.Scope == AccountScope.Household || account.OwnerUserId == userId ||
+                         transaction.IncludeInHouseholdBudget == true) &&
+                        (transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) ||
+                         transaction.IncludeInHouseholdBudget == null &&
+                         account.Scope == AccountScope.Personal && account.OwnerUserId == userId))
             select new
             {
                 transaction.CategoryId,
@@ -231,9 +241,13 @@ internal sealed class BudgetRepository(BudgetAppDbContext dbContext) : IBudgetRe
                   !transaction.IsVoided &&
                   !transaction.IsExcludedFromBudget &&
                   (scope == BudgetScope.Household
-                      ? account.Scope == AccountScope.Household
-                      : account.Scope == AccountScope.Personal &&
-                        account.OwnerUserId == userId)
+                      ? transaction.IncludeInHouseholdBudget == true ||
+                        transaction.IncludeInHouseholdBudget == null && account.Scope == AccountScope.Household
+                      : (account.Scope == AccountScope.Household || account.OwnerUserId == userId ||
+                         transaction.IncludeInHouseholdBudget == true) &&
+                        (transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) ||
+                         transaction.IncludeInHouseholdBudget == null &&
+                         account.Scope == AccountScope.Personal && account.OwnerUserId == userId))
             select new
             {
                 transaction.TransactionDate.Month,

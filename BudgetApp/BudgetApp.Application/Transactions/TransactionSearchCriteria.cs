@@ -9,7 +9,10 @@ public sealed record TransactionSearchCriteria(
     CategoryType? CategoryType,
     Guid? CategoryId,
     bool UncategorizedOnly,
-    string? DescriptionSearch)
+    string? DescriptionSearch,
+    string? BudgetInclusion = null,
+    string? Currency = null,
+    bool SpendingOnly = false)
 {
     public static TransactionSearchCriteria Create(
         Guid? accountId,
@@ -18,7 +21,8 @@ public sealed record TransactionSearchCriteria(
         string? categoryType,
         Guid? categoryId,
         bool uncategorizedOnly,
-        string? descriptionSearch)
+        string? descriptionSearch,
+        string? budgetInclusion = null, string? currency = null, bool spendingOnly = false)
     {
         if (fromDate > toDate)
         {
@@ -49,6 +53,12 @@ public sealed record TransactionSearchCriteria(
                 nameof(descriptionSearch));
         }
 
+        var inclusion = string.IsNullOrWhiteSpace(budgetInclusion) ? null :
+            new[] { "Household", "Personal", "PersonalAndHousehold", "NotIncluded" }
+                .FirstOrDefault(value => value.Equals(budgetInclusion, StringComparison.OrdinalIgnoreCase))
+                ?? throw new ArgumentException("Budget inclusion is not supported.");
+        var normalizedCurrency = string.IsNullOrWhiteSpace(currency) ? null :
+            BudgetApp.Application.Finance.CurrencyCatalog.NormalizeSupported(currency);
         return new TransactionSearchCriteria(
             accountId,
             fromDate,
@@ -56,6 +66,6 @@ public sealed record TransactionSearchCriteria(
             parsedCategoryType,
             categoryId,
             uncategorizedOnly,
-            normalizedDescriptionSearch);
+            normalizedDescriptionSearch, inclusion, normalizedCurrency, spendingOnly);
     }
 }

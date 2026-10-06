@@ -2,7 +2,7 @@ import { apiDownload, apiGet, apiPut } from '../api/apiClient'
 
 export interface TransactionItem {
   id: string
-  accountId: string
+  accountId: string | null
   accountName: string
   currency: string
   categoryId: string | null
@@ -18,6 +18,10 @@ export interface TransactionItem {
   isExcludedFromBudget: boolean
   isVoided: boolean
   canEdit: boolean
+  includeInHouseholdBudget?: boolean
+  includeInPersonalBudget?: boolean
+  canEditHouseholdInclusion?: boolean
+  updatedAtUtc?: string
 }
 
 export interface TransactionListResult {
@@ -38,6 +42,9 @@ export interface TransactionQuery {
   uncategorizedOnly?: boolean
   description?: string
   page: number
+  budgetInclusion?: string
+  currency?: string
+  spendingOnly?: boolean
 }
 
 export interface UpdateTransactionRequest {
@@ -48,7 +55,8 @@ export interface UpdateTransactionRequest {
   description: string
   merchantName: string | null
   notes: string | null
-  isExcludedFromBudget: boolean
+  isExcludedFromBudget?: boolean
+  updatedAtUtc?: string
 }
 
 export function getTransactions(
@@ -62,6 +70,9 @@ export function getTransactions(
 
 function buildTransactionParameters(query: TransactionQuery): URLSearchParams {
   const parameters = new URLSearchParams()
+  if (query.budgetInclusion) parameters.set('budgetInclusion', query.budgetInclusion)
+  if (query.currency) parameters.set('currency', query.currency)
+  if (query.spendingOnly) parameters.set('spendingOnly', 'true')
   if (query.accountId) parameters.set('accountId', query.accountId)
   if (query.fromDate) parameters.set('fromDate', query.fromDate)
   if (query.toDate) parameters.set('toDate', query.toDate)
@@ -81,6 +92,12 @@ export function updateTransaction(
     `/api/households/${householdId}/transactions/${transactionId}`,
     request,
   )
+}
+
+export function updateBudgetInclusion(householdId: string, transactionId: string, request: {
+  includeInHouseholdBudget?: boolean, includeInPersonalBudget: boolean, updatedAtUtc: string,
+}): Promise<void> {
+  return apiPut(`/api/households/${householdId}/transactions/${transactionId}/budget-inclusion`, request)
 }
 
 export async function downloadTransactionsCsv(

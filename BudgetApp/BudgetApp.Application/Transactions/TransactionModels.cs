@@ -2,7 +2,7 @@ namespace BudgetApp.Application.Transactions;
 
 public sealed record TransactionListItem(
     Guid Id,
-    Guid AccountId,
+    Guid? AccountId,
     string AccountName,
     string Currency,
     Guid? CategoryId,
@@ -17,11 +17,15 @@ public sealed record TransactionListItem(
     string ReviewStatus,
     bool IsExcludedFromBudget,
     bool IsVoided,
-    bool CanEdit);
+    bool CanEdit,
+    bool IncludeInHouseholdBudget,
+    bool IncludeInPersonalBudget,
+    bool CanEditHouseholdInclusion,
+    DateTimeOffset UpdatedAtUtc);
 
 public sealed record TransactionRecord(
     Guid Id,
-    Guid AccountId,
+    Guid? AccountId,
     string AccountName,
     string Currency,
     Guid? CategoryId,
@@ -37,7 +41,10 @@ public sealed record TransactionRecord(
     bool IsExcludedFromBudget,
     bool IsVoided,
     bool IsPersonalAccount,
-    Guid? AccountOwnerUserId);
+    Guid? AccountOwnerUserId,
+    bool IncludeInHouseholdBudget,
+    bool IncludeInPersonalBudget,
+    DateTimeOffset UpdatedAtUtc);
 
 public sealed record TransactionListResult(
     IReadOnlyList<TransactionListItem> Items,
@@ -60,7 +67,9 @@ public sealed record TransactionExportRecord(
     decimal Amount,
     string Description,
     string? Notes,
-    bool IsExcludedFromBudget);
+    bool IsExcludedFromBudget,
+    bool IncludeInHouseholdBudget,
+    bool IncludeInPersonalBudget);
 
 public sealed record TransactionCsvExport(
     byte[] Content,

@@ -19,6 +19,7 @@ public sealed class TransactionCsvExportService(
         "Category",
         "Subcategory",
         "Budget Treatment",
+        "Included in Budgets",
         "Notes"
     ];
 
@@ -32,7 +33,8 @@ public sealed class TransactionCsvExportService(
         Guid? categoryId,
         bool uncategorizedOnly,
         string? descriptionSearch,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? budgetInclusion = null, string? currency = null, bool spendingOnly = false)
     {
         await authorizationService.RequireViewAsync(
             householdId,
@@ -46,7 +48,7 @@ public sealed class TransactionCsvExportService(
             categoryType,
             categoryId,
             uncategorizedOnly,
-            descriptionSearch);
+            descriptionSearch, budgetInclusion, currency, spendingOnly);
         var transactions = await transactionRepository.ListVisibleForExportAsync(
             householdId,
             userId,
@@ -68,6 +70,8 @@ public sealed class TransactionCsvExportService(
                 ProtectSpreadsheetText(transaction.CategoryName),
                 ProtectSpreadsheetText(transaction.SubcategoryName),
                 transaction.IsExcludedFromBudget ? "Excluded" : "Included",
+                transaction.IncludeInHouseholdBudget && transaction.IncludeInPersonalBudget ? "Personal + Household" :
+                    transaction.IncludeInHouseholdBudget ? "Household" : transaction.IncludeInPersonalBudget ? "Personal" : "Not included",
                 ProtectSpreadsheetText(transaction.Notes)
             ]);
         }

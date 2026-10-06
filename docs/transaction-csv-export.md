@@ -32,7 +32,8 @@ The export uses the same visibility rules as the Transactions page:
 - the user must be an active member of the requested household;
 - shared household-account transactions are included;
 - the signed-in user's personal-account transactions are included;
-- another household member's personal-account transactions are excluded;
+- another member's personal-account transactions are excluded unless explicitly
+  included in Household; shared rows omit the private account identity and notes;
 - membership in one household cannot authorize exporting another household.
 
 An export event is written to the technical log with the user, household, and
@@ -49,7 +50,8 @@ exported record count. Transaction contents are not written to that log event.
 | Account | Human-readable account name |
 | Category | Top-level category name |
 | Subcategory | Child category name, when assigned |
-| Budget Treatment | `Included` or `Excluded` from budget calculations |
+| Budget Treatment | `Included` or `Excluded` for Household/the current viewer's Personal budget; other users' choices are private |
+| Included in Budgets | Current viewer's Personal, Household, Personal + Household, or Not included |
 | Notes | Optional saved notes |
 
 The file deliberately omits internal database IDs, user IDs, account numbers,

@@ -258,7 +258,8 @@ public sealed class ImportReviewService(
         decimal? amount,
         string? description,
         Guid? selectedCategoryId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool? includeHousehold = null, bool? includePersonal = null)
     {
         var (access, role) = await GetAuthorized(
             householdId, userId, importFileId, forUpdate: true, cancellationToken);
@@ -283,6 +284,7 @@ public sealed class ImportReviewService(
         var now = timeProvider.GetUtcNow();
         draft.CorrectParsedValues(
             transactionDate, amount, description, selectedCategoryId, now);
+        ApplyBudgetInclusion(draft, access, role, userId, includeHousehold, includePersonal, now);
         await ApplyDuplicateResults(access.ImportFile.AccountId, [draft], cancellationToken);
         access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), now);
         RecordImportEvent(
@@ -364,6 +366,8 @@ public sealed class ImportReviewService(
                 update.Description,
                 update.SelectedCategoryId,
                 now);
+            ApplyBudgetInclusion(draft, access, role, userId,
+                update.IncludeInHouseholdBudget, update.IncludeInPersonalBudget, now);
             updatedDrafts.Add(draft);
         }
 
@@ -589,7 +593,8 @@ public sealed class ImportReviewService(
             .Where(draft =>
                 draft.ReviewDecision == ImportDraftReviewDecision.Approved &&
                 !draft.ApprovedTransactionId.HasValue)
-            .Select(draft => Transaction.CreateImported(
+            .Select(draft => {
+                var transaction = Transaction.CreateImported(
                 importFile.HouseholdId,
                 importFile.AccountId,
                 draft.SelectedCategoryId,
@@ -604,7 +609,15 @@ public sealed class ImportReviewService(
                 notes: null,
                 isExcludedFromBudget: false,
                 userId,
-                now))
+                now);
+                transaction.InitializeBudgetInclusion(!access.IsPersonalAccount, access.AccountOwnerUserId);
+                if (draft.IncludeInHouseholdBudget.HasValue)
+                    transaction.SetBudgetInclusionForUser(
+                        draft.PersonalBudgetUserId ?? userId, draft.IncludeInHouseholdBudget,
+                        draft.PersonalBudgetUserId.HasValue, now);
+                transaction.MarkReviewed(userId, now);
+                return transaction;
+            })
             .ToList();
 
         foreach (var transaction in transactions)
@@ -795,10 +808,10 @@ public sealed class ImportReviewService(
             file.InvalidRowCount, file.ApprovedRowCount, file.ExcludedRowCount,
             file.DuplicateRowCount,
             CanEdit(access.IsPersonalAccount, access.AccountOwnerUserId, role, userId),
-            drafts.Select(ToDraftItem).ToList());
+            drafts.Select(draft => ToDraftItem(draft, access, role, userId)).ToList());
     }
 
-    private static ImportDraftItem ToDraftItem(ImportTransactionDraft draft)
+    private static ImportDraftItem ToDraftItem(ImportTransactionDraft draft, ImportAccessRecord access, HouseholdRole role, Guid userId)
     {
         var (categoryName, subcategoryName) = ReadImportedCategoryNames(draft.RawData);
         return new ImportDraftItem(
@@ -807,7 +820,29 @@ public sealed class ImportReviewService(
             draft.ValidationStatus.ToString(), draft.ValidationMessage,
             draft.DuplicateStatus.ToString(), draft.PossibleMatchingTransactionId,
             draft.ReviewDecision.ToString(), draft.IsDuplicateAcknowledged,
-            draft.ApprovedTransactionId);
+            draft.ApprovedTransactionId,
+            draft.IncludeInHouseholdBudget ?? !access.IsPersonalAccount,
+            draft.IncludeInHouseholdBudget.HasValue ? draft.PersonalBudgetUserId == userId :
+                access.IsPersonalAccount && access.AccountOwnerUserId == userId,
+            !draft.PersonalBudgetUserId.HasValue || draft.PersonalBudgetUserId == userId,
+            role != HouseholdRole.Viewer);
+    }
+
+    private static void ApplyBudgetInclusion(ImportTransactionDraft draft,
+        ImportAccessRecord access, HouseholdRole role, Guid userId,
+        bool? household, bool? personal, DateTimeOffset now)
+    {
+        if (!household.HasValue && !personal.HasValue) return;
+        var previousHousehold = draft.IncludeInHouseholdBudget ?? !access.IsPersonalAccount;
+        var owner = draft.IncludeInHouseholdBudget.HasValue ? draft.PersonalBudgetUserId :
+            access.IsPersonalAccount ? access.AccountOwnerUserId : null;
+        if (household.HasValue && household != previousHousehold && role == HouseholdRole.Viewer)
+            throw new HouseholdAccessDeniedException();
+        if (personal == true && owner.HasValue && owner != userId)
+            throw new InvalidOperationException("Another user's personal inclusion cannot be reassigned.");
+        if (personal == true) owner = userId;
+        else if (personal == false && owner == userId) owner = null;
+        draft.SetBudgetInclusion(household ?? previousHousehold, owner, now);
     }
 
     private static (string? CategoryName, string? SubcategoryName)

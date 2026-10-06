@@ -16,7 +16,8 @@ public interface ITransactionRepository
         string? descriptionSearch,
         int skip,
         int take,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? budgetInclusion = null, string? currency = null, bool spendingOnly = false);
 
     Task<IReadOnlyList<TransactionExportRecord>> ListVisibleForExportAsync(
         Guid householdId,
