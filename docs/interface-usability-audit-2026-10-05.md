@@ -163,6 +163,16 @@ coach controls and the intended page target, but not unrelated blocked actions.
 Focus is introduced and restored deliberately. Do not apply a dialog focus trap
 that prevents interacting with the highlighted control outside the dialog.
 
+**Implementation follow-up (#177):** The existing tour now resolves rendered
+targets continuously, reveals navigation from its actual visibility state, and
+provides bounded retry/skip/exit recovery. Coach/target keyboard isolation and
+focus restoration replace the misleading modal declaration. Learn-only steps
+block unrelated writes; delayed tutorial-progress saving no longer blocks Exit.
+Component tests cover these behaviors and the real shell/router flow. Real
+responsive/200%-zoom and screen-reader checks remain manual sign-off items in
+[the permanent QA cases](manual-qa-regression-test-plan.md#tutorial-resilience-regression-177).
+Details: [tutorial resilience](tutorial-resilience.md).
+
 ### UI-05 — Current location and page changes lack accessible navigation feedback
 
 **Medium. Pages:** Shared shell and route transitions.

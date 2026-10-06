@@ -71,7 +71,11 @@ describe('staged import edit protection', () => {
   it('bulk choices preserve row corrections, support cancellation, and save through the existing bulk endpoint', async () => {
     show(<ImportReviewPage />)
     const input = await screen.findByLabelText('Description') as HTMLInputElement
+    // Rows can render while the initial load still disables editing. Wait for
+    // readiness and the dirty cache before testing preservation by bulk choices.
+    await waitFor(() => expect(input.disabled).toBe(false))
     fireEvent.change(input, { target: { value: 'My correction' } })
+    await screen.findByRole('button', { name: 'Save all corrections (1)' })
     fireEvent.change(screen.getByLabelText('Bulk budget inclusion'), { target: { value: 'PersonalAndHousehold' } })
     fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (1)' }))
     expect((screen.getByLabelText('My personal budget') as HTMLInputElement).checked).toBe(false)

@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { revealTutorialNavigationEvent } from '../tutorials/tutorialTargets'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { useHouseholds } from '../households/useHouseholds'
@@ -41,6 +42,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   } = useHouseholds()
   const { confirmNavigation, navigate, path } = useRouter()
   const [isNavigationOpen, setIsNavigationOpen] = useState(false)
+  const menuRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const menu = menuRef.current
+    const reveal = () => setIsNavigationOpen(true)
+    menu?.addEventListener(revealTutorialNavigationEvent, reveal)
+    return () => menu?.removeEventListener(revealTutorialNavigationEvent, reveal)
+  }, [])
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     if (!user) return false
     try {
@@ -104,14 +112,16 @@ export function AppShell({ children }: { children: ReactNode }) {
         <button
           className="sidebar-menu-button secondary-button"
           data-tutorial-id="sidebar-menu"
+          ref={menuRef}
           type="button"
           aria-expanded={isNavigationOpen}
+          aria-controls="app-main-navigation"
           onClick={() => setIsNavigationOpen(open => !open)}
         >
           Menu
         </button>
 
-        <nav className="sidebar-navigation" aria-label="Main navigation">
+        <nav id="app-main-navigation" className="sidebar-navigation" aria-label="Main navigation">
           <NavigationLinks items={primaryNavigation} currentPath={path} />
           <p>Settings</p>
           <NavigationLinks items={settingsNavigation} currentPath={path} />
