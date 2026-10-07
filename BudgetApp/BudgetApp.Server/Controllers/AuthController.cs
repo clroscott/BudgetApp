@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Authentication;
 using BudgetApp.Application.Authentication;
 using BudgetApp.Infrastructure.Identity;
 using BudgetApp.Server.Security;
@@ -14,11 +15,13 @@ namespace BudgetApp.Server.Controllers;
 [ApiController]
 [Route("api/auth")]
 [AllowUnverifiedEmail]
+[ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
 public sealed class AuthController(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
     IPasswordRecoveryService passwordRecoveryService,
     IEmailOwnershipService emailOwnershipService,
+    LoginVerificationService verification,
     ILogger<AuthController> logger) : ControllerBase
 {
     [AllowAnonymous]
@@ -72,14 +75,15 @@ public sealed class AuthController(
     [AllowAnonymous]
     [EnableRateLimiting("authentication")]
     [HttpPost("login")]
-    public async Task<ActionResult<CurrentUserResponse>> Login(LoginRequest request)
+    public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken)
     {
         var email = request.Email.Trim();
-        var result = await signInManager.PasswordSignInAsync(
-            email,
-            request.Password,
-            request.RememberMe,
-            lockoutOnFailure: true);
+        // A password-only step never creates a full session for an enrolled account.
+        if (User.Identity?.IsAuthenticated == true) await signInManager.SignOutAsync();
+        else await HttpContext.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme);
+        var user = await userManager.FindByEmailAsync(email);
+        var result = user is null ? Microsoft.AspNetCore.Identity.SignInResult.Failed : await signInManager.CheckPasswordSignInAsync(
+            user, request.Password, lockoutOnFailure: true);
 
         if (!result.Succeeded)
         {
@@ -91,8 +95,6 @@ public sealed class AuthController(
             });
         }
 
-        var user = await userManager.FindByEmailAsync(email);
-
         if (user is null)
         {
             logger.LogError("Identity sign-in succeeded but the user could not be loaded");
@@ -100,6 +102,20 @@ public sealed class AuthController(
             return Problem(statusCode: StatusCodes.Status500InternalServerError);
         }
 
+        if (user.TwoFactorEnabled)
+        {
+            try
+            {
+                var challenge = await verification.BeginAsync(user.Id, VerificationPurpose.Login, user.SecurityStamp!, cancellationToken);
+                await LoginVerificationSession.Start(HttpContext, user.Id, request.RememberMe, challenge);
+                return Ok(new { requiresVerification = true, challenge });
+            }
+            catch (VerificationException error)
+            {
+                return Problem(statusCode: error.RateLimited ? 429 : 400, title: "Verification unavailable", detail: error.Message);
+            }
+        }
+        await signInManager.SignInAsync(user, request.RememberMe);
         logger.LogInformation("Signed in user {UserId}", user.Id);
         return Ok(ToResponse(user));
     }
@@ -217,7 +233,7 @@ public sealed class AuthController(
 
     private async Task<AccountSettingsResponse> SettingsResponse(ApplicationUser user, CancellationToken cancellationToken) =>
         new(ToResponse(user), await emailOwnershipService.GetPendingEmailChangeAsync(user.Id, cancellationToken),
-            user.ConcurrencyStamp!);
+            user.ConcurrencyStamp!, await verification.StatusAsync(user, cancellationToken));
 
     [Authorize]
     [EnableRateLimiting("emailOwnership")]
@@ -238,8 +254,11 @@ public sealed class AuthController(
     {
         var user = await userManager.GetUserAsync(User);
         if (user is null) return Unauthorized();
-        if (!await emailOwnershipService.RequestEmailChangeAsync(user.Id, request.NewEmail,
-                request.CurrentPassword, cancellationToken))
+        bool requested;
+        try { requested = await emailOwnershipService.RequestEmailChangeAsync(user.Id, request.NewEmail,
+                request.CurrentPassword, cancellationToken, request.Proof); }
+        catch (VerificationException error) { return Problem(statusCode: error.RateLimited ? 429 : 400, title: "Verification unavailable", detail: error.Message); }
+        if (!requested)
             return Problem(statusCode: StatusCodes.Status400BadRequest,
                 title: "Email change not requested", detail: "Check your current password and the email address, then try again.");
         return Accepted(ConfirmationRequested());
@@ -279,7 +298,7 @@ public sealed class AuthController(
     [Authorize]
     [EnableRateLimiting("emailOwnership")]
     [HttpPost("change-password")]
-    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken cancellationToken)
     {
         var user = await userManager.GetUserAsync(User);
 
@@ -288,6 +307,17 @@ public sealed class AuthController(
             return Unauthorized();
         }
 
+        if (user.TwoFactorEnabled)
+        {
+            try
+            {
+                await verification.ManageAsync(user.Id, VerificationPurpose.ChangePassword, request.CurrentPassword,
+                    request.Proof ?? new(Guid.Empty, ""), request.NewPassword, cancellationToken);
+                await signInManager.RefreshSignInAsync(user);
+                return NoContent();
+            }
+            catch (VerificationException error) { return Problem(statusCode: error.RateLimited ? 429 : 400, title: "Verification unavailable", detail: error.Message); }
+        }
         var result = await userManager.ChangePasswordAsync(
             user,
             request.CurrentPassword,
@@ -315,8 +345,8 @@ public sealed class AuthController(
         return ValidationProblem(new ValidationProblemDetails(errors));
     }
 
-    private static CurrentUserResponse ToResponse(ApplicationUser user) =>
-        new(user.Id, user.Email!, user.DisplayName, user.EmailConfirmed);
+    internal static CurrentUserResponse ToResponse(ApplicationUser user) =>
+        new(user.Id, user.Email!, user.DisplayName, user.EmailConfirmed, user.TwoFactorEnabled);
 }
 
 public sealed record AntiforgeryResponse(string Token);
@@ -343,22 +373,23 @@ public sealed record PasswordRecoveryRequestedResponse(string Message);
 
 public sealed record ChangePasswordRequest(
     [param: Required, StringLength(128)] string CurrentPassword,
-    [param: Required, StringLength(128, MinimumLength = 12)] string NewPassword);
+    [param: Required, StringLength(128, MinimumLength = 12)] string NewPassword, VerificationProof? Proof = null);
 
 public sealed record CurrentUserResponse(
     Guid Id,
     string Email,
     string DisplayName,
-    bool EmailConfirmed);
+    bool EmailConfirmed, bool LoginVerificationEnabled);
 
 public sealed record EmailRequestedResponse(string Message);
 public sealed record ConfirmEmailRequest(Guid UserId,
     [param: Required, StringLength(4096)] string Token);
 public sealed record RequestEmailChangeRequest(
     [param: Required, EmailAddress, StringLength(256)] string NewEmail,
-    [param: Required, StringLength(128)] string CurrentPassword);
+    [param: Required, StringLength(128)] string CurrentPassword, VerificationProof? Proof = null);
 
-public sealed record AccountSettingsResponse(CurrentUserResponse User, PendingEmailChange? PendingEmailChange, string Version);
+public sealed record AccountSettingsResponse(CurrentUserResponse User, PendingEmailChange? PendingEmailChange, string Version,
+    LoginVerificationStatus Verification);
 public sealed record UpdateProfileRequest(
     [param: Required, StringLength(100)] string DisplayName,
     [param: Required, StringLength(100)] string Version);

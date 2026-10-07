@@ -150,6 +150,70 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] No password, reset token, or secret is written to normal client-visible data or
       routine logs.
 
+## Optional email multi-factor authentication (MFA) (#135)
+
+Use disposable Development accounts, never production credentials/recovery codes.
+Record SMTP mode, browser/assistive technology, viewport, and results. Setup details:
+`docs/email-login-verification.md`.
+
+- [ ] An existing unenrolled account signs in normally. The dashboard shows a
+      non-blocking setup reminder linked to personal Account settings; no enrollment
+      or email is triggered by visiting either page. Confirmed/unconfirmed/no-household
+      account settings remain correctly available.
+- [ ] Enrollment requires current password and an emailed six-digit code. Requesting
+      a code alone does not enable verification. Delivery failure leaves it off and
+      gives an explicit retry. An incorrect/expired/replaced code cannot enable it.
+- [ ] Settings, dashboard, sign-in, and security emails consistently call the feature
+      Multi-factor authentication (MFA). There is one **Resend code** action (with a
+      cooldown), not a second ambiguous "start new verification" action.
+- [ ] The email input shows six boxes. Type and paste all six digits (including
+      leading zeros and codes copied with spaces/hyphens); try Backspace, arrows,
+      select-all/replace, clicking a filled digit, and one-time-code autofill. It
+      remains one labeled keyboard/screen-reader input, fits narrow/200% layouts,
+      and rejects longer/nonnumeric codes instead of silently truncating them.
+      Switching to recovery-code entry focuses its normal, full-length input.
+- [ ] In settings, an expired/unavailable challenge offers explicit **Resend code**
+      recovery with the current password; no save or automatic resend occurs. On
+      expired login, return to password sign-in; no expired pending session bypass.
+- [ ] Successful enrollment displays ten codes once, protects navigation/household
+      switching until acknowledged, and leaves financial records/shared activity
+      unchanged. Save codes offline; none appear in browser storage or safe logs.
+- [ ] Sign out/in: password-only success does not authorize account or financial APIs.
+      The second screen is keyboard reachable and announces its purpose. Correct code
+      completes without another password and preserves a safe intended destination.
+- [ ] Refresh the pending screen or reopen it in the same browser: resume the challenge
+      without sending another email. Cancel returns to password sign-in; canceled,
+      consumed, wrong-user, wrong-purpose, or expired challenges cannot complete.
+- [ ] Codes expire after five minutes; sessions after ten. Resend has a one-minute
+      cooldown and invalidates the old code without extending the session or resetting
+      failed attempts. Five failed code attempts lock login for fifteen minutes,
+      including attempts split across new password steps. Check real SQL Server
+      simultaneous submissions: one code/recovery code must succeed at most once.
+- [ ] Simulate email failure only in an isolated installation. No password-only
+      bypass occurs; explicit resend/recovery remains available. A recovery code works
+      once, reduces the remaining count, and leaves verification on.
+- [ ] Code replacement requires password plus fresh action-specific verification,
+      invalidates all older codes, and displays only the new set once. Lost success
+      responses give a safe read/re-enrollment path, not automatic duplicate writes.
+- [ ] Turning off the last method requires fresh proof and explicit warning.
+      Cancel does not write. Successful disabling preserves data, removes recovery
+      codes, restores password-only sign-in and dashboard reminder, and attempts a
+      private security-notification email.
+- [ ] Password/email changes require fresh proof while enabled. Pending replacement
+      does not receive login codes until confirmed; confirmation keeps verification
+      enabled, uses the new mailbox, and invalidates older sessions/challenges.
+      Password reset changes only the password, does not sign in or turn verification off.
+- [ ] Other pre-enrollment sessions are revoked. Completed verified sessions survive
+      normal reads/profile refresh without repeatedly asking for sign-in. Keep me
+      signed in applies only to the completed session, not trusted-device bypass.
+- [ ] Failed security saves preserve non-secret form context, clear passwords/codes,
+      stop saving indicators, and offer an explicit retry without claiming success.
+- [ ] At 390px, 200% zoom, and with keyboard/screen reader: labels, error/retry states,
+      code type toggle, countdown/expiry guidance, recovery list, confirmation, and
+      acknowledgement are reachable and understandable without horizontal clipping.
+- [ ] Losing email and all saved codes clearly explains the lack of self-service
+      recovery. No household-admin reset or emergency password-only bypass is offered.
+
 ## Email ownership and email changes (#149)
 
 Use Development/Scratch accounts and inboxes you control. Email changes can now

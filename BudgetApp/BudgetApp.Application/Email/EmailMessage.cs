@@ -13,5 +13,7 @@ public enum EmailPurpose
     HouseholdInvitation = 2,
     Informational = 3,
     EmailConfirmation = 4,
-    EmailChange = 5
+    EmailChange = 5,
+    LoginVerification = 6,
+    SecurityChange = 7
 }

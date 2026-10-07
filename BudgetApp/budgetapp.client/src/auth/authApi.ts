@@ -1,10 +1,12 @@
 import { ApiError, apiGet, apiPost } from '../api/apiClient'
+import type { PendingLogin, VerificationProof } from './loginVerificationApi'
 
 export interface CurrentUser {
   id: string
   email: string
   displayName: string
   emailConfirmed: boolean
+  loginVerificationEnabled: boolean
 }
 
 export interface RegisterRequest {
@@ -58,12 +60,12 @@ export function confirmEmail(userId: string, token: string, changeEmail = false)
 }
 
 // Shared backend flow for the account settings interface (#156).
-export function requestEmailChange(newEmail: string, currentPassword: string): Promise<PasswordRecoveryRequestedResponse> {
-  return apiPost('/api/auth/request-email-change', { newEmail, currentPassword })
+export function requestEmailChange(newEmail: string, currentPassword: string, proof?: VerificationProof): Promise<PasswordRecoveryRequestedResponse> {
+  return apiPost('/api/auth/request-email-change', { newEmail, currentPassword, ...(proof ? { proof } : {}) })
 }
 
-export function login(request: LoginRequest): Promise<CurrentUser> {
-  return apiPost<CurrentUser>('/api/auth/login', request)
+export function login(request: LoginRequest): Promise<CurrentUser | PendingLogin> {
+  return apiPost<CurrentUser | PendingLogin>('/api/auth/login', request)
 }
 
 export function logout(): Promise<void> {

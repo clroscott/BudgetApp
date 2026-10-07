@@ -5,6 +5,32 @@ namespace BudgetApp.Application.Email;
 
 public sealed class EmailTemplateFactory(IApplicationEmailLinkBuilder linkBuilder)
 {
+    public EmailMessage CreateLoginVerification(string address, string code, DateTimeOffset expires, string purpose)
+    {
+        var action = purpose switch {
+            "Login" => "complete your MFA sign-in", "Enable" => "enable multi-factor authentication (MFA)",
+            "Disable" => "turn off multi-factor authentication (MFA)", "RecoveryCodes" => "replace your recovery codes",
+            "ChangePassword" => "change your password", "ChangeEmail" => "request an email change", _ => "verify a security action"
+        };
+        var expiry = FormatExpiry(expires);
+        return new(address, "Your MC Budget verification code",
+            $"Use this code to {action}:\n\n{code}\n\nExpires {expiry}. This code can only be used once. Resending replaces it. Never share it. If you did not request this action, do not use the code; secure your account.",
+            $"<!doctype html><html lang=\"en\"><body><h1>MC Budget verification</h1><p>Use this code to {WebUtility.HtmlEncode(action)}:</p><p><strong>{WebUtility.HtmlEncode(code)}</strong></p><p>Expires {WebUtility.HtmlEncode(expiry)}. This code can only be used once. Resending replaces it. Never share it.</p><p>If you did not request this action, do not use the code; secure your account.</p></body></html>",
+            EmailPurpose.LoginVerification);
+    }
+
+    public EmailMessage CreateLoginVerificationChanged(string address, string purpose)
+    {
+        var change = purpose switch {
+            "Enable" => "Email multi-factor authentication (MFA) was enabled.",
+            "Disable" => "Multi-factor authentication (MFA) was turned off. Future sign-ins use your password only.",
+            _ => "Recovery codes were replaced. Older recovery codes no longer work."
+        };
+        return new(address, "Your MC Budget security settings changed",
+            $"{change}\nIf you did not make this change, secure your account and contact the person who manages this installation.",
+            $"<!doctype html><html lang=\"en\"><body><h1>Security settings changed</h1><p>{WebUtility.HtmlEncode(change)}</p><p>If you did not make this change, secure your account and contact the person who manages this installation.</p></body></html>", EmailPurpose.SecurityChange);
+    }
+
     public EmailMessage CreateEmailConfirmation(string recipientAddress, Guid userId, string token,
         DateTimeOffset expiresAtUtc, bool changeEmail)
     {

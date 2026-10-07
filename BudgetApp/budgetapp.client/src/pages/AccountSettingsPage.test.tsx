@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../api/apiClient'
 import { changePassword, getAccountSettings, saveDisplayName, type AccountSettings } from '../auth/accountSettingsApi'
 import { requestEmailChange, resendConfirmation } from '../auth/authApi'
+import { requestSecurityCode } from '../auth/loginVerificationApi'
 import { AuthContext } from '../auth/authContext'
 import { HouseholdContext } from '../households/householdContext'
 import { HouseholdProvider } from '../households/HouseholdProvider'
@@ -16,6 +17,7 @@ import { TutorialContext } from '../tutorials/tutorialContext'
 import { AccountSettingsPage } from './AccountSettingsPage'
 
 vi.mock('../auth/accountSettingsApi', () => ({ getAccountSettings: vi.fn(), saveDisplayName: vi.fn(), changePassword: vi.fn() }))
+vi.mock('../auth/loginVerificationApi', async original => ({ ...await original<typeof import('../auth/loginVerificationApi')>(), requestSecurityCode: vi.fn() }))
 vi.mock('../auth/authApi', async original => ({ ...await original<typeof import('../auth/authApi')>(), requestEmailChange: vi.fn(), resendConfirmation: vi.fn() }))
 vi.mock('../households/householdApi', async original => ({ ...await original<typeof import('../households/householdApi')>(), getHouseholds: vi.fn() }))
 function data(changes: Partial<AccountSettings> = {}): AccountSettings {
@@ -277,6 +279,26 @@ describe('personal account settings', () => {
     expect(screen.getByRole('combobox', { name: 'Current household' })).toBeTruthy()
     expect(households.currentHousehold?.id).toBe(household.id)
     expect(otherHousehold.id).not.toBe(household.id)
+  })
+  it('requires fresh verification in the existing email and password forms when enabled', async () => {
+    const user = { ...authFixture().user!, loginVerificationEnabled: true }
+    vi.mocked(getAccountSettings).mockResolvedValue(data({ user, verification: { emailEnabled: true, recoveryCodesRemaining: 10 } }))
+    vi.mocked(requestSecurityCode).mockResolvedValue({ challengeId: 'security-proof', delivered: true,
+      expiresAtUtc: new Date(Date.now() + 300000).toISOString(), resendAtUtc: new Date(Date.now() + 60000).toISOString(),
+      challengeExpiresAtUtc: new Date(Date.now() + 600000).toISOString() })
+    show(); await ready(); typeEmail(); typePassword()
+    expect((screen.getByRole('button', { name: 'Request email change' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Change password' }) as HTMLButtonElement).disabled).toBe(true)
+    const form = screen.getByRole('form', { name: 'Request an email change' })
+    fireEvent.click(within(form).getByRole('button', { name: 'Request verification code' }))
+    fireEvent.change(await within(form).findByLabelText('Email verification code'), { target: { value: '001234' } })
+    expect(requestSecurityCode).toHaveBeenLastCalledWith('ChangeEmail', 'existing long password')
+    fireEvent.click(within(form).getByRole('button', { name: 'Request email change' }))
+    await waitFor(() => expect(requestEmailChange).toHaveBeenCalledWith(pendingReplacement.email, 'existing long password', {
+      challengeId: 'security-proof', code: '001234', useRecoveryCode: false,
+    }))
+    expect(changePassword).not.toHaveBeenCalled()
+    await waitFor(() => expect((screen.getByLabelText('Current password for email change') as HTMLInputElement).value).toBe(''))
   })
   it('guards real household switching and retains account edits because they are not household-specific', async () => {
     window.history.replaceState(null, '', '/settings/account')

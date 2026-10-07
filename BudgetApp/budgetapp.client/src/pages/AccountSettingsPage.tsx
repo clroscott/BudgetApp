@@ -2,6 +2,9 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 
 import { ApiError } from '../api/apiClient'
 import { changePassword, getAccountSettings, saveDisplayName, type AccountSettings } from '../auth/accountSettingsApi'
 import { requestEmailChange, resendConfirmation } from '../auth/authApi'
+import type { VerificationProof } from '../auth/loginVerificationApi'
+import { LoginVerificationSettings } from '../components/LoginVerificationSettings'
+import { SecurityVerificationFields } from '../components/SecurityVerificationFields'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { ErrorSummary } from '../components/ErrorSummary'
@@ -32,6 +35,10 @@ export function AccountSettingsPage() {
   const [name, setName] = useState('')
   const [emailForm, setEmailForm] = useState(emptyEmail)
   const [passwordForm, setPasswordForm] = useState(emptyPassword)
+  const [emailProof, setEmailProof] = useState<VerificationProof>()
+  const [passwordProof, setPasswordProof] = useState<VerificationProof>()
+  const [proofReset, setProofReset] = useState(0)
+  const [verificationBusy, setVerificationBusy] = useState(false)
   const [action, setAction] = useState<Action | null>(null)
   const [errors, setErrors] = useState<string[]>([])
   const [notices, setNotices] = useState<Partial<Record<Action, string>>>({})
@@ -41,8 +48,8 @@ export function AccountSettingsPage() {
   useEffect(() => { active.current = true; return () => { active.current = false } }, [])
   const profileDirty = name !== baseline.displayName
   const hasEdits = profileDirty || Boolean(emailForm.newEmail || emailForm.currentPassword ||
-    passwordForm.currentPassword || passwordForm.newPassword || passwordForm.confirmPassword)
-  const confirmDiscard = useUnsavedChangesGuard(hasEdits || action !== null, 'You have unsaved account settings. Continue leaving or switching context? Edits are discarded if this page closes. An in-progress request may still finish.')
+    passwordForm.currentPassword || passwordForm.newPassword || passwordForm.confirmPassword || emailProof || passwordProof)
+  const confirmDiscard = useUnsavedChangesGuard(hasEdits || action !== null || verificationBusy, 'You have unsaved account settings. Continue leaving or switching context? Edits are discarded if this page closes. An in-progress request may still finish.')
   const currentDraft = useRef({ profileDirty })
   currentDraft.current = { profileDirty }
   const loadState = usePageLoad(userId)
@@ -55,7 +62,7 @@ export function AccountSettingsPage() {
       setName(data.user.displayName)
       setBaseline({ displayName: data.user.displayName, version: data.version })
     }
-    if (discard) { setEmailForm(emptyEmail); setPasswordForm(emptyPassword) }
+    if (discard) { setEmailForm(emptyEmail); setPasswordForm(emptyPassword); setEmailProof(undefined); setPasswordProof(undefined); setProofReset(value => value + 1) }
     setRequiresReload(false)
   }, [updateUser, userId])
   const load = useCallback(async (discard = false) => {
@@ -63,7 +70,7 @@ export function AccountSettingsPage() {
     await run(getAccountSettings, data => applyRead(data, discard))
   }, [userId, run, applyRead])
   useEffect(() => { void load() }, [load])
-  const busy = action !== null
+  const busy = action !== null || verificationBusy
   const canEdit = loadState.isFresh && !busy && !requiresReload
   const reload = () => {
     if (pending.current || !confirmDiscard()) return
@@ -88,6 +95,9 @@ export function AccountSettingsPage() {
         // Do not retain or persist password values after an attempted save.
         if (nextAction === 'email') setEmailForm(current => ({ ...current, currentPassword: '' }))
         if (nextAction === 'password') setPasswordForm(emptyPassword)
+        if (nextAction === 'email' || nextAction === 'password') {
+          setEmailProof(undefined); setPasswordProof(undefined); setProofReset(value => value + 1)
+        }
         setAction(null)
       }
     }
@@ -114,7 +124,8 @@ export function AccountSettingsPage() {
       return
     }
     void write('email', async () => {
-      const result = await requestEmailChange(emailForm.newEmail.trim(), emailForm.currentPassword)
+      const result = emailProof ? await requestEmailChange(emailForm.newEmail.trim(), emailForm.currentPassword, emailProof) :
+        await requestEmailChange(emailForm.newEmail.trim(), emailForm.currentPassword)
       if (!active.current) return
       setEmailForm(emptyEmail)
       setNotices(current => ({ ...current, email: `Email-change request submitted. ${result.message} Your current email stays in use until the replacement is confirmed.` }))
@@ -131,7 +142,8 @@ export function AccountSettingsPage() {
       return
     }
     void write('password', async () => {
-      await changePassword(passwordForm.currentPassword, passwordForm.newPassword)
+      if (passwordProof) await changePassword(passwordForm.currentPassword, passwordForm.newPassword, passwordProof)
+      else await changePassword(passwordForm.currentPassword, passwordForm.newPassword)
       if (!active.current) return
       setPasswordForm(emptyPassword)
       setEmailForm(current => ({ ...current, currentPassword: '' }))
@@ -160,11 +172,13 @@ export function AccountSettingsPage() {
   const cancelEmail = () => {
     if (pending.current || !window.confirm('Discard this unsaved email-change form? This does not cancel a submitted request.')) return
     setEmailForm(emptyEmail)
+    setEmailProof(undefined); setPasswordProof(undefined); setProofReset(value => value + 1)
     setErrors([])
   }
   const cancelPassword = () => {
     if (pending.current || !window.confirm('Discard your unsaved password entries?')) return
     setPasswordForm(emptyPassword)
+    setEmailProof(undefined); setPasswordProof(undefined); setProofReset(value => value + 1)
     setErrors([])
   }
   const returnTo = !user?.emailConfirmed ? '/verify-email' : currentHousehold ? '/dashboard' : '/household/setup'
@@ -215,8 +229,10 @@ export function AccountSettingsPage() {
             <label htmlFor={`${id}-email-password`}>Current password for email change</label>
             <input id={`${id}-email-password`} type="password" autoComplete="current-password" maxLength={128} required value={emailForm.currentPassword} disabled={!canEdit} onChange={event => setEmailForm(current => ({ ...current, currentPassword: event.target.value }))} />
             <p className="field-help">The new address must be confirmed using its email link. Your current email and existing data stay unchanged until then. Requesting a new link replaces the previous request; wait one minute between requests.</p>
+            {saved.user.loginVerificationEnabled && <SecurityVerificationFields key={`email-${proofReset}`} purpose="ChangeEmail"
+              password={emailForm.currentPassword} proof={emailProof} onChange={setEmailProof} disabled={!canEdit} />}
             <div className="household-settings-actions">
-              <button type="submit" className="primary-button" disabled={!canEdit || !emailForm.newEmail || !emailForm.currentPassword}>Request email change</button>
+              <button type="submit" className="primary-button" disabled={!canEdit || !emailForm.newEmail || !emailForm.currentPassword || (saved.user.loginVerificationEnabled && !emailProof?.code.trim())}>Request email change</button>
               <button type="button" className="secondary-button" disabled={busy || !(emailForm.newEmail || emailForm.currentPassword)} onClick={cancelEmail}>Clear email form</button>
             </div>
           </form>
@@ -231,12 +247,23 @@ export function AccountSettingsPage() {
           <label htmlFor={`${id}-confirm-password`}>Confirm new password</label>
           <input id={`${id}-confirm-password`} type="password" autoComplete="new-password" minLength={12} maxLength={128} required value={passwordForm.confirmPassword} disabled={!canEdit} onChange={event => setPasswordForm(current => ({ ...current, confirmPassword: event.target.value }))} />
           <p id={`${id}-password-help`} className="field-help">Use at least 12 characters. Passwords are never saved in browser storage and are cleared after a save attempt. Other sessions must sign in again after a successful password change.</p>
+          {saved.user.loginVerificationEnabled && <SecurityVerificationFields key={`password-${proofReset}`} purpose="ChangePassword"
+            password={passwordForm.currentPassword} proof={passwordProof} onChange={setPasswordProof} disabled={!canEdit} />}
           <div className="household-settings-actions">
-            <button type="submit" className="primary-button" disabled={!canEdit || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}>Change password</button>
+            <button type="submit" className="primary-button" disabled={!canEdit || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword || (saved.user.loginVerificationEnabled && !passwordProof?.code.trim())}>Change password</button>
             <button type="button" className="secondary-button" disabled={busy || !(passwordForm.currentPassword || passwordForm.newPassword || passwordForm.confirmPassword)} onClick={cancelPassword}>Clear password form</button>
           </div>
         </form>
       </div>}
+      {loadState.hasData && saved && <LoginVerificationSettings confirmed={saved.user.emailConfirmed}
+        status={saved.verification ?? { emailEnabled: saved.user.loginVerificationEnabled, recoveryCodesRemaining: 0 }}
+        disabled={!loadState.isFresh || action !== null || requiresReload} onBusy={setVerificationBusy} onSaved={async result => {
+          updateUser(result.user)
+          setSaved(current => current ? { ...current, user: result.user, verification: result.verification } : current)
+          setEmailForm(current => ({ ...current, currentPassword: '' })); setPasswordForm(emptyPassword)
+          setEmailProof(undefined); setPasswordProof(undefined); setProofReset(value => value + 1)
+          await load()
+        }} />}
       <div className="household-settings-actions"><button className="text-button" type="button" disabled={busy} onClick={() => void signOut()}>Sign out</button></div>
     </section>
   </main>

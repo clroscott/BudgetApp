@@ -4,6 +4,7 @@ import { getErrorMessages } from '../auth/errorMessages'
 import { emailVerificationPath } from '../auth/emailVerification'
 import { getSafeReturnPath } from '../auth/returnPath'
 import { useAuth } from '../auth/useAuth'
+import { isPendingLogin } from '../auth/loginVerificationApi'
 import { BrandLogo } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { AppLink } from '../routing/AppLink'
@@ -45,6 +46,10 @@ export function RegisterPage() {
       try {
         const currentUser = await login({ email, password, rememberMe: false })
         const returnTo = getSafeReturnPath() ?? '/household/setup'
+        if (isPendingLogin(currentUser)) {
+          navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`, { replace: true })
+          return
+        }
         navigate(currentUser.emailConfirmed ? returnTo : emailVerificationPath(returnTo), { replace: true })
       } catch (error) {
         // An existing address with different credentials receives the same generic

@@ -1,4 +1,5 @@
 import { createContext } from 'react'
+import type { PendingLogin } from './loginVerificationApi'
 import type {
   CurrentUser,
   LoginRequest,
@@ -10,7 +11,7 @@ export interface AuthContextValue {
   user: CurrentUser | null
   isLoading: boolean
   initializationError: string | null
-  login: (request: LoginRequest) => Promise<CurrentUser>
+  login: (request: LoginRequest) => Promise<CurrentUser | PendingLogin>
   register: (request: RegisterRequest) => Promise<PasswordRecoveryRequestedResponse>
   updateUser: (user: CurrentUser) => void
   logout: () => Promise<void>
