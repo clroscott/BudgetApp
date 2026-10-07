@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CurrentUser } from './auth/authApi'
 import { confirmEmail } from './auth/authApi'
+import { getPendingLogin } from './auth/loginVerificationApi'
 import { getAccountSettings } from './auth/accountSettingsApi'
 import { AuthContext } from './auth/authContext'
 import { getHouseholds } from './households/householdApi'
@@ -11,6 +12,7 @@ import { authFixture, household } from './test/fixtures'
 import App from './App'
 
 const scenario = vi.hoisted(() => ({ user: null as CurrentUser | null, refreshedUser: null as CurrentUser | null }))
+vi.mock('./auth/loginVerificationApi', async original => ({ ...await original<typeof import('./auth/loginVerificationApi')>(), getPendingLogin: vi.fn() }))
 vi.mock('./auth/AuthProvider', () => ({ AuthProvider: ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState(scenario.user)
   return <AuthContext.Provider value={{ ...authFixture(), user, updateUser: setUser,
@@ -27,6 +29,7 @@ vi.mock('./pages/BudgetManagementPage', () => ({ BudgetManagementPage: () => <ma
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(getPendingLogin).mockResolvedValue({ challenge: null })
   scenario.user = { ...authFixture().user!, emailConfirmed: false }
   scenario.refreshedUser = { ...scenario.user, emailConfirmed: true }
   vi.mocked(getHouseholds).mockResolvedValue([household])

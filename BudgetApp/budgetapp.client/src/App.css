@@ -4674,3 +4674,21 @@ a {
 .saved-filter-management { margin-top: 0.75rem; }
 .saved-filter-management summary { cursor: pointer; font-weight: 600; }
 .saved-filter-management p { max-width: 70ch; }
+.verification-code-fields,
+.security-verification-fields {
+  display: grid;
+  gap: 0.6rem;
+  margin-block: 1rem;
+  min-width: 0;
+}
+.recovery-code-card code { overflow-wrap: anywhere; user-select: all; }
+.recovery-code-card ol { padding-inline-start: 1.5rem; line-height: 1.8; }
+.dashboard-security-prompt {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-block: 1rem;
+}
+.dashboard-security-prompt > div { flex: 1 1 20rem; min-width: 0; }
+.dashboard-security-prompt h2 { font-size: 1.1rem; margin-top: 0; }

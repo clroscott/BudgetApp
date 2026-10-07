@@ -9,6 +9,7 @@ import { flushSync } from 'react-dom'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { LoginVerificationReminder } from '../components/LoginVerificationReminder'
 import { AppIcon } from '../components/AppIcon'
 import {
   getDashboardLayout,
@@ -258,6 +259,7 @@ export function DashboardPage() {
         </div>
 
         <ErrorSummary errors={errors} />
+        <LoginVerificationReminder enabled={user.loginVerificationEnabled} />
 
         {!tutorialsLoading && (() => {
           const tutorial = tutorialByKey.get('getting-started')

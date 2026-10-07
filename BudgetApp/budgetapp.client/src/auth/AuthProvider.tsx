@@ -15,6 +15,7 @@ import {
   type RegisterRequest,
 } from './authApi'
 import { AuthContext, type AuthContextValue } from './authContext'
+import { isPendingLogin } from './loginVerificationApi'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null)
@@ -70,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (request: LoginRequest) => {
     const currentUser = await loginRequest(request)
-    setUser(currentUser)
+    setUser(isPendingLogin(currentUser) ? null : currentUser)
     return currentUser
   }, [])
 

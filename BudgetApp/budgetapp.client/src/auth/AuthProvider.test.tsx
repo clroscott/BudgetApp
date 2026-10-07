@@ -35,6 +35,25 @@ beforeEach(() => {
 })
 
 describe('verification session continuity', () => {
+  it('keeps a password-only verification challenge out of the authenticated user context', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(null)
+    vi.mocked(login).mockResolvedValue({ requiresVerification: true, challenge: {
+      challengeId: 'pending-verification', delivered: true,
+      expiresAtUtc: new Date(Date.now() + 300000).toISOString(),
+      resendAtUtc: new Date(Date.now() + 60000).toISOString(),
+      challengeExpiresAtUtc: new Date(Date.now() + 600000).toISOString(),
+    } })
+    function StartLogin() {
+      const auth = useAuth()
+      return <button onClick={() => void auth.login({ email: verified.email, password: 'test-only password', rememberMe: false })}>Begin pending login</button>
+    }
+    render(<AuthProvider><SessionProbe /><StartLogin /></AuthProvider>)
+    await screen.findByText('Signed out')
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Begin pending login' })))
+    expect(login).toHaveBeenCalledOnce()
+    expect(screen.getByText('Signed out')).toBeTruthy()
+    expect(screen.queryByText(/undefined: unverified/)).toBeNull()
+  })
   it('quietly updates status when returning from an email tab without resetting edits or focus', async () => {
     render(<AuthProvider><SessionProbe /></AuthProvider>)
     await screen.findByText(`${verified.email}: unverified`)
@@ -53,7 +72,12 @@ describe('verification session continuity', () => {
     render(<RouterProvider><AuthProvider><ResendConfirmationPage /></AuthProvider></RouterProvider>)
     await screen.findByRole('button', { name: 'Check confirmation status' })
     vi.mocked(getCurrentUser).mockResolvedValue(verified)
-    fireEvent(document, new Event('visibilitychange'))
+    // The child can render before the parent's passive return-to-tab listener.
+    // Establish the check before asserting its eventual confirmation result.
+    await waitFor(() => {
+      fireEvent(document, new Event('visibilitychange'))
+      expect(getCurrentUser).toHaveBeenCalledTimes(2)
+    })
     const link = await screen.findByRole('link', { name: 'Continue' })
     expect(link.getAttribute('href')).toBe('/budgeting?scope=Personal')
     expect(login).not.toHaveBeenCalled()

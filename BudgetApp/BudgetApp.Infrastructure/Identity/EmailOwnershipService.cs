@@ -17,6 +17,7 @@ public sealed class EmailOwnershipService(
     BudgetAppDbContext db,
     EmailTemplateFactory templates,
     EmailDispatchService email,
+    LoginVerificationService verification,
     TimeProvider clock) : IEmailOwnershipService
 {
     public static readonly TimeSpan TokenLifespan = TimeSpan.FromHours(1);
@@ -26,11 +27,11 @@ public sealed class EmailOwnershipService(
     private const string EmailChange = "EmailChange";
 
     public Task RequestConfirmationAsync(Guid userId, CancellationToken cancellationToken = default) =>
-        RequestAsync(userId, null, null, cancellationToken);
+        RequestAsync(userId, null, null, cancellationToken, null);
 
     public Task<bool> RequestEmailChangeAsync(Guid userId, string newEmail, string currentPassword,
-        CancellationToken cancellationToken = default) =>
-        RequestAsync(userId, newEmail.Trim(), currentPassword, cancellationToken);
+        CancellationToken cancellationToken = default, VerificationProof? proof = null) =>
+        RequestAsync(userId, newEmail.Trim(), currentPassword, cancellationToken, proof);
 
     public async Task<PendingEmailChange?> GetPendingEmailChangeAsync(Guid userId,
         CancellationToken cancellationToken = default)
@@ -47,7 +48,7 @@ public sealed class EmailOwnershipService(
     }
 
     private async Task<bool> RequestAsync(Guid userId, string? newEmail, string? password,
-        CancellationToken ct)
+        CancellationToken ct, VerificationProof? proof)
     {
         EmailMessage? message = null;
         await using (var transaction = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct))
@@ -57,6 +58,13 @@ public sealed class EmailOwnershipService(
             var changing = newEmail is not null;
             if (changing && (!ValidEmail(newEmail!) || !await users.CheckPasswordAsync(user, password!)))
                 return false;
+            if (changing && user.TwoFactorEnabled &&
+                !await verification.ConsumeLockedAsync(user, VerificationPurpose.ChangeEmail, proof, ct))
+            {
+                await db.SaveChangesAsync(ct);
+                await transaction.CommitAsync(ct);
+                return false;
+            }
             if (!changing && user.EmailConfirmed) return true;
 
             var name = changing ? EmailChange : Confirmation;

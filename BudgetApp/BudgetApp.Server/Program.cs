@@ -4,6 +4,7 @@ using BudgetApp.Server.Configuration;
 using BudgetApp.Server.Middleware;
 using BudgetApp.Server.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Serilog;
@@ -58,6 +59,16 @@ try
         options.Filters.Add<ValidateAntiforgeryHeaderFilter>());
     builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
         .AddIdentityCookies();
+    builder.Services.Configure<CookieAuthenticationOptions>(IdentityConstants.TwoFactorUserIdScheme, options =>
+    {
+        options.Cookie.Name = "__Host-BudgetApp.Verification";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.IsEssential = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.ExpireTimeSpan = BudgetApp.Infrastructure.Identity.LoginVerificationService.ChallengeLifetime;
+        options.SlidingExpiration = false;
+    });
     builder.Services.ConfigureApplicationCookie(options =>
     {
         options.Cookie.Name = "__Host-BudgetApp.Auth";
@@ -69,7 +80,18 @@ try
         options.SlidingExpiration = true;
         options.Events = new CookieAuthenticationEvents
         {
-            OnValidatePrincipal = SecurityStampValidator.ValidatePrincipalAsync,
+            OnValidatePrincipal = async context =>
+            {
+                await SecurityStampValidator.ValidatePrincipalAsync(context);
+                if (context.Principal?.Identity?.IsAuthenticated != true) return;
+                var users = context.HttpContext.RequestServices.GetRequiredService<UserManager<BudgetApp.Infrastructure.Identity.ApplicationUser>>();
+                var user = await users.GetUserAsync(context.Principal);
+                if (user?.TwoFactorEnabled == true && !context.Principal.HasClaim("amr", "mfa"))
+                {
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+                }
+            },
             OnRedirectToLogin = context =>
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -84,7 +106,18 @@ try
     });
     // Password and email-address changes invalidate other sessions immediately.
     builder.Services.Configure<SecurityStampValidatorOptions>(options =>
-        options.ValidationInterval = TimeSpan.Zero);
+    {
+        options.ValidationInterval = TimeSpan.Zero;
+        // Identity rebuilds principals on stamp validation. Preserve proof from the
+        // validated cookie, never manufacture it from the account's enabled flag.
+        options.OnRefreshingPrincipal = context =>
+        {
+            if (context.CurrentPrincipal?.HasClaim("amr", "mfa") == true &&
+                context.NewPrincipal?.Identity is System.Security.Claims.ClaimsIdentity identity)
+                identity.AddClaim(new System.Security.Claims.Claim("amr", "mfa"));
+            return Task.CompletedTask;
+        };
+    });
     builder.Services.AddAuthorization();
     builder.Services.AddHsts(options =>
     {
