@@ -146,12 +146,19 @@ $certificateCredential = $null
 
 ## 5. Create the Initial Production Schema
 
+First complete [Windows Production key setup](production-key-storage.md) using
+the staged server from step 2. EF also loads the startup project's configuration,
+so include the printed key path and certificate thumbprint in this process before
+running the Production migration below. Key initialization itself never uses SQL.
+
 This step is appropriate only while `BudgetAppDb` is new and contains no real data. From the repository root:
 
 ```powershell
 $env:ASPNETCORE_ENVIRONMENT = "Production"
 $env:ConnectionStrings__BudgetApp =
     "Server=<sql-server-instance>;Database=BudgetAppDb;Integrated Security=True;TrustServerCertificate=True;"
+$env:DataProtection__KeyRingPath = "C:\Apps\BudgetApp\data\protection-keys\production"
+$env:DataProtection__CertificateThumbprint = "<dedicated encryption-certificate thumbprint>"
 
 dotnet tool restore
 
@@ -161,6 +168,8 @@ dotnet tool run dotnet-ef database update `
 
 Remove-Item Env:ConnectionStrings__BudgetApp
 Remove-Item Env:ASPNETCORE_ENVIRONMENT
+Remove-Item Env:DataProtection__KeyRingPath
+Remove-Item Env:DataProtection__CertificateThumbprint
 ```
 
 Replace `<sql-server-instance>` with the local instance, such as `MY-PC\SQLEXPRESS`.
@@ -171,11 +180,21 @@ After real household data has been entered, never repeat a Production migration 
 
 ## 6. Start the Published Application
 
+Before starting a release containing #150, complete
+[Windows Production key setup, backup, and restore rehearsal](production-key-storage.md).
+Production now requires explicit protected key storage; it will not fall back to
+the old implicit ring. Add the printed `DataProtection__KeyRingPath` and
+`DataProtection__CertificateThumbprint` values to the launch process below.
+The first switch requires fresh sign-ins and Identity links, not a database change.
+
 Open a fresh PowerShell window and paste:
 
 ```powershell
 $env:ASPNETCORE_ENVIRONMENT = "Production"
 $env:ASPNETCORE_URLS = "https://0.0.0.0:443"
+
+$env:DataProtection__KeyRingPath = "C:\Apps\BudgetApp\data\protection-keys\production"
+$env:DataProtection__CertificateThumbprint = "<dedicated encryption-certificate thumbprint>"
 
 $env:ASPNETCORE_Kestrel__Certificates__Default__Path =
     "C:\Apps\BudgetApp\certs\budgetapp.p12"

@@ -88,6 +88,12 @@ project.fragment.lock.json
 artifacts/
 .artifacts/
 development-email/
+key-*.xml
+revocation-*.xml
+budgetapp-key-ring.json
+*.keyring-probe
+*.p12
+*.credential
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt

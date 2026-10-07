@@ -8,6 +8,13 @@ The committed `appsettings.json` contains an empty `ConnectionStrings:BudgetApp`
 
 ## Backend User Secrets
 
+Development Data Protection keys now live outside the repository under the
+Windows user's local-app-data `BudgetApp\DataProtection\Development`, protected
+with current-user DPAPI. Inherited Production key paths/certificates are ignored.
+The first switch to the explicit Development ring requires a fresh sign-in and
+new old-context Identity links; fictional data is not deleted. Tests use ephemeral
+or disposable keys. See [Production key storage](production-key-storage.md).
+
 The server project has an MSBuild `UserSecretsId`, which enables ASP.NET Core User Secrets during local development. User Secrets are stored outside the repository and are loaded automatically when the server runs in the Development environment.
 
 Run these commands from the repository root.

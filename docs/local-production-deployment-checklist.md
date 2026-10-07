@@ -27,6 +27,12 @@ already working.
   proven.
 - Do not enter or import financial data while deployment or rollback is in
   progress.
+- Preserve the explicit key ring and current/retained encryption certificates
+  outside publish. Follow [Windows key setup and recovery](production-key-storage.md)
+  for the first #150 deployment; take and rehearse a key backup separately from SQL.
+- Before a code swap, run `tools\Test-ProductionKeyRing.cmd` with the staged server,
+  actual key path, and certificate settings. Do not deploy if it fails, and never
+  initialize replacement keys to bypass the failure.
 - A code rollback and database rollback are separate decisions. Perform both
   when the old code is incompatible with the new schema.
 

@@ -117,6 +117,16 @@ without a tested recovery path can turn a hardware failure into permanent data l
 
 ### SEC-004 — Data Protection key lifecycle is implicit (launch blocker)
 
+2026-10-07 follow-up: #150 adds explicit separate rings and a stable application
+name, certificate-encrypted Windows Production keys with restricted permissions,
+startup continuity/decryption checks, offline setup/check/backup/restore tools,
+and automated disposable-ring regression coverage. Actual Windows setup,
+permission checks, and portable restore evidence still require operator QA.
+See [Windows key storage and recovery](production-key-storage.md). This is not
+proof that the live installation has been changed. Host-specific storage,
+service/workload identity, replicas, migration, and provider recovery remain
+[#204](https://github.com/clroscott/BudgetApp/issues/204); public launch remains blocked.
+
 Identity cookies, antiforgery values, and password-reset tokens rely on ASP.NET Core
 Data Protection. Before installing as a service or using multiple hosts, configure:
 
