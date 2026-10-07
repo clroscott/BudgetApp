@@ -1034,6 +1034,43 @@ or real invitation recipients for failure injection.
 - [ ] Test status/error announcements and retry buttons with keyboard and screen
       reader. Repeat at narrow width; no broad layout changes are expected.
 
+### Windows encryption-key lifecycle (#150)
+
+Use a disposable installation with fictional data and a NEW ring, never delete,
+corrupt, revoke, or broaden permissions on the live Production ring for a test.
+Follow [Windows key storage and recovery](production-key-storage.md).
+
+- [ ] Record the launching Windows account; initialization uses that account and
+      a new directory outside publish/Git. Cancellation and repeat initialization
+      never overwrite existing keys or change financial data.
+- [ ] Key directory and dedicated private-key file permit only that identity,
+      SYSTEM, and trusted local Administrators. A different ordinary Windows
+      account cannot read/write key XML or decrypt it. Web app administrator
+      grants do not grant Windows secret access.
+- [ ] Sign in, obtain an antiforgery token, confirmation/reset/change-email link,
+      and pending email-MFA challenge. Restart/redeploy into another release
+      directory with the same ring/configuration; each remains valid until its
+      original expiry/security-stamp rules say otherwise.
+- [ ] Generate a protected backup, keep its password separately, and restore
+      into a NEW isolated directory. The pre-backup probe verifies. Repeat under
+      another trusted Windows identity/machine without already installed private
+      certificates to prove portable recovery.
+- [ ] Failed/canceled backup or restore is not labeled verified; partial new
+      artifacts are clearly inspected, not promoted. Existing destinations are
+      rejected and the live ring/startup/DB remain unchanged.
+- [ ] On a disposable copy: missing/empty ring, deleted key/manifest, wrong
+      certificate, corrupt key XML, wrong name, broad ACL, and denied write access
+      stop startup/checks without creating substitute keys. No key XML, codes,
+      certificate password, or token values are pasted into logs/issues.
+- [ ] Ordinary key rotation retains old keys and original cookie/link expiry;
+      wrapping-certificate rotation retains old private certificates. Back up
+      ALL retained certificates and verify old and new probes after restore.
+- [ ] Inherited Production path/certificate settings do not redirect Development
+      or Scratch to real keys. Default Testing keys leave no filesystem material.
+- [ ] First adoption and pre-#150 code rollback require fresh login/Identity links
+      deliberately; user records, budgets, transactions, and MFA recovery hashes
+      are preserved. Hosted-provider QA remains #204 before internet exposure.
+
 ### General persistence and recovery
 
 - [ ] Saved changes survive browser refresh.

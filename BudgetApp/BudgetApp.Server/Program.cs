@@ -57,6 +57,8 @@ try
             ActivityTrackingOptions.SpanId);
 
     builder.Services.AddSerilog();
+    var applicationKeyRing = ApplicationKeyRing.Register(builder.Services, builder.Configuration, builder.Environment);
+    if (KeyRingMaintenanceCommand.TryRun(builder, args, applicationKeyRing)) return;
     builder.Services.AddControllers(options =>
         options.Filters.Add<ValidateAntiforgeryHeaderFilter>());
     builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
@@ -209,6 +211,9 @@ try
             BudgetApp.Infrastructure.Identity.PasswordRecoveryService.TokenLifespan);
 
     var app = builder.Build();
+
+    // Validate retained keys before accepting a request or running owner setup.
+    applicationKeyRing.Verify(app.Services);
 
     // Local setup mode exits without opening any web listener or bootstrap API.
     if (await ApplicationOwnerSetupCommand.TryRunAsync(app, args, databaseEnvironment)) return;
