@@ -6,6 +6,7 @@ export type AppIconName =
   | 'categories'
   | 'dashboard'
   | 'household'
+  | 'help'
   | 'import'
   | 'profiles'
   | 'rules'
@@ -15,6 +16,7 @@ export type AppIconName =
   | 'user'
 
 const paths: Record<AppIconName, string[]> = {
+  help: ['M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0', 'M9.5 9a2.5 2.5 0 1 1 4 2c-1 .7-1.5 1-1.5 2', 'M12 17h.01'],
   user: ['M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0', 'M4 21v-2a8 8 0 0 1 16 0v2'],
   accounts: ['M4 7h16v12H4z', 'M4 10h16', 'M16 15h1'],
   activity: ['M12 8v5l3 2', 'M3.1 12a9 9 0 1 0 2.6-6.3', 'M3 4v5h5'],

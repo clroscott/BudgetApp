@@ -8,6 +8,7 @@ import { currencies } from '../finance/currencies'
 import { getHouseholdSettings, saveHouseholdSettings, type HouseholdSettings, type HouseholdSettingsValues } from '../households/householdApi'
 import { timeZoneOptions } from '../households/timeZoneOptions'
 import { useHouseholds } from '../households/useHouseholds'
+import { ContextualHelp } from '../components/ContextualHelp'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedForm } from '../routing/useUnsavedForm'
 import { usePageLoad } from './usePageLoad'
@@ -113,6 +114,7 @@ export function HouseholdSettingsPage() {
             {months.map((month, index) => <option key={month} value={index + 1}>{month}</option>)}
           </select>
           <p id={`${id}-fiscal-help`} className="field-help">Chooses the initial month for new, unsaved annual plans. You can still choose a different start for each plan. This default does not change saved annual plans or existing monthly budgets.</p>
+          <ContextualHelp topic="annual-targets" />
           <label htmlFor={`${id}-currency`}>Default currency</label>
           <select id={`${id}-currency`} aria-describedby={`${id}-currency-help`} value={draft.defaultCurrency}
             disabled={!canEdit || !saved.canChangeCurrency} onChange={event => setDraft(current => ({ ...current, defaultCurrency: event.target.value }))}>

@@ -4,6 +4,7 @@ import { getErrorMessages } from '../auth/errorMessages'
 import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
+import { ContextualHelp } from '../components/ContextualHelp'
 import { uploadCsvImport, type CsvImportResult } from '../imports/importApi'
 import {
   createImportProfile,
@@ -215,6 +216,10 @@ export function CsvImportPage() {
           </div>
         </div>
 
+        <div className="contextual-help-row">
+          <ContextualHelp topic="import-approval" />
+          <ContextualHelp topic="scope-privacy" />
+        </div>
         <ErrorSummary errors={errors} />
 
         {isLoading ? (

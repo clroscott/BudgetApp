@@ -246,6 +246,49 @@ password values, confirmation proofs, or pending private addresses in shared QA 
       layouts, long email addresses, 200% browser zoom, and a screen reader work
       across all sections. Focus/entered values are not reset by routine status reads.
 
+## Contextual help regression (#154)
+
+Use Development/Scratch sample records. Help itself is read-only; do not confirm
+destructive actions against records that must be kept.
+
+- [ ] Open **About scope and privacy** on Accounts, Transactions/budget inclusion,
+      Monthly Budget, Annual Targets/Overview, and import controls. Explain account
+      access versus budget inclusion, full-amount Personal + Household counting,
+      overlap, and which personal-account transaction details become shared.
+- [ ] On Monthly Budget, open **About budget states**. Draft/Active/Closed match
+      enabled actions. Closed planned amounts are read-only, but historical actuals
+      are not claimed to be frozen. Missing amounts and explicit zero are distinct.
+- [ ] Read annual-target help beside plan/default and allocation controls. Changing
+      the household default or plan start never claims to rewrite existing monthly
+      budgets. Selected months, independent copies, cents, and protected states are
+      explained. Enable Draft replacement: its overwrite/no-Undo warning is visible
+      even while help is collapsed; cancel confirmation and verify no changes.
+- [ ] On CSV Import/Review, help distinguishes upload, correction, approval, and
+      **Create approved transactions**. Explain why approval alone does not change
+      actuals and why Exclude differs from Neither budget. Bulk page/all-matching
+      scope and skipped rows match the implemented controls.
+- [ ] Critical sharing and deletion/discard consequences stay visible without
+      opening help. Cancel Draft deletion/import discard: existing data remains;
+      confirmation explains that ledger transactions are not deleted by these actions.
+- [ ] Open an inline disclosure while a budget, import row, or account form is dirty:
+      no save, approval, changed value, or guard clearing occurs. Follow **Read more**,
+      cancel leaving, and verify corrections/selected context stay intact. Accept
+      leaving only on disposable edits. Ctrl-click/new-tab retains the correct topic.
+- [ ] Visit **Settings → Help** and every deep link. Reload, Back, Forward, and topic
+      switching show the intended article/current-topic indicator; unknown IDs give
+      a safe fallback. Help starts no tutorial and makes no financial/progress writes.
+- [ ] Read `/help` anonymously, with no household, and while unverified. Return links
+      fit that state, no financial navigation is exposed, and financial API gates
+      remain enforced. Household-load failures do not prevent static help access.
+- [ ] Keyboard-only: Tab reaches named help summaries, Enter/Space toggles them,
+      Tab reaches the deeper link, Escape closes and returns focus. No focus trap or
+      inaccessible hover content. Help routes/topics have meaningful headings,
+      current-page state, visible focus, Skip, and the shared route announcements.
+- [ ] At narrow/tablet/desktop sizes and real 200% browser zoom, disclosures and
+      topic navigation wrap, content remains readable without page overflow, and
+      expanded help does not enlarge the fixed Save bar. With a screen reader, verify
+      disclosure state, topic heading navigation, list meanings, and warning text.
+
 ## Security baseline
 
 - [ ] Production is reachable only over HTTPS with the intended trusted certificate.

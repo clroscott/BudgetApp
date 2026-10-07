@@ -36,6 +36,20 @@ beforeEach(() => {
 })
 
 describe('full app verification gate', () => {
+  it.each(['anonymous', 'unverified', 'no-household'] as const)('allows static help for %s users without unlocking financial pages', async mode => {
+    if (mode === 'anonymous') scenario.user = null
+    if (mode === 'no-household') { scenario.user = scenario.refreshedUser; vi.mocked(getHouseholds).mockResolvedValue([]) }
+    window.history.replaceState(null, '', '/help#import-approval')
+    render(<App />)
+    await screen.findByRole('heading', { level: 1, name: 'Import review and approval' })
+    expect(window.location.pathname).toBe('/help')
+    expect(getAccountSettings).not.toHaveBeenCalled()
+    expect(screen.queryByRole('heading', { name: 'Private monthly budget' })).toBeNull()
+    if (mode !== 'no-household') {
+      expect(getHouseholds).not.toHaveBeenCalled()
+      expect(getTutorialProgress).not.toHaveBeenCalled()
+    }
+  })
   it('allows signed-in unverified account maintenance without loading household or tutorial data', async () => {
     window.history.replaceState(null, '', '/settings/account')
     render(<App />)

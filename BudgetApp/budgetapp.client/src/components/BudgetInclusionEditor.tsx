@@ -3,6 +3,8 @@ import { getErrorMessages } from '../auth/errorMessages'
 import { useUnsavedForm } from '../routing/useUnsavedForm'
 import { updateBudgetInclusion, type TransactionItem } from '../transactions/transactionApi'
 import { ErrorSummary } from './ErrorSummary'
+import { ContextualHelp } from './ContextualHelp'
+import { helpWarnings } from '../help/helpTopics'
 
 export function BudgetInclusionEditor({ householdId, transaction, onSaved, disabled = false }: {
   householdId: string, transaction: TransactionItem, onSaved: () => Promise<void>,
@@ -52,8 +54,8 @@ export function BudgetInclusionEditor({ householdId, transaction, onSaved, disab
         disabled={!transaction.canEditHouseholdInclusion}
         onChange={event => setValue({ ...value, household: event.target.checked })} />Household budget</label>
       <p>The full amount counts toward each selected budget. The transaction is recorded only once.</p>
-      {transaction.canEditHouseholdInclusion && <p>Including a personal-account expense in Household shares its date,
-        amount, category, and description. Your account details, private notes, and import file stay private.</p>}
+      {transaction.canEditHouseholdInclusion && <p>{helpWarnings.sharePersonalExpense}</p>}
+      <ContextualHelp topic="scope-privacy" />
       {transaction.canEditHouseholdInclusion && transaction.includeInHouseholdBudget && !value.household &&
         <p>For a personal-account transaction, removing Household inclusion also hides it from other
           members and removes it from their Personal actuals.</p>}

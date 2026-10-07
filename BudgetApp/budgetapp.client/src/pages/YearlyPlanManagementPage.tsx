@@ -18,6 +18,8 @@ import { ErrorSummary } from '../components/ErrorSummary'
 import { PageLoadFeedback } from '../components/PageLoadFeedback'
 import { usePageLoad } from './usePageLoad'
 import { useHouseholds } from '../households/useHouseholds'
+import { ContextualHelp } from '../components/ContextualHelp'
+import { helpWarnings } from '../help/helpTopics'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 
@@ -231,7 +233,8 @@ export function YearlyPlanManagementPage() {
     if (!window.confirm(
       `Continue? ${createCount} month${createCount === 1 ? '' : 's'} will be created, ` +
       `${replaceCount} Draft${replaceCount === 1 ? '' : 's'} will be replaced, and ` +
-      `${protectedCount} existing budget${protectedCount === 1 ? '' : 's'} will be kept.`,
+      `${protectedCount} existing budget${protectedCount === 1 ? '' : 's'} will be kept.` +
+      (replaceCount > 0 ? ` ${helpWarnings.replaceDrafts}` : ''),
     )) return
     setIsSaving(true)
     setErrors([])
@@ -390,6 +393,10 @@ export function YearlyPlanManagementPage() {
         </div>
       </section>
 
+      <div className="contextual-help-row">
+        <ContextualHelp topic="scope-privacy" />
+        <ContextualHelp topic="annual-targets" />
+      </div>
       <p className="field-help">
         Household default for new annual plans: {loadState.hasData && plan
           ? monthNames[plan.householdDefaultFiscalYearStartMonth - 1] : 'Unavailable'}.
@@ -560,6 +567,8 @@ export function YearlyPlanManagementPage() {
             <span>Replace amounts in existing Draft budgets after confirmation</span>
           </label>
         </div>
+        {replaceDrafts && <p className="action-consequence">{helpWarnings.replaceDrafts}</p>}
+        <ContextualHelp topic="destructive-actions" />
         <div className="yearly-allocation-submit">
           <div>
             <strong>

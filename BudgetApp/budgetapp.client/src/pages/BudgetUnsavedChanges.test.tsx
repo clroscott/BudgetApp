@@ -5,14 +5,15 @@ import { HouseholdContext } from '../households/householdContext'
 import { RouterProvider } from '../routing/RouterProvider'
 import { useRouter } from '../routing/useRouter'
 import { budgetFixture, annualFixture, householdsFixture } from '../test/fixtures'
-import { getBudget, getBudgetMonthOptions, saveBudget } from '../budgets/budgetApi'
+import { getBudget, getBudgetMonthOptions, saveBudget, deleteDraftBudget } from '../budgets/budgetApi'
+import { helpWarnings } from '../help/helpTopics'
 import { getYearlyPlan, saveYearlyPlan, changeFiscalYearStartMonth } from '../budgets/yearlyPlanApi'
 import { BudgetManagementPage } from './BudgetManagementPage'
 import { YearlyPlanManagementPage } from './YearlyPlanManagementPage'
 
 vi.mock('../budgets/budgetApi', async importOriginal => ({
   ...await importOriginal<typeof import('../budgets/budgetApi')>(),
-  getBudget: vi.fn(), getBudgetMonthOptions: vi.fn(), saveBudget: vi.fn(),
+  getBudget: vi.fn(), getBudgetMonthOptions: vi.fn(), saveBudget: vi.fn(), deleteDraftBudget: vi.fn(),
 }))
 vi.mock('../budgets/yearlyPlanApi', async importOriginal => ({
   ...await importOriginal<typeof import('../budgets/yearlyPlanApi')>(),
@@ -40,6 +41,33 @@ beforeEach(() => {
 })
 
 describe('monthly budget guard integration', () => {
+  it('keeps deletion consequences visible with help collapsed and still requires confirmation', async () => {
+    show(<BudgetManagementPage />, '/budgeting?year=2026&month=1')
+    await screen.findByLabelText('Housing budget')
+    const warning = screen.getByText(helpWarnings.deleteDraft)
+    expect(warning.closest('details')).toBeNull()
+    expect(screen.getByText('About removal and replacement').closest('details')!.open).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete draft' }))
+    expect(window.confirm).toHaveBeenCalledWith(helpWarnings.confirmDeleteDraft)
+    expect(deleteDraftBudget).not.toHaveBeenCalled()
+    expect((screen.getByLabelText('Housing budget') as HTMLInputElement).value).toBe('100')
+  })
+  it('opening help preserves dirty budget amounts, and canceled deeper-help navigation keeps them protected', async () => {
+    show(<BudgetManagementPage />, '/budgeting?year=2026&month=1')
+    const amount = await screen.findByLabelText('Housing budget') as HTMLInputElement
+    fireEvent.change(amount, { target: { value: '250' } })
+    fireEvent.click(screen.getByText('About budget states'))
+    expect(window.confirm).not.toHaveBeenCalled()
+    expect(saveBudget).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('link', { name: 'Read more: Monthly budget states' }))
+    expect(window.confirm).toHaveBeenCalledOnce()
+    expect(window.location.pathname).toBe('/budgeting')
+    expect(amount.value).toBe('250')
+    expect(saveBudget).not.toHaveBeenCalled()
+    const close = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(close)
+    expect(close.defaultPrevented).toBe(true)
+  })
   it('does not warn after loading an untouched budget', async () => {
     show(<BudgetManagementPage />, '/budgeting?year=2026&month=1')
     await screen.findByLabelText('Housing budget')

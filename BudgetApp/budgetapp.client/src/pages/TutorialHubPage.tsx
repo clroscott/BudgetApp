@@ -154,6 +154,7 @@ export function TutorialHubPage() {
           </div>
         </div>
 
+        <p className="field-help">Need a quick explanation instead? <AppLink to="/help">Browse help topics</AppLink>.</p>
         <ErrorSummary errors={error ? [error] : []} />
 
         <div className="tutorial-library">

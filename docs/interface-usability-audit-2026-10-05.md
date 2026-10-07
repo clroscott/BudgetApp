@@ -249,6 +249,15 @@ financial history. Updated automated and live-sign-off cases are in
 
 ## Recommended order and existing-board alignment
 
+**Contextual help follow-up (#154):** Shared native disclosures and a read-only
+Help page now explain scope/privacy, budget states, annual targets, import
+approval, and destructive actions using a central topic catalog. Critical warnings
+remain visible, existing confirmations/guards are retained, and help does not
+execute writes or start tutorials. Static help is available before household/email
+setup. Automated topic/focus/guard tests and a sample desktop/narrow keyboard preview
+are included; real 200% zoom and screen-reader speech remain manual sign-off.
+Details: [Contextual help](contextual-help.md).
+
 **Account settings follow-up (#156):** Personal account maintenance now has an
 independent route, three separately saved forms, own-account/pending-state APIs,
 and reused #149 email/password flows. It remains accessible without households
