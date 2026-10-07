@@ -14,6 +14,7 @@ import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { currencies } from '../finance/currencies'
 import { useHouseholds } from '../households/useHouseholds'
+import { ContextualHelp } from '../components/ContextualHelp'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedForm, useUnsavedNativeForm } from '../routing/useUnsavedForm'
 
@@ -245,6 +246,7 @@ export function AccountManagementPage() {
               Changing scope also changes who can see this account. Saved transaction budget inclusion
               does not change automatically. Reports keep currencies separate.
             </p>
+            <ContextualHelp topic="scope-privacy" />
             <div className="account-actions">
               <button
                 type="button"
@@ -390,6 +392,7 @@ export function AccountManagementPage() {
           <button className="primary-button account-submit" type="submit" disabled={isSaving}>
             Add account
           </button>
+          <ContextualHelp topic="scope-privacy" />
         </form>
 
         {isLoading ? (

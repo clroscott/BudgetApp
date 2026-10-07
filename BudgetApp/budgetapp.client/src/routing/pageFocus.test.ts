@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { focusPageElement } from './pageFocus'
 
 describe('page focus visibility and restoration', () => {
@@ -51,5 +51,60 @@ describe('page focus visibility and restoration', () => {
       focusPageElement(main)()
       expect(document.activeElement).not.toBe(main)
     } finally { sidebar.remove(); main.remove(); elsewhere.remove() }
+  })
+})
+
+let originalScroll: PropertyDescriptor | undefined
+beforeEach(() => { originalScroll = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView') })
+afterEach(() => {
+  document.querySelector('[data-focus-fixture]')?.remove()
+  if (originalScroll) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScroll)
+  else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
+})
+function box(left: number, top: number, width: number, height: number): DOMRect {
+  return { left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }
+}
+function fixture(narrow = false) {
+  const root = document.createElement('div')
+  root.dataset.focusFixture = ''
+  root.innerHTML = '<aside class="app-sidebar" style="position:sticky"></aside><div class="household-context-bar" style="position:sticky"></div><h1 style="scroll-margin-top:12px">Help topic</h1>'
+  document.body.append(root)
+  const sidebar = root.querySelector<HTMLElement>('aside')!
+  const context = root.querySelector<HTMLElement>('.household-context-bar')!
+  const heading = root.querySelector<HTMLHeadingElement>('h1')!
+  vi.spyOn(sidebar, 'getBoundingClientRect').mockReturnValue(narrow ? box(0, 0, 390, 70) : box(0, 0, 220, 800))
+  vi.spyOn(context, 'getBoundingClientRect').mockReturnValue(narrow ? box(0, 70, 390, 60) : box(220, 0, 780, 60))
+  vi.spyOn(heading, 'getBoundingClientRect').mockReturnValue(narrow ? box(20, 300, 350, 40) : box(300, 300, 650, 40))
+  let scrollMargin = ''
+  const scroll = vi.fn(function (this: HTMLElement) { scrollMargin = this.style.scrollMarginTop })
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scroll })
+  return { sidebar, context, heading, scroll, margin: () => scrollMargin }
+}
+describe('visible heading scroll offset', () => {
+  it('keeps desktop topic headings below the household header without treating the side rail as a header', () => {
+    const { heading, scroll, margin } = fixture()
+    const restore = focusPageElement(heading)
+    expect(margin()).toBe('76px')
+    expect(scroll).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' })
+    expect(document.activeElement).toBe(heading)
+    expect(heading.style.scrollMarginTop).toBe('12px')
+    restore()
+    expect(heading.hasAttribute('tabindex')).toBe(false)
+  })
+  it('accounts for both narrow shell headers and restores the original inline margin', () => {
+    const { heading, margin } = fixture(true)
+    focusPageElement(heading)()
+    expect(margin()).toBe('146px')
+    expect(heading.style.scrollMarginTop).toBe('12px')
+  })
+  it('ignores hidden or non-sticky context bars on a standalone help page', () => {
+    const { heading, context, margin } = fixture()
+    context.hidden = true
+    focusPageElement(heading)()
+    expect(margin()).toBe('12px')
+    context.hidden = false
+    context.style.position = 'static'
+    focusPageElement(heading)()
+    expect(margin()).toBe('12px')
   })
 })

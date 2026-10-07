@@ -3163,6 +3163,30 @@ a {
   margin-top: 1rem;
 }
 
+.contextual-help-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem 1.25rem; margin: 0.75rem 0; }
+.contextual-help { min-width: 0; max-width: 100%; margin: 0.5rem 0; font-size: 0.9rem; }
+.contextual-help-row > .contextual-help { margin: 0; }
+.contextual-help > summary { cursor: pointer; color: var(--accent); font-weight: 650; padding: 0.4rem 0.15rem; overflow-wrap: anywhere; }
+.contextual-help > summary svg { width: 1rem; height: 1rem; display: inline-block; margin: 0 0.4rem; vertical-align: -0.15rem; }
+.contextual-help > summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 0.2rem; }
+.contextual-help-body { max-width: 36rem; padding: 0.75rem 1rem; border-left: 3px solid var(--accent); background: var(--surface); overflow-wrap: anywhere; }
+.contextual-help-body p { margin: 0 0 0.5rem; }
+.contextual-help-body a { font-weight: 650; }
+.help-topic-navigation { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.25rem 0; }
+.help-topic-navigation a { padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: 0.5rem; overflow-wrap: anywhere; }
+.help-topic-navigation a[aria-current="page"] { background: var(--accent); color: white; }
+.help-topic-list { display: grid; gap: 0.75rem; }
+.help-topic-list > article, .help-article { padding: 1.25rem; border: 1px solid var(--border); border-radius: 0.8rem; background: var(--surface); min-width: 0; overflow-wrap: anywhere; }
+.help-topic-list h2 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+.help-topic-list p { margin: 0; }
+.help-article section + section { margin-top: 1.5rem; }
+.help-article h2 { font-size: 1.2rem; margin: 0 0 0.75rem; }
+.help-article p, .help-article li { line-height: 1.65; }
+.help-article li + li { margin-top: 0.65rem; }
+.help-article ul { padding-left: 1.4rem; }
+.action-consequence { font-size: 0.9rem; line-height: 1.5; overflow-wrap: anywhere; }
+.budget-action-help { margin-top: 1.25rem; padding: 0.5rem 1rem; border-left: 3px solid var(--border); }
+
 .account-settings-stack { display: grid; gap: 1.25rem; margin-top: 1rem; }
 .account-settings-card {
   display: grid;

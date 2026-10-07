@@ -26,18 +26,19 @@ export function focusPageElement(element: HTMLElement) {
     element.removeEventListener('blur', restore)
   }
   element.addEventListener('blur', restore, { once: true })
-  const sidebar = document.querySelector<HTMLElement>('.app-sidebar')
   const oldMargin = element.style.scrollMarginTop
   const hadStyle = element.hasAttribute('style')
-  if (sidebar) {
-    const position = getComputedStyle(sidebar).position
-    const bar = sidebar.getBoundingClientRect()
-    const target = element.getBoundingClientRect()
-    // Only account for an overlapping sticky header, not a desktop side rail.
-    if ((position === 'sticky' || position === 'fixed') && bar.left < target.right && bar.right > target.left && bar.bottom > 0) {
-      element.style.scrollMarginTop = `${bar.height + 16}px`
-    }
-  }
+  const target = element.getBoundingClientRect()
+  const headerBottom = [...document.querySelectorAll<HTMLElement>('.app-sidebar, .household-context-bar')]
+    .filter(isPageElementVisible)
+    .reduce((bottom, header) => {
+      const position = getComputedStyle(header).position
+      const box = header.getBoundingClientRect()
+      // Include stacked/overlapping shell headers, never a desktop side rail.
+      return (position === 'sticky' || position === 'fixed') && box.left < target.right && box.right > target.left
+        ? Math.max(bottom, box.bottom) : bottom
+    }, 0)
+  if (headerBottom > 0) element.style.scrollMarginTop = `${headerBottom + 16}px`
   element.scrollIntoView?.({ behavior: 'auto', block: 'start' })
   element.style.scrollMarginTop = oldMargin
   if (!hadStyle && element.style.length === 0) element.removeAttribute('style')

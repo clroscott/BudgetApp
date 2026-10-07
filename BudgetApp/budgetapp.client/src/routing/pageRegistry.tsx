@@ -48,6 +48,11 @@ function page(loader: () => Promise<Record<string, unknown>>, exportName: string
 
 export const appPages: AppPageDefinition[] = [
   {
+    id: 'help', path: '/help', label: 'Help', icon: 'help', access: 'public',
+    navigation: { section: 'settings', order: 90 },
+    component: page(() => import('../pages/HelpPage'), 'HelpPage'),
+  },
+  {
     id: 'account-settings',
     path: '/settings/account',
     label: 'Account settings',

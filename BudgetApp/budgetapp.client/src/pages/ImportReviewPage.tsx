@@ -7,6 +7,8 @@ import {
 } from '../categorizationRules/categorizationRuleApi'
 import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { ContextualHelp } from '../components/ContextualHelp'
+import { helpWarnings } from '../help/helpTopics'
 import { useHouseholds } from '../households/useHouseholds'
 import {
   applyImportCategorizationRules,
@@ -809,7 +811,7 @@ export function ImportReviewPage() {
     if (!window.confirm(`Set ${label} on ${count} staged ${count === 1 ? 'row' : 'rows'}? ` +
       'Existing corrections will be kept. Choices are not saved until you use Save all corrections.' +
       ((bulkBudgetPreset === 'Household' || bulkBudgetPreset === 'PersonalAndHousehold')
-        ? ' Household inclusion shares each transaction’s date, amount, category, and description when the import is completed.' : ''))) return
+        ? ` ${helpWarnings.sharePersonalExpense} Sharing takes effect when approved transactions are created.` : ''))) return
     setDirtyDraftUpdates(current => {
       const updated = new Map(current)
       for (const [id, change] of bulkBudgetPreview.changes) {
@@ -992,7 +994,7 @@ export function ImportReviewPage() {
 
   const handleDiscard = async () => {
     if (!detail || !window.confirm(
-      `Discard ${detail.originalFileName} and all of its staged rows? This cannot be undone.`,
+      helpWarnings.confirmDiscardImport(detail.originalFileName),
     )) return
 
     setIsDiscarding(true)
@@ -1028,6 +1030,8 @@ export function ImportReviewPage() {
           <AppLink to="/import">Upload another CSV</AppLink>
         </div>
 
+        <ContextualHelp topic="import-approval" />
+        <p className="field-help">{helpWarnings.sharePersonalExpense}</p>
         <ErrorSummary errors={errors} />
 
         {imports.length > 0 && (
@@ -1204,6 +1208,8 @@ export function ImportReviewPage() {
                   </div>
                   <div className="import-control-group import-control-danger">
                     <strong>Staged data</strong>
+                    <p className="action-consequence">{helpWarnings.discardImport}</p>
+                    <ContextualHelp topic="destructive-actions" />
                     <div className="import-control-actions">
                       <button className="danger-button" type="button"
                         disabled={isDiscarding}
@@ -1273,6 +1279,9 @@ export function ImportReviewPage() {
               </div>
               <p className="field-help">Keeps your existing corrections. Changes are staged, then saved with
                 “Save all corrections”. Saving changed approved rows returns them to Pending for review.</p>
+              {(bulkBudgetPreset === 'Household' || bulkBudgetPreset === 'PersonalAndHousehold') &&
+                <p className="action-consequence">{helpWarnings.sharePersonalExpense}</p>}
+              <ContextualHelp topic="scope-privacy" />
               {bulkBudgetPreset && <p className="field-help">{bulkBudgetPreview.changes.size} rows would change;
                 {' '}{bulkBudgetPreview.unchanged} already match; {bulkBudgetPreview.skipped} excluded, linked,
                 or permission-protected rows will be skipped.</p>}

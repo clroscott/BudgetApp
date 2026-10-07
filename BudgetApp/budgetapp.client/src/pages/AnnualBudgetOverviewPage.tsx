@@ -8,6 +8,7 @@ import { annualOverviewSelection, transactionLink } from '../budgets/transaction
 import { BrandLockup } from '../components/Brand'
 import { AnnualCategoryTable } from '../components/AnnualCategoryTable'
 import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
+import { ContextualHelp } from '../components/ContextualHelp'
 import { PageLoadFeedback } from '../components/PageLoadFeedback'
 import { usePageLoad } from './usePageLoad'
 import { useHouseholds } from '../households/useHouseholds'
@@ -84,6 +85,10 @@ export function AnnualBudgetOverviewPage() {
         </label>
       </section>
 
+      <div className="contextual-help-row">
+        <ContextualHelp topic="scope-privacy" />
+        <ContextualHelp topic="budget-states" />
+      </div>
       <PageLoadFeedback subject="annual overview" status={loadState.status} errors={loadState.errors}
         onReload={() => setReloadVersion(version => version + 1)} />
       {loadState.hasData && overview && <>

@@ -3,6 +3,8 @@ import { getErrorMessages } from '../auth/errorMessages'
 import { BrandLockup } from '../components/Brand'
 import { AmountCalculator } from '../components/AmountCalculator'
 import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
+import { ContextualHelp } from '../components/ContextualHelp'
+import { helpWarnings } from '../help/helpTopics'
 import {
   changeBudgetStatus,
   copyBudget,
@@ -218,7 +220,7 @@ export function BudgetManagementPage() {
 
   const handleDeleteDraft = async () => {
     if (!canManage || isSaving || !budget?.id || budget.status !== 'Draft' || !window.confirm(
-      'Delete this draft budget and all of its amounts? This cannot be undone.',
+      helpWarnings.confirmDeleteDraft,
     )) return
     setIsSaving(true)
     setErrors([])
@@ -262,7 +264,7 @@ export function BudgetManagementPage() {
     if (!canManage || isSaving || !budget?.id || isDirty) return
     if (action === 'close' && !window.confirm('Close this budget? It will become read-only.')) return
     if (action === 'return-to-draft' && !window.confirm(
-      'Return this active budget to Draft? It can then be replaced from annual targets or deleted.',
+      helpWarnings.confirmReturnToDraft,
     )) return
     if (action === 'reopen' && !window.confirm('Reopen this budget and allow changes again?')) return
     setIsSaving(true)
@@ -381,6 +383,11 @@ export function BudgetManagementPage() {
           <button className="secondary-button" type="button" disabled={isSaving} onClick={() => changePeriod(year, month + 1)}>Next</button>
         </section>
 
+        <div className="contextual-help-row">
+          <ContextualHelp topic="scope-privacy" />
+          <ContextualHelp topic="budget-states" />
+          <ContextualHelp topic="annual-targets" />
+        </div>
         <ErrorSummary errors={errors} />
         {notice && <p role="status">{notice}</p>}
         <PageLoadFeedback subject="budget" status={loadState.status} errors={loadState.errors}
@@ -394,7 +401,7 @@ export function BudgetManagementPage() {
           <div className="empty-state"><h2>No expense categories</h2><p>Add expense categories before entering budget amounts.</p><AppLink to="/settings/categories">Manage categories</AppLink></div>
         ) : (
           <>
-            {isClosed && <p className="budget-readonly-note">This historical budget is closed and read-only.</p>}
+            {isClosed && <p className="budget-readonly-note">This historical budget’s planned amounts are closed and read-only. Actuals can still change when transactions are corrected.</p>}
             {budget.uncategorizedActualAmount !== 0 && <p className="budget-actual-warning"><strong>{formatAmount(budget.uncategorizedActualAmount)} uncategorized</strong> is not included in the category totals. Categorize those transactions to see the complete budget picture.</p>}
             {budget.currencyMismatchTransactionCount > 0 && <p className="budget-actual-warning"><strong>{budget.currencyMismatchTransactionCount} transaction{budget.currencyMismatchTransactionCount === 1 ? '' : 's'}</strong> in another currency {budget.currencyMismatchTransactionCount === 1 ? 'is' : 'are'} excluded because currency conversion is not available yet.</p>}
             <div className="budget-sections">
@@ -419,6 +426,11 @@ export function BudgetManagementPage() {
             </div>
           </>
         )}
+        {loadState.hasData && budget?.id && canManage && budget.status !== 'Closed' &&
+          <aside className="budget-action-help" aria-label="Budget removal and replacement">
+            <p className="action-consequence">{budget.status === 'Draft' ? helpWarnings.deleteDraft : helpWarnings.returnToDraft}</p>
+            <ContextualHelp topic="destructive-actions" />
+          </aside>}
       </section>
         {loadState.hasData && budget?.id && budget.categories.length > 0 && <section
           className="budget-save-bar"

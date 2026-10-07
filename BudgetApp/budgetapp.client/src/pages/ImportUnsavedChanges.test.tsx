@@ -292,7 +292,7 @@ describe('pending CSV uploads', () => {
       accountName: 'Sample account', status: 'ReadyForReview', totalRows: 1, validRows: 1, invalidRows: 0, duplicateRows: 0 })
     fireEvent.submit(fileInput.closest('form')!)
     await waitFor(() => expect(uploadCsvImport).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(screen.getByRole('link', { name: /Review/i })).toBeTruthy())
+    await screen.findByRole('link', { name: 'Review this import' })
     fireEvent.click(screen.getByText('Leave page'))
     expect(window.confirm).toHaveBeenCalledTimes(1)
     expect(screen.getByText('Destination')).toBeTruthy()

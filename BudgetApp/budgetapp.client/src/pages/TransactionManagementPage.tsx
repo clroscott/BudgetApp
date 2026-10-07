@@ -8,6 +8,7 @@ import { BudgetInclusionEditor } from '../components/BudgetInclusionEditor'
 import { useRouter } from '../routing/useRouter'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
+import { ContextualHelp } from '../components/ContextualHelp'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 import { annualReportReturnLink, readAnnualReportContext, transactionFilterKey } from '../transactions/reportContext'
@@ -465,6 +466,7 @@ export function TransactionManagementPage() {
           <AppLink to="/import">Import CSV</AppLink>
         </div>
 
+        <ContextualHelp topic="scope-privacy" />
         <ErrorSummary errors={errors} />
 
         {reportContext && <aside className="transaction-report-context" aria-label="Annual report context">
