@@ -9,6 +9,9 @@ import { useRouter } from '../routing/useRouter'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { useHouseholds } from '../households/useHouseholds'
 import { ContextualHelp } from '../components/ContextualHelp'
+import { SavedTransactionFilters } from '../components/SavedTransactionFilters'
+import { buildTransactionQuery, createDefaultFilters, createInitialFilters, filterIntentKey,
+  resolveFilterCategory, uncategorizedFilterValue, type DateFilterMode, type TransactionFilters } from '../transactions/transactionFilters'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 import { annualReportReturnLink, readAnnualReportContext, transactionFilterKey } from '../transactions/reportContext'
@@ -21,129 +24,11 @@ import {
   type UpdateTransactionRequest,
 } from '../transactions/transactionApi'
 
-type DateFilterMode = 'pastDays' | 'specificDate' | 'specificMonth' | 'range' | 'all'
-const uncategorizedFilterValue = '__uncategorized__'
-
-interface TransactionFilters {
-  accountId: string
-  dateMode: DateFilterMode
-  pastDays: string
-  specificDate: string
-  specificMonth: string
-  fromDate: string
-  toDate: string
-  categoryType: CategoryType | ''
-  categoryId: string
-  subcategoryId: string
-  description: string
-  budgetInclusion: string
-  currency: string
-  spendingOnly: boolean
-}
-
 interface PaginationState {
   page: number
   pageSize: number
   totalCount: number
   totalPages: number
-}
-
-function formatLocalDate(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function addDays(date: Date, days: number) {
-  const result = new Date(date)
-  result.setDate(result.getDate() + days)
-  return result
-}
-
-function createDefaultFilters(): TransactionFilters {
-  const today = new Date()
-  return {
-    accountId: '',
-    budgetInclusion: '', currency: '', spendingOnly: false,
-    dateMode: 'pastDays',
-    pastDays: '30',
-    specificDate: formatLocalDate(today),
-    specificMonth: formatLocalDate(today).slice(0, 7),
-    fromDate: formatLocalDate(addDays(today, -29)),
-    toDate: formatLocalDate(today),
-    categoryType: '',
-    categoryId: '',
-    subcategoryId: '',
-    description: '',
-  }
-}
-
-function createInitialFilters(): TransactionFilters {
-  const defaults = createDefaultFilters()
-  const search = new URLSearchParams(window.location.search)
-  const fromDate = search.get('fromDate') ?? ''
-  const toDate = search.get('toDate') ?? ''
-  const categoryId = search.get('categoryId') ?? ''
-  const uncategorizedOnly = search.get('uncategorizedOnly') === 'true'
-  defaults.budgetInclusion = search.get('budgetInclusion') ?? ''
-  defaults.currency = search.get('currency') ?? ''
-  defaults.spendingOnly = search.get('spendingOnly') === 'true'
-  if (!fromDate || !toDate) return defaults
-
-  return {
-    ...defaults,
-    dateMode: 'range',
-    fromDate,
-    toDate,
-    categoryId: uncategorizedOnly ? uncategorizedFilterValue : categoryId,
-  }
-}
-
-function buildTransactionQuery(filters: TransactionFilters, page: number): TransactionQuery {
-  const query: TransactionQuery = {
-    accountId: filters.accountId || undefined,
-    budgetInclusion: filters.budgetInclusion || undefined,
-    currency: filters.currency || undefined,
-    spendingOnly: filters.spendingOnly || undefined,
-    categoryType: filters.categoryType || undefined,
-    categoryId: filters.categoryId === uncategorizedFilterValue
-      ? undefined
-      : filters.subcategoryId || filters.categoryId || undefined,
-    uncategorizedOnly: filters.categoryId === uncategorizedFilterValue || undefined,
-    description: filters.description.trim() || undefined,
-    page,
-  }
-
-  if (filters.dateMode === 'pastDays') {
-    const days = Number(filters.pastDays)
-    if (!Number.isInteger(days) || days < 1 || days > 3650) {
-      throw new Error('Past days must be a whole number between 1 and 3,650.')
-    }
-    const today = new Date()
-    query.fromDate = formatLocalDate(addDays(today, -(days - 1)))
-    query.toDate = formatLocalDate(today)
-  } else if (filters.dateMode === 'specificDate') {
-    if (!filters.specificDate) throw new Error('Choose a specific date.')
-    query.fromDate = filters.specificDate
-    query.toDate = filters.specificDate
-  } else if (filters.dateMode === 'specificMonth') {
-    if (!filters.specificMonth) throw new Error('Choose a specific month.')
-    const [year, month] = filters.specificMonth.split('-').map(Number)
-    query.fromDate = `${filters.specificMonth}-01`
-    query.toDate = formatLocalDate(new Date(year, month, 0))
-  } else if (filters.dateMode === 'range') {
-    if (!filters.fromDate || !filters.toDate) {
-      throw new Error('Choose both a start date and an end date.')
-    }
-    if (filters.fromDate > filters.toDate) {
-      throw new Error('Start date cannot be after end date.')
-    }
-    query.fromDate = filters.fromDate
-    query.toDate = filters.toDate
-  }
-
-  return query
 }
 
 function findCategorySelection(categories: CategoryItem[], selectedCategoryId: string | null) {
@@ -195,6 +80,8 @@ export function TransactionManagementPage() {
   const [accounts, setAccounts] = useState<AccountItem[]>([])
   const [categories, setCategories] = useState<CategoryItem[]>([])
   const [filters, setFilters] = useState<TransactionFilters>(initialFilters)
+  const [appliedFilters, setAppliedFilters] = useState<TransactionFilters>(initialFilters)
+  const [presetNeedsCorrection, setPresetNeedsCorrection] = useState(false)
   const [appliedQuery, setAppliedQuery] = useState<TransactionQuery>(
     () => buildTransactionQuery(initialFilters, 1),
   )
@@ -225,17 +112,8 @@ export function TransactionManagementPage() {
       if (!isCurrent) return
       setAccounts(accountItems)
       setCategories(categoryItems)
-      setFilters(current => {
-        const selectedId = current.subcategoryId || current.categoryId
-        if (!selectedId || selectedId === uncategorizedFilterValue) return current
-        const selection = findCategorySelection(categoryItems, selectedId)
-        // A missing category must not silently turn a report link into "all categories".
-        if (!selection.categoryId) return current
-        return {
-          ...current,
-          ...selection,
-        }
-      })
+      setFilters(current => resolveFilterCategory(current, categoryItems))
+      setAppliedFilters(current => resolveFilterCategory(current, categoryItems))
     }).catch(error => {
       if (isCurrent) setErrors(getErrorMessages(error))
     })
@@ -291,8 +169,8 @@ export function TransactionManagementPage() {
     transactionFilterKey(appliedQuery) === transactionFilterKey(reportContext.query)
   let pendingFilterChanges = false
   try {
-    pendingFilterChanges = transactionFilterKey(buildTransactionQuery(filters, 1)) !==
-      transactionFilterKey(appliedQuery)
+    pendingFilterChanges = filterIntentKey(filters) !== filterIntentKey(appliedFilters)
+    buildTransactionQuery(filters, 1)
   } catch {
     pendingFilterChanges = true
   }
@@ -328,11 +206,21 @@ export function TransactionManagementPage() {
 
   const handleApplyFilters = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!confirmNavigation()) return
-    cancelEditing()
-    setErrors([])
     try {
-      setAppliedQuery(buildTransactionQuery(filters, 1))
+      const query = buildTransactionQuery(filters, 1)
+      if (presetNeedsCorrection && (
+        (filters.accountId && !accounts.some(account => account.id === filters.accountId)) ||
+        (filters.categoryId && filters.categoryId !== uncategorizedFilterValue &&
+          !filterCategories.some(category => category.id === filters.categoryId)) ||
+        (filters.subcategoryId && !filterSubcategories.some(category => category.id === filters.subcategoryId)))) {
+        throw new Error('Correct the unavailable preset choices before applying filters. You can explicitly select all accounts, categories, or subcategories.')
+      }
+      if (!confirmNavigation()) return
+      cancelEditing()
+      setErrors([])
+      setAppliedFilters(filters)
+      setPresetNeedsCorrection(false)
+      setAppliedQuery(query)
     } catch (error) {
       setErrors(getErrorMessages(error))
     }
@@ -343,6 +231,8 @@ export function TransactionManagementPage() {
     cancelEditing()
     const defaults = createDefaultFilters()
     setFilters(defaults)
+    setAppliedFilters(defaults)
+    setPresetNeedsCorrection(false)
     setAppliedQuery(buildTransactionQuery(defaults, 1))
     setErrors([])
   }
@@ -358,7 +248,10 @@ export function TransactionManagementPage() {
     if (!reportContext || !confirmNavigation()) return
     cancelEditing()
     const selection = findCategorySelection(categories, reportContext.query.categoryId ?? null)
-    setFilters({ ...initialFilters, ...(selection.categoryId ? selection : {}) })
+    const restored = { ...initialFilters, ...(selection.categoryId ? selection : {}) }
+    setFilters(restored)
+    setAppliedFilters(restored)
+    setPresetNeedsCorrection(false)
     setAppliedQuery(reportContext.query)
     setErrors([])
   }
@@ -367,6 +260,25 @@ export function TransactionManagementPage() {
     if (!confirmNavigation()) return
     cancelEditing()
     setReloadGeneration(current => current + 1)
+  }
+
+  const applySavedFilters = (saved: TransactionFilters, apply: boolean) => {
+    try {
+      const query = buildTransactionQuery(saved, 1)
+      if (!confirmNavigation()) return false
+      cancelEditing()
+      setFilters(saved)
+      setPresetNeedsCorrection(!apply)
+      setErrors([])
+      if (apply) {
+        setAppliedFilters(saved)
+        setAppliedQuery(query)
+      }
+      return true
+    } catch (error) {
+      setErrors(getErrorMessages(error))
+      return false
+    }
   }
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
@@ -490,6 +402,10 @@ export function TransactionManagementPage() {
           </div>
         </aside>}
 
+        <SavedTransactionFilters key={currentHousehold.id} householdId={currentHousehold.id}
+          appliedFilters={appliedFilters} pendingFilterChanges={pendingFilterChanges}
+          onApply={applySavedFilters} disabled={isLoading} needsCorrection={presetNeedsCorrection} />
+
         <form className="transaction-filter-panel" onSubmit={handleApplyFilters}>
           <div className="transaction-filter-grid">
             <label><span>Currency</span>
@@ -515,8 +431,10 @@ export function TransactionManagementPage() {
               <select value={filters.accountId} onChange={event =>
                 setFilters({ ...filters, accountId: event.target.value })}>
                 <option value="">All visible accounts</option>
+                {filters.accountId && !accounts.some(account => account.id === filters.accountId) &&
+                  <option value={filters.accountId}>Selected account (unavailable)</option>}
                 {accounts.map(account => (
-                  <option key={account.id} value={account.id}>{account.name}</option>
+                  <option key={account.id} value={account.id}>{account.name}{account.isActive ? '' : ' (deactivated)'}</option>
                 ))}
               </select>
             </label>
@@ -611,6 +529,8 @@ export function TransactionManagementPage() {
               }
                 onChange={event => setFilters({ ...filters, subcategoryId: event.target.value })}>
                 <option value="">All subcategories</option>
+                {filters.subcategoryId && !filterSubcategories.some(category => category.id === filters.subcategoryId) &&
+                  <option value={filters.subcategoryId}>Selected subcategory (unavailable)</option>}
                 {filterSubcategories.map(category => (
                   <option key={category.id} value={category.id}>
                     {category.name}{category.isActive ? '' : ' (deactivated)'}
@@ -640,11 +560,14 @@ export function TransactionManagementPage() {
           </div>
         </form>
 
-        {reportContext && <section className="transaction-active-filters" aria-label="Active report filters">
+        <section className="transaction-active-filters" aria-label={reportContext ? 'Active report filters' : 'Active transaction filters'}>
           <h2>Active filters</h2>
           <dl>
             <div><dt>Household</dt><dd>{currentHousehold.name}</dd></div>
-            <div><dt>Budget inclusion</dt><dd>{appliedQuery.budgetInclusion || 'All visible transactions'}</dd></div>
+            <div><dt>Budget inclusion</dt><dd>{appliedQuery.budgetInclusion === 'PersonalAndHousehold' ? 'Personal + Household'
+              : appliedQuery.budgetInclusion === 'NotIncluded' ? 'Not included in my budgets'
+              : appliedQuery.budgetInclusion === 'Personal' ? 'My personal budget'
+              : appliedQuery.budgetInclusion === 'Household' ? 'Household budget' : 'All visible transactions'}</dd></div>
             <div><dt>Period</dt><dd>{appliedQuery.fromDate ?? 'Any start date'} – {appliedQuery.toDate ?? 'Any end date'}</dd></div>
             <div><dt>Category</dt><dd>{activeCategory}{appliedQuery.categoryId &&
               !findCategorySelection(categories, appliedQuery.categoryId).subcategoryId
@@ -666,7 +589,7 @@ export function TransactionManagementPage() {
           {pendingFilterChanges && <p role="status">
             Filter edits are not applied yet. Results and export still use the active filters.
           </p>}
-        </section>}
+        </section>
 
         {!isLoading && !loadFailed && totalsUnavailable && <div className="transaction-matching-totals" role="status">
           <p>Matching totals could not be refreshed after saving. Retry the search before comparing amounts.</p>

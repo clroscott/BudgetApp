@@ -73,7 +73,12 @@ describe('verification session continuity', () => {
     await screen.findByText(`${verified.email}: unverified`)
     let complete!: (value: typeof unverified) => void
     vi.mocked(getCurrentUser).mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
-    fireEvent(window, new Event('focus'))
+    // The unverified status can render before the passive focus listener is installed.
+    // Establish the pending request before exercising stale-response behavior.
+    await waitFor(() => {
+      fireEvent(window, new Event('focus'))
+      expect(getCurrentUser).toHaveBeenCalledTimes(2)
+    })
     fireEvent(document, new Event('visibilitychange'))
     expect(getCurrentUser).toHaveBeenCalledTimes(2)
     fireEvent.click(screen.getByRole('button', { name: 'Complete confirmation' }))
@@ -85,7 +90,10 @@ describe('verification session continuity', () => {
     await screen.findByText(`${verified.email}: unverified`)
     let complete!: (value: typeof unverified) => void
     vi.mocked(getCurrentUser).mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
-    fireEvent(window, new Event('focus'))
+    await waitFor(() => {
+      fireEvent(window, new Event('focus'))
+      expect(getCurrentUser).toHaveBeenCalledTimes(2)
+    })
     fireEvent.click(screen.getByRole('button', { name: 'Log out test session' }))
     await screen.findByText('Signed out')
     await act(async () => complete(verified))
