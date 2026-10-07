@@ -249,6 +249,14 @@ financial history. Updated automated and live-sign-off cases are in
 
 ## Recommended order and existing-board alignment
 
+**Account settings follow-up (#156):** Personal account maintenance now has an
+independent route, three separately saved forms, own-account/pending-state APIs,
+and reused #149 email/password flows. It remains accessible without households
+or before verification without bypassing financial-data gating. Guarded edits,
+safe failure recovery, privacy/concurrency tests, and a read-only desktop/narrow
+layout preview are included. Actual 200% zoom and screen-reader speech remain
+manual sign-off; see [Account settings](account-settings.md).
+
 1. Expand and implement #157 using UI-01; it has the clearest lost-work risk.
 2. Address UI-02 and UI-03: trustworthy drill-downs and recoverable errors.
 3. Address UI-04 through UI-06 before adding more tutorials or dense report pages.

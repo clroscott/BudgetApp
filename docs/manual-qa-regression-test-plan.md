@@ -119,8 +119,8 @@ Run this shorter section before every merge, even when the change appears isolat
 
 ## Email ownership and email changes (#149)
 
-Use Development/Scratch accounts and inboxes you control. Test email-change
-requests through the documented API until #156 supplies the settings interface.
+Use Development/Scratch accounts and inboxes you control. Email changes can now
+be tested through **Settings → Account settings** (#156).
 
 - [ ] Register a new address. Confirmation arrives in the configured File outbox
       or SMTP inbox and uses the correct reachable HTTPS frontend.
@@ -200,6 +200,51 @@ requests through the documented API until #156 supplies the settings interface.
 - [ ] No SMTP password, recipient address, message body, or token-bearing link is
       present in routine logs, API configuration, or frontend assets.
 - [ ] Returning to File mode stops real sends and produces the expected local files.
+
+## Account settings regression (#156)
+
+Use disposable Development/Scratch accounts and inboxes you control. Never record
+password values, confirmation proofs, or pending private addresses in shared QA evidence.
+
+- [ ] **Settings → Account settings** is identifiable/current in the sidebar. It
+      is also linked from onboarding and verification, and remains accessible with
+      no household or a failed household load. Direct anonymous access preserves
+      the destination through login. No household role grants access to another account.
+- [ ] The three sections have visible labels and independent save buttons. Current
+      email, verification status, and pending replacement are unmistakably different.
+      Without verification, only account maintenance is available; financial APIs
+      stay blocked and existing data remains unchanged.
+- [ ] Save a display name and verify it persists after refresh and appears as the
+      own profile/member name. Empty/whitespace/overlong names fail safely. A stale
+      second-tab save cannot overwrite the first tab; reload asks before discarding.
+- [ ] Saving one section retains edits in the other sections. Canceled sidebar,
+      Back/Forward, return, refresh/close, sign-out, and household switching keep
+      edits. A household switch never retargets an account edit or creates shared
+      account-security activity. Delayed household loading does not reset the form.
+- [ ] Current-password checks reject invalid email/password changes. Failed saves
+      retain safe name/email edits but clear password inputs; retries require re-entry.
+      Passwords are not placed in browser storage, shared activity, or routine logs.
+- [ ] Request a replacement email. The current email/login and verification remain
+      unchanged; the pending address/expiry become visible only in this account.
+      Duplicate-address/delivery-failure guidance does not reveal another account.
+      After one-hour expiry, request a new link explicitly; wait a minute between requests.
+- [ ] Confirm the replacement as the matching account and return to settings. The
+      new login/email is verified, pending status clears, and membership/financial
+      ownership stays attached to the same account. Other sessions must sign in again.
+- [ ] Clear email form discards only unsaved entries—not an already submitted request.
+      Resending current-address confirmation never confirms a pending replacement.
+- [ ] Change password successfully: the finishing browser stays signed in, other
+      sessions are revoked, old credentials fail, and new credentials work. Older
+      pending confirmation links require fresh requests.
+- [ ] Initial/refresh failures stop loading and offer a read-only retry. Stale data
+      is clearly marked and unavailable for saves. A failed read after a successful
+      email/password write never repeats that write. Rapid clicks issue one pending write.
+- [ ] Own-account APIs ignore arbitrary target-user IDs; anonymous callers cannot
+      read settings, and profile mutations without antiforgery fail. Security changes,
+      pending addresses, and confirmation details are absent from shared household activity.
+- [ ] Keyboard, Skip to main content, titles/announcements, focus outlines, narrow
+      layouts, long email addresses, 200% browser zoom, and a screen reader work
+      across all sections. Focus/entered values are not reset by routine status reads.
 
 ## Security baseline
 

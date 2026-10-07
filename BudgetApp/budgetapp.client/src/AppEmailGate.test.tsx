@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CurrentUser } from './auth/authApi'
 import { confirmEmail } from './auth/authApi'
+import { getAccountSettings } from './auth/accountSettingsApi'
 import { AuthContext } from './auth/authContext'
 import { getHouseholds } from './households/householdApi'
 import { getTutorialProgress } from './tutorials/tutorialProgressApi'
@@ -21,6 +22,7 @@ vi.mock('./auth/authApi', async original => ({ ...await original<typeof import('
 }))
 vi.mock('./households/householdApi', async original => ({ ...await original<typeof import('./households/householdApi')>(), getHouseholds: vi.fn() }))
 vi.mock('./tutorials/tutorialProgressApi', () => ({ getTutorialProgress: vi.fn(), saveTutorialProgress: vi.fn() }))
+vi.mock('./auth/accountSettingsApi', async original => ({ ...await original<typeof import('./auth/accountSettingsApi')>(), getAccountSettings: vi.fn() }))
 vi.mock('./pages/BudgetManagementPage', () => ({ BudgetManagementPage: () => <main><h1>Private monthly budget</h1></main> }))
 
 beforeEach(() => {
@@ -30,9 +32,50 @@ beforeEach(() => {
   vi.mocked(getHouseholds).mockResolvedValue([household])
   vi.mocked(getTutorialProgress).mockResolvedValue([])
   vi.mocked(confirmEmail).mockResolvedValue(scenario.refreshedUser)
+  vi.mocked(getAccountSettings).mockReset().mockImplementation(async () => ({ user: scenario.user!, pendingEmailChange: null, version: 'version-1' }))
 })
 
 describe('full app verification gate', () => {
+  it('allows signed-in unverified account maintenance without loading household or tutorial data', async () => {
+    window.history.replaceState(null, '', '/settings/account')
+    render(<App />)
+    await screen.findByRole('textbox', { name: 'Display name' })
+    expect(window.location.pathname).toBe('/settings/account')
+    expect(screen.queryByRole('navigation', { name: 'Main navigation' })).toBeNull()
+    expect(getHouseholds).not.toHaveBeenCalled()
+    expect(getTutorialProgress).not.toHaveBeenCalled()
+    expect(document.title).toBe('Account settings | MC Budget')
+  })
+  it('keeps account settings reachable without any household, even if household loading fails', async () => {
+    scenario.user = scenario.refreshedUser
+    vi.mocked(getHouseholds).mockRejectedValue(new Error('Household service is unavailable'))
+    window.history.replaceState(null, '', '/settings/account')
+    render(<App />)
+    await screen.findByRole('textbox', { name: 'Display name' })
+    expect(window.location.pathname).toBe('/settings/account')
+    expect(screen.getByRole('link', { name: 'Return to household setup' })).toBeTruthy()
+  })
+  it('preserves the account-settings destination through anonymous sign-in', async () => {
+    scenario.user = null
+    window.history.replaceState(null, '', '/settings/account')
+    render(<App />)
+    await screen.findByRole('button', { name: 'Sign in' })
+    expect(new URLSearchParams(window.location.search).get('returnTo')).toBe('/settings/account')
+    expect(getAccountSettings).not.toHaveBeenCalled()
+  })
+  it('does not remount or discard an edit when household loading finishes after account settings appear', async () => {
+    scenario.user = scenario.refreshedUser
+    let finish!: (value: typeof household[]) => void
+    vi.mocked(getHouseholds).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    window.history.replaceState(null, '', '/settings/account')
+    render(<App />)
+    const name = await screen.findByRole('textbox', { name: 'Display name' }) as HTMLInputElement
+    fireEvent.change(name, { target: { value: 'Keep this account edit' } })
+    finish([household])
+    await screen.findByRole('navigation', { name: 'Main navigation' })
+    expect((screen.getByRole('textbox', { name: 'Display name' }) as HTMLInputElement).value).toBe('Keep this account edit')
+    expect(getAccountSettings).toHaveBeenCalledTimes(1)
+  })
   it('keeps an already signed-in user on the confirmation journey instead of returning them to login or losing the link', async () => {
     window.history.replaceState(null, '', '/login?returnTo=%2Fconfirm-email%3FuserId%3Dtest-user%26token%3Dproof')
     render(<App />)

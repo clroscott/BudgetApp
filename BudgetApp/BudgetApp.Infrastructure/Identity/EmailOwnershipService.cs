@@ -32,6 +32,20 @@ public sealed class EmailOwnershipService(
         CancellationToken cancellationToken = default) =>
         RequestAsync(userId, newEmail.Trim(), currentPassword, cancellationToken);
 
+    public async Task<PendingEmailChange?> GetPendingEmailChangeAsync(Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(item => item.Id == userId, cancellationToken);
+        var stored = await db.UserTokens.AsNoTracking().SingleOrDefaultAsync(item => item.UserId == userId &&
+            item.LoginProvider == Provider && item.Name == EmailChange, cancellationToken);
+        var state = ReadState(stored?.Value);
+        if (user is null || state?.NewEmail is null || state.CurrentEmail != user.NormalizedEmail) return null;
+        // Show the user's own requested address regardless of eligibility/delivery.
+        // Never expose token hashes or whether another account owns the address.
+        return new PendingEmailChange(state.NewEmail, state.RequestedAt, state.ExpiresAt,
+            clock.GetUtcNow() >= state.ExpiresAt);
+    }
+
     private async Task<bool> RequestAsync(Guid userId, string? newEmail, string? password,
         CancellationToken ct)
     {
