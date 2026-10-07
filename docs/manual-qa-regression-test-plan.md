@@ -150,7 +150,7 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] No password, reset token, or secret is written to normal client-visible data or
       routine logs.
 
-## Optional email login verification (#135)
+## Optional email multi-factor authentication (MFA) (#135)
 
 Use disposable Development accounts, never production credentials/recovery codes.
 Record SMTP mode, browser/assistive technology, viewport, and results. Setup details:
@@ -160,9 +160,21 @@ Record SMTP mode, browser/assistive technology, viewport, and results. Setup det
       non-blocking setup reminder linked to personal Account settings; no enrollment
       or email is triggered by visiting either page. Confirmed/unconfirmed/no-household
       account settings remain correctly available.
-- [ ] Enrollment requires current password and an emailed eight-digit code. Requesting
+- [ ] Enrollment requires current password and an emailed six-digit code. Requesting
       a code alone does not enable verification. Delivery failure leaves it off and
       gives an explicit retry. An incorrect/expired/replaced code cannot enable it.
+- [ ] Settings, dashboard, sign-in, and security emails consistently call the feature
+      Multi-factor authentication (MFA). There is one **Resend code** action (with a
+      cooldown), not a second ambiguous "start new verification" action.
+- [ ] The email input shows six boxes. Type and paste all six digits (including
+      leading zeros and codes copied with spaces/hyphens); try Backspace, arrows,
+      select-all/replace, clicking a filled digit, and one-time-code autofill. It
+      remains one labeled keyboard/screen-reader input, fits narrow/200% layouts,
+      and rejects longer/nonnumeric codes instead of silently truncating them.
+      Switching to recovery-code entry focuses its normal, full-length input.
+- [ ] In settings, an expired/unavailable challenge offers explicit **Resend code**
+      recovery with the current password; no save or automatic resend occurs. On
+      expired login, return to password sign-in; no expired pending session bypass.
 - [ ] Successful enrollment displays ten codes once, protects navigation/household
       switching until acknowledged, and leaves financial records/shared activity
       unchanged. Save codes offline; none appear in browser storage or safe logs.

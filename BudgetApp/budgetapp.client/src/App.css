@@ -4681,6 +4681,54 @@ a {
   margin-block: 1rem;
   min-width: 0;
 }
+.email-code-input {
+  position: relative;
+  width: min(100%, 20rem);
+  direction: ltr;
+}
+.email-code-slots {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(0.25rem, 1.5vw, 0.5rem);
+}
+.email-code-slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  height: 3rem;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--heading);
+  font: 600 1.4rem ui-monospace, monospace;
+}
+.email-code-slot.is-current,
+.email-code-slot.is-selected {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.email-code-slot.is-selected { background: var(--accent); color: white; }
+.email-code-caret { height: 1.4rem; border-left: 2px solid currentColor; }
+.email-code-input > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: text;
+}
+.email-code-input.is-disabled { opacity: 0.6; }
+@media (forced-colors: active) {
+  .email-code-slot.is-current,
+  .email-code-slot.is-selected { outline-color: Highlight; }
+  .email-code-slot.is-selected { background: Highlight; color: HighlightText; }
+}
 .recovery-code-card code { overflow-wrap: anywhere; user-select: all; }
 .recovery-code-card ol { padding-inline-start: 1.5rem; line-height: 1.8; }
 .dashboard-security-prompt {

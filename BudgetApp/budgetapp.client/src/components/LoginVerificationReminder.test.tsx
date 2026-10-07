@@ -6,11 +6,11 @@ import { LoginVerificationReminder } from './LoginVerificationReminder'
 describe('dashboard security reminder', () => {
   it('links an unenrolled user directly to personal account settings', () => {
     render(<RouterProvider><LoginVerificationReminder enabled={false} /></RouterProvider>)
-    expect(screen.getByRole('link', { name: 'Set up login verification' }).getAttribute('href')).toBe('/settings/account')
+    expect(screen.getByRole('link', { name: 'Set up MFA' }).getAttribute('href')).toBe('/settings/account')
     expect(screen.getByRole('heading', { name: 'Add protection to your account' })).toBeTruthy()
   })
   it('does not show a contradictory reminder for an enrolled user', () => {
     render(<RouterProvider><LoginVerificationReminder enabled /></RouterProvider>)
-    expect(screen.queryByRole('link', { name: 'Set up login verification' })).toBeNull()
+    expect(screen.queryByRole('link', { name: 'Set up MFA' })).toBeNull()
   })
 })

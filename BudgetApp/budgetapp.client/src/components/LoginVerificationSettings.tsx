@@ -41,13 +41,13 @@ export function LoginVerificationSettings({ status, confirmed, disabled, onSaved
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (pending.current || disabled || !action || !proof?.code.trim()) return
-    if (action === 'Disable' && !window.confirm('Turn off your last verification method? Future sign-ins will use your password only. Your financial data is kept.')) return
+    if (action === 'Disable' && !window.confirm('Turn off MFA? Email is your only MFA method. Future sign-ins will use your password only. Your financial data is kept.')) return
     pending.current = true; setBusy(true); onBusy(true); setErrors([])
     void manageVerification(action, password, proof).then(async result => {
       if (!active.current) return
       setCodes(result.recoveryCodes)
       setAction(null); setProof(undefined)
-      setNotice(result.verification.emailEnabled ? 'Additional login verification is on.' : 'Additional login verification is off. Future sign-ins use your password only.')
+      setNotice(result.verification.emailEnabled ? 'MFA is on.' : 'MFA is off. Future sign-ins use your password only.')
       await onSaved(result)
       if (active.current) heading.current?.focus()
     }).catch(error => { if (active.current) setErrors(getErrorMessages(error)) })
@@ -57,22 +57,22 @@ export function LoginVerificationSettings({ status, confirmed, disabled, onSaved
       })
   }
   return <section className="account-settings-card" aria-labelledby={`${id}-heading`} aria-busy={busy}>
-    <h2 ref={heading} id={`${id}-heading`} tabIndex={-1}>Additional login verification</h2>
+    <h2 ref={heading} id={`${id}-heading`} tabIndex={-1}>Multi-factor authentication (MFA)</h2>
     <p>{status.emailEnabled ? 'On — email code or a saved recovery code is required after your password.' : 'Off — your password is the only login step.'}</p>
     <p className="field-help">Optional extra protection for your personal account. It is separate from confirming email ownership and applies across all households.</p>
     <ErrorSummary errors={errors} />
     {notice && <p className="success-summary" role="status">{notice}</p>}
     {busy && <p role="status">Saving security settings…</p>}
-    {codes ? <RecoveryCodeDisplay codes={codes} busy={busy} onAcknowledge={() => setCodes(null)} /> : action ? <form onSubmit={submit} aria-label="Manage additional login verification">
-      <h3>{action === 'Enable' ? 'Enable email verification' : action === 'Disable' ? 'Turn verification off' : 'Replace recovery codes'}</h3>
-      {action === 'Disable' && <p className="notice-card">Email is your only additional method. Turning it off removes the second login step, not your password or financial data.</p>}
-      <label htmlFor={`${id}-password`}>Current password for login verification</label>
+    {codes ? <RecoveryCodeDisplay codes={codes} busy={busy} onAcknowledge={() => setCodes(null)} /> : action ? <form onSubmit={submit} aria-label="Manage multi-factor authentication">
+      <h3>{action === 'Enable' ? 'Enable email MFA' : action === 'Disable' ? 'Turn off MFA' : 'Replace recovery codes'}</h3>
+      {action === 'Disable' && <p className="notice-card">Email is your only MFA method. Turning it off removes the second login step, not your password or financial data.</p>}
+      <label htmlFor={`${id}-password`}>Current password for MFA</label>
       <input id={`${id}-password`} type="password" autoComplete="current-password" required maxLength={128} disabled={disabled || busy}
         value={password} onChange={event => setPassword(event.target.value)} />
       <SecurityVerificationFields key={reset} purpose={action} password={password} proof={proof} onChange={setProof} disabled={disabled || busy} />
       <div className="household-settings-actions">
         <button type="submit" className="primary-button" disabled={disabled || busy || !password || !proof?.code.trim()}>
-          {action === 'Enable' ? 'Enable verification' : action === 'Disable' ? 'Turn off verification' : 'Replace recovery codes'}
+          {action === 'Enable' ? 'Enable MFA' : action === 'Disable' ? 'Turn off MFA' : 'Replace recovery codes'}
         </button>
         <button type="button" className="secondary-button" disabled={busy} onClick={() => {
           setAction(null); setPassword(''); setProof(undefined); setErrors([])
@@ -80,11 +80,11 @@ export function LoginVerificationSettings({ status, confirmed, disabled, onSaved
       </div>
     </form> : <>
       {status.emailEnabled && <p>Unused recovery codes: {status.recoveryCodesRemaining}. {status.recoveryCodesRemaining === 0 ? 'Replace your codes while you can still receive email.' : 'Keep your codes offline for email outages or lost mailbox access.'}</p>}
-      {!confirmed ? <p>Confirm your current email address before enabling login verification.</p> : <div className="household-settings-actions">
+      {!confirmed ? <p>Confirm your current email address before enabling MFA.</p> : <div className="household-settings-actions">
         {status.emailEnabled ? <>
           <button type="button" className="secondary-button" disabled={disabled || busy} onClick={() => choose('RecoveryCodes')}>Replace recovery codes</button>
-          <button type="button" className="text-button danger-text" disabled={disabled || busy} onClick={() => choose('Disable')}>Turn off verification</button>
-        </> : <button type="button" className="secondary-button" disabled={disabled || busy} onClick={() => choose('Enable')}>Set up email verification</button>}
+          <button type="button" className="text-button danger-text" disabled={disabled || busy} onClick={() => choose('Disable')}>Turn off MFA</button>
+        </> : <button type="button" className="secondary-button" disabled={disabled || busy} onClick={() => choose('Enable')}>Set up MFA</button>}
       </div>}
     </>}
   </section>

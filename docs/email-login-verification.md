@@ -1,4 +1,4 @@
-# Optional email login verification (#135)
+# Optional email multi-factor authentication (MFA) (#135)
 
 ## Test it in Development
 
@@ -6,10 +6,10 @@ No database migration is required: this feature uses existing Identity user/toke
 tables. Existing accounts remain unenrolled. Restart the app after building.
 
 1. Sign in with an account whose current email address is confirmed.
-2. Open **Account settings → Additional login verification → Set up email verification**.
+2. Open **Account settings → Multi-factor authentication (MFA) → Set up MFA**.
 3. Enter the current password and request a code. This does not enable verification yet.
-4. Enter the eight-digit code from the existing configured email delivery system
-   and select **Enable verification**.
+4. Enter or paste the six-digit code from the existing configured email delivery
+   system into the six-box field and select **Enable MFA**. Leading zeros are kept.
 5. Save the ten recovery codes offline before acknowledging the once-only display.
 6. Sign out and sign in again. The password step must stay on the verification
    screen; the account/settings/household APIs remain unauthorized until an email
@@ -28,10 +28,19 @@ exhaust real-account recovery codes or simulate failures on production email.
 - Optional per account; separate from required email-ownership confirmation.
 - Email is the only enrolled method in this release. Recovery codes are a fallback,
   not a trusted device or an automatic security reset.
-- Eight-digit cryptographically random email codes expire after five minutes;
+- Six-digit cryptographically random email codes expire after five minutes;
   challenges expire after ten minutes, including after resend. Resending replaces
   the old code and requires a one-minute cooldown across verification emails for
   the account. This can also apply immediately after enrollment/security changes.
+- The six boxes share one accessible input: type, paste a full code, select/replace
+  digits, or use ordinary keyboard editing/autofill. Spaces/hyphens in pasted codes
+  are ignored, but longer or nonnumeric codes are not silently truncated. Recovery
+  codes retain their separate, full-length text field and unchanged entropy.
+- **Resend code** is the single resend action. In settings, an expired or unavailable
+  challenge can be replaced on explicit retry using the current password; no save
+  happens automatically. An expired login session requires password sign-in again.
+  Existing eight-digit challenges issued before this update must be resent (or
+  allowed to expire); no database migration or re-enrollment is required.
 - Five failed code attempts in a fifteen-minute account-wide window cause a
   fifteen-minute login lockout. Starting another password step or resending does
   not reset that attempt budget. Request endpoints also have the existing IP

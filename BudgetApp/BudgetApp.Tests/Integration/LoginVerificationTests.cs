@@ -51,6 +51,18 @@ public sealed class LoginVerificationTests
     }
 
     [Fact]
+    public async Task EmailCodes_AreExactlySixDigits_AndCannotBeShortenedOrExtended()
+    {
+        using var h = new Harness(); using var client = h.Client();
+        await TestIdentity.RegisterAndSignIn(client, h.Address, confirmationHost: h.Host);
+        var challenge = await h.Challenge(client, "Enable"); var code = h.Code();
+        Assert.Matches(@"^[0-9]{6}$", code);
+        Assert.Equal(HttpStatusCode.BadRequest, (await h.ManageResponse(client, "enable", challenge, code[..5])).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await h.ManageResponse(client, "enable", challenge, code + "0")).StatusCode);
+        Assert.True((await h.Manage(client, "enable", challenge, code)).User.LoginVerificationEnabled);
+    }
+
+    [Fact]
     public async Task PasswordStep_HasNoApplicationAccess_AndCookieIsSecure_CompletionIsSingleUse()
     {
         using var h = new Harness(); using var client = h.Client(); await h.Enroll(client);
@@ -257,7 +269,12 @@ public sealed class LoginVerificationTests
         { var response = await Login(client, address: address); response.EnsureSuccessStatusCode(); return (await response.Content.ReadFromJsonAsync<Pending>())!.Challenge; }
         public async Task<VerificationChallenge> Challenge(HttpClient client, string purpose)
         { var response = await Post(client, "challenge", new { purpose, currentPassword = TestIdentity.Password }); response.EnsureSuccessStatusCode(); return (await response.Content.ReadFromJsonAsync<VerificationChallenge>())!; }
-        public string Code() => Regex.Match(Sender.Messages.Last(x => x.Purpose == EmailPurpose.LoginVerification).PlainTextBody, @"^\d{8}$", RegexOptions.Multiline).Value;
+        public string Code()
+        {
+            var code = Regex.Match(Sender.Messages.Last(x => x.Purpose == EmailPurpose.LoginVerification).PlainTextBody, @"^\d{6}$", RegexOptions.Multiline).Value;
+            Assert.Matches(@"^[0-9]{6}$", code);
+            return code;
+        }
         public Task<HttpResponseMessage> Verify(HttpClient client, VerificationChallenge challenge, string code, bool recovery = false) =>
             Post(client, "login", new { challenge.ChallengeId, code, useRecoveryCode = recovery });
         public Task<HttpResponseMessage> ManageResponse(HttpClient client, string action, VerificationChallenge challenge, string code, bool recovery = false) =>

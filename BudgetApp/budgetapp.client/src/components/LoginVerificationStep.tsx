@@ -34,10 +34,10 @@ export function LoginVerificationStep({ initial, onCancel }: { initial: Verifica
     })
   }
   return <div>
-    <h2 ref={heading} tabIndex={-1}>Complete your sign-in</h2>
+    <h2 ref={heading} tabIndex={-1}>Multi-factor authentication</h2>
     <p>Your password was accepted. Verify this step before accessing your account.</p>
     <ErrorSummary errors={errors} />
-    <form onSubmit={submit} aria-label="Additional login verification" aria-busy={busy}>
+    <form onSubmit={submit} aria-label="Multi-factor authentication" aria-busy={busy}>
       <VerificationCodeFields challenge={challenge} proof={proof} onChange={setProof} disabled={busy}
         onResend={() => void run(async () => { const value = await resendLoginCode(challenge.challengeId); if (active.current) setChallenge(value) })} />
       <button type="submit" className="primary-button" disabled={busy || !proof.code.trim()}>{busy ? 'Verifying…' : 'Verify and sign in'}</button>

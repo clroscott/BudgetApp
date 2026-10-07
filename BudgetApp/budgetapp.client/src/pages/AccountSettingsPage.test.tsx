@@ -291,11 +291,11 @@ describe('personal account settings', () => {
     expect((screen.getByRole('button', { name: 'Change password' }) as HTMLButtonElement).disabled).toBe(true)
     const form = screen.getByRole('form', { name: 'Request an email change' })
     fireEvent.click(within(form).getByRole('button', { name: 'Request verification code' }))
-    fireEvent.change(await within(form).findByLabelText('Email verification code'), { target: { value: '00123456' } })
+    fireEvent.change(await within(form).findByLabelText('Email verification code'), { target: { value: '001234' } })
     expect(requestSecurityCode).toHaveBeenLastCalledWith('ChangeEmail', 'existing long password')
     fireEvent.click(within(form).getByRole('button', { name: 'Request email change' }))
     await waitFor(() => expect(requestEmailChange).toHaveBeenCalledWith(pendingReplacement.email, 'existing long password', {
-      challengeId: 'security-proof', code: '00123456', useRecoveryCode: false,
+      challengeId: 'security-proof', code: '001234', useRecoveryCode: false,
     }))
     expect(changePassword).not.toHaveBeenCalled()
     await waitFor(() => expect((screen.getByLabelText('Current password for email change') as HTMLInputElement).value).toBe(''))

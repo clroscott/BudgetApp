@@ -47,7 +47,7 @@ public sealed class LoginVerificationService(
             var now = clock.GetUtcNow();
             var limits = await GetLimits(userId, ct);
             CheckLimits(limits, now, sending: true);
-            code = NewCode();
+            code = NewCode(Read<Challenge>((await TokenAsync(userId, purpose.ToString(), ct))?.Value)?.ProtectedCode);
             address = user.Email!;
             state = new(Guid.NewGuid(), user.NormalizedEmail!, user.SecurityStamp!, now,
                 now + CodeLifetime, now + ChallengeLifetime, protector.Protect(code), false);
@@ -84,7 +84,7 @@ public sealed class LoginVerificationService(
             var now = clock.GetUtcNow();
             var limits = await GetLimits(userId, ct);
             CheckLimits(limits, now, sending: true);
-            code = NewCode();
+            code = NewCode(previous!.ProtectedCode);
             address = user!.Email!;
             state = previous! with { SentAt = now, CodeExpiresAt = Min(now + CodeLifetime, previous!.ExpiresAt),
                 ProtectedCode = protector.Protect(code), Delivered = false };
@@ -269,7 +269,19 @@ public sealed class LoginVerificationService(
         if (user is not null) await db.Entry(user).ReloadAsync(ct);
         return user;
     }
-    private static string NewCode() => RandomNumberGenerator.GetInt32(100_000_000).ToString("D8", CultureInfo.InvariantCulture);
+    private string NewCode(string? previousProtectedCode = null)
+    {
+        string? previous = null;
+        if (previousProtectedCode is not null)
+        {
+            try { previous = protector.Unprotect(previousProtectedCode); }
+            catch (CryptographicException) { /* An unreadable old code cannot authenticate. */ }
+        }
+        string code;
+        do { code = RandomNumberGenerator.GetInt32(1_000_000).ToString("D6", CultureInfo.InvariantCulture); }
+        while (code == previous); // Resending must not accidentally repeat the replaced code.
+        return code;
+    }
     private static string HashRecovery(string code) => Convert.ToHexString(SHA256.HashData(
         Encoding.UTF8.GetBytes(code.Replace("-", "", StringComparison.Ordinal).Replace(" ", "", StringComparison.Ordinal).Trim().ToUpperInvariant())));
     private static bool FixedEquals(string left, string right) => CryptographicOperations.FixedTimeEquals(

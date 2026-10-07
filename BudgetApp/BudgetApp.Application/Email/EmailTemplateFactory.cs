@@ -8,8 +8,8 @@ public sealed class EmailTemplateFactory(IApplicationEmailLinkBuilder linkBuilde
     public EmailMessage CreateLoginVerification(string address, string code, DateTimeOffset expires, string purpose)
     {
         var action = purpose switch {
-            "Login" => "complete your sign-in", "Enable" => "enable additional login verification",
-            "Disable" => "turn off additional login verification", "RecoveryCodes" => "replace your recovery codes",
+            "Login" => "complete your MFA sign-in", "Enable" => "enable multi-factor authentication (MFA)",
+            "Disable" => "turn off multi-factor authentication (MFA)", "RecoveryCodes" => "replace your recovery codes",
             "ChangePassword" => "change your password", "ChangeEmail" => "request an email change", _ => "verify a security action"
         };
         var expiry = FormatExpiry(expires);
@@ -22,8 +22,8 @@ public sealed class EmailTemplateFactory(IApplicationEmailLinkBuilder linkBuilde
     public EmailMessage CreateLoginVerificationChanged(string address, string purpose)
     {
         var change = purpose switch {
-            "Enable" => "Additional email login verification was enabled.",
-            "Disable" => "Additional login verification was turned off. Future sign-ins use your password only.",
+            "Enable" => "Email multi-factor authentication (MFA) was enabled.",
+            "Disable" => "Multi-factor authentication (MFA) was turned off. Future sign-ins use your password only.",
             _ => "Recovery codes were replaced. Older recovery codes no longer work."
         };
         return new(address, "Your MC Budget security settings changed",
