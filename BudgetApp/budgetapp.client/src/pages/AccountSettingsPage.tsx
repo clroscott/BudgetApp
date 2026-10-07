@@ -190,6 +190,7 @@ export function AccountSettingsPage() {
         <AppLink className="header-link" to={returnTo} aria-disabled={busy} onClick={event => { if (busy) event.preventDefault() }}>{returnLabel}</AppLink>
       </header>
       <p className="field-help">Security changes and pending email details are private and are not added to shared household activity. Your display name is visible to household members.</p>
+      {user?.isApplicationAdministrator && <p><AppLink to="/admin">Application administration</AppLink> — separate from household management.</p>}
       <PageLoadFeedback subject="account settings" status={loadState.status} errors={loadState.errors} onReload={reload} disabled={busy} />
       <ErrorSummary errors={errors} />
       {action && <p role="status">{actionLabels[action]}</p>}

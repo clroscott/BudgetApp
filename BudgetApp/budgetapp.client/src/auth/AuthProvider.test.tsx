@@ -83,10 +83,12 @@ describe('verification session continuity', () => {
     expect(login).not.toHaveBeenCalled()
   })
   it('retains the session on a temporary status-check failure and retries when focus returns', async () => {
-    render(<AuthProvider><SessionProbe /></AuthProvider>)
+    // Flush initialization and its passive focus listener before simulating a
+    // return to the tab; rendered status alone does not guarantee installation.
+    await act(async () => { render(<AuthProvider><SessionProbe /></AuthProvider>) })
     await screen.findByText(`${verified.email}: unverified`)
     vi.mocked(getCurrentUser).mockRejectedValueOnce(new Error('Temporary outage')).mockResolvedValue(verified)
-    fireEvent(window, new Event('focus'))
+    await act(async () => { fireEvent(window, new Event('focus')) })
     await waitFor(() => expect(getCurrentUser).toHaveBeenCalledTimes(2))
     expect(screen.getByText(`${verified.email}: unverified`)).toBeTruthy()
     fireEvent(window, new Event('focus'))

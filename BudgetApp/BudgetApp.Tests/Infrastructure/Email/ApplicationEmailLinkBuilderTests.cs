@@ -28,6 +28,11 @@ public sealed class ApplicationEmailLinkBuilderTests
             invitation,
             StringComparison.Ordinal);
         Assert.Contains("token=invitation%20token", invitation);
+        var mfa = builder.BuildOperatorMfaRecoveryLink(userId, "recovery +/&?");
+        Assert.StartsWith("https://budget.example/recover-mfa?", mfa, StringComparison.Ordinal);
+        Assert.Contains($"userId={userId}", mfa);
+        Assert.Contains("token=recovery%20%2B%2F%26%3F", mfa);
+        Assert.DoesNotContain("email=", mfa);
     }
 
     [Theory]

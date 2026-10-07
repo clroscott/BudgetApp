@@ -6,6 +6,7 @@ using System.Text.Json;
 using BudgetApp.Application.Authentication;
 using BudgetApp.Application.Email;
 using BudgetApp.Infrastructure.Data;
+using BudgetApp.Infrastructure.Administration;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -16,7 +17,7 @@ namespace BudgetApp.Infrastructure.Identity;
 /// All consumption/counters are serialized with the user row, including across server processes.</summary>
 public sealed class LoginVerificationService(
     BudgetAppDbContext db, UserManager<ApplicationUser> users, EmailTemplateFactory templates,
-    EmailDispatchService email, IDataProtectionProvider protection, TimeProvider clock)
+    EmailDispatchService email, IDataProtectionProvider protection, TimeProvider clock, ApplicationAdministratorAccess administrators)
 {
     public static readonly TimeSpan CodeLifetime = TimeSpan.FromMinutes(5);
     public static readonly TimeSpan ChallengeLifetime = TimeSpan.FromMinutes(10);
@@ -33,7 +34,7 @@ public sealed class LoginVerificationService(
             (await TokenAsync(user.Id, Recovery, ct))?.Value)?.Length ?? 0);
 
     public async Task<VerificationChallenge> BeginAsync(Guid userId, VerificationPurpose purpose,
-        string expectedStamp, CancellationToken ct)
+        string expectedStamp, CancellationToken ct, string? context = null)
     {
         Challenge state;
         string code;
@@ -50,7 +51,7 @@ public sealed class LoginVerificationService(
             code = NewCode(Read<Challenge>((await TokenAsync(userId, purpose.ToString(), ct))?.Value)?.ProtectedCode);
             address = user.Email!;
             state = new(Guid.NewGuid(), user.NormalizedEmail!, user.SecurityStamp!, now,
-                now + CodeLifetime, now + ChallengeLifetime, protector.Protect(code), false);
+                now + CodeLifetime, now + ChallengeLifetime, protector.Protect(code), false, context);
             await StoreAsync(userId, purpose.ToString(), state, ct);
             await StoreAsync(userId, Limits, limits with { LastSentAt = now }, ct);
             await db.SaveChangesAsync(ct);
@@ -70,7 +71,7 @@ public sealed class LoginVerificationService(
     }
 
     public async Task<VerificationChallenge> ResendAsync(Guid userId, Guid challengeId,
-        VerificationPurpose purpose, CancellationToken ct)
+        VerificationPurpose purpose, CancellationToken ct, string? context = null)
     {
         Challenge state;
         string address;
@@ -80,7 +81,7 @@ public sealed class LoginVerificationService(
             var user = await LockUserAsync(userId, ct);
             var token = await TokenAsync(userId, purpose.ToString(), ct);
             var previous = Read<Challenge>(token?.Value);
-            if (!Valid(user, previous, challengeId, purpose) || await users.IsLockedOutAsync(user!)) throw Unavailable();
+            if (!Valid(user, previous, challengeId, purpose) || previous!.Context != context || await users.IsLockedOutAsync(user!)) throw Unavailable();
             var now = clock.GetUtcNow();
             var limits = await GetLimits(userId, ct);
             CheckLimits(limits, now, sending: true);
@@ -150,8 +151,14 @@ public sealed class LoginVerificationService(
         string[]? codes = null;
         await using (var tx = await db.Database.BeginTransactionAsync(IsolationLevel.Serializable, ct))
         {
+            if (purpose == VerificationPurpose.Disable) await administrators.LockStateAsync(ct);
             user = await LockUserAsync(userId, ct) ?? throw Unavailable();
             if (!await users.CheckPasswordAsync(user, password) || await users.IsLockedOutAsync(user)) throw Unavailable();
+            if (purpose == VerificationPurpose.Disable && await administrators.IsOwnerAsync(userId, ct))
+            {
+                try { await administrators.EnsureOtherEligibleOwnerAsync(userId, clock.GetUtcNow(), ct); }
+                catch (AdministrationException error) { throw new VerificationException(error.Message); }
+            }
             if (!await ConsumeLockedAsync(user, purpose, proof, ct))
             {
                 await db.SaveChangesAsync(ct);
@@ -190,12 +197,12 @@ public sealed class LoginVerificationService(
     /// <summary>Caller holds the user row lock and commits failures as well as successful consumption.
     /// Used by email replacement so authorization and the request write share one transaction.</summary>
     public async Task<bool> ConsumeLockedAsync(ApplicationUser user, VerificationPurpose purpose,
-        VerificationProof? proof, CancellationToken ct)
+        VerificationProof? proof, CancellationToken ct, string? context = null)
     {
         if (proof is null || string.IsNullOrWhiteSpace(proof.Code) || proof.Code.Length > 100 || await users.IsLockedOutAsync(user)) return false;
         var token = await TokenAsync(user.Id, purpose.ToString(), ct);
         var state = Read<Challenge>(token?.Value);
-        if (!Valid(user, state, proof.ChallengeId, purpose)) return false;
+        if (!Valid(user, state, proof.ChallengeId, purpose) || state!.Context != context) return false;
         var now = clock.GetUtcNow();
         var limits = await GetLimits(user.Id, ct);
         CheckLimits(limits, now, sending: false);
@@ -253,6 +260,18 @@ public sealed class LoginVerificationService(
         db.UserTokens.RemoveRange(await db.UserTokens.Where(x => x.UserId == id &&
             x.LoginProvider == Provider && names.Contains(x.Name)).ToListAsync(ct));
     }
+    // Called only inside the operator-recovery transaction after email + password
+    // proof. Keep email MFA ON; do not manufacture a signed-in application session.
+    internal async Task<string[]> RenewEmailMfaLockedAsync(ApplicationUser user, CancellationToken ct)
+    {
+        if (!user.EmailConfirmed || !user.TwoFactorEnabled) throw Unavailable();
+        var codes = Enumerable.Range(0, 10).Select(_ => Convert.ToHexString(RandomNumberGenerator.GetBytes(16)))
+            .Select(code => string.Join('-', Enumerable.Range(0, 4).Select(i => code.Substring(i * 8, 8)))).ToArray();
+        await RemoveChallengesAsync(user.Id, ct);
+        await StoreAsync(user.Id, Recovery, codes.Select(HashRecovery).ToArray(), ct);
+        Ensure(await users.UpdateSecurityStampAsync(user));
+        return codes;
+    }
     private async Task StoreAsync<T>(Guid id, string name, T value, CancellationToken ct)
     {
         var token = await TokenAsync(id, name, ct);
@@ -300,7 +319,7 @@ public sealed class LoginVerificationService(
         if (!result.Succeeded) throw new VerificationException("The security change was not saved. Check the values and request fresh verification before retrying.");
     }
     private sealed record Challenge(Guid Id, string Email, string Stamp, DateTimeOffset SentAt,
-        DateTimeOffset CodeExpiresAt, DateTimeOffset ExpiresAt, string ProtectedCode, bool Delivered);
+        DateTimeOffset CodeExpiresAt, DateTimeOffset ExpiresAt, string ProtectedCode, bool Delivered, string? Context = null);
     private sealed record AttemptLimits(int Failures, DateTimeOffset WindowStartedAt, DateTimeOffset? LastSentAt);
 }
 

@@ -148,8 +148,10 @@ describe('shared page navigation', () => {
     expect(document.activeElement).toBe(link)
     expect(announcement().textContent).toBe('')
     view.ready()
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Accounts heading' })))
-    expect(announcement().textContent).toBe('Accounts page loaded.')
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Accounts heading' }))
+      expect(announcement().textContent).toBe('Accounts page loaded.')
+    })
   })
 
   it.each(['keydown', 'pointerdown', 'focusin'])('does not steal focus when the user interacts via %s during a delayed load', async event => {

@@ -4,6 +4,7 @@ using BudgetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BudgetApp.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(BudgetAppDbContext))]
-    partial class BudgetAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007182139_AddAdministrativeAuditEvents")]
+    partial class AddAdministrativeAuditEvents
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1336,47 +1339,6 @@ namespace BudgetApp.Infrastructure.Data.Migrations
                     b.ToTable("AdministrativeAuditEvents", (string)null);
                 });
 
-            modelBuilder.Entity("BudgetApp.Infrastructure.Administration.ApplicationAdministrationState", b =>
-                {
-                    b.Property<int>("Id")
-                        .HasColumnType("int");
-
-                    b.Property<bool>("BootstrapCompleted")
-                        .HasColumnType("bit");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ApplicationAdministrationState", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            BootstrapCompleted = false
-                        });
-                });
-
-            modelBuilder.Entity("BudgetApp.Infrastructure.Administration.ApplicationAdministratorGrant", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Role")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("Version")
-                        .IsConcurrencyToken()
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.HasKey("UserId");
-
-                    b.ToTable("ApplicationAdministratorGrants", (string)null);
-                });
-
             modelBuilder.Entity("BudgetApp.Infrastructure.Identity.ApplicationUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1858,15 +1820,6 @@ namespace BudgetApp.Infrastructure.Data.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("BudgetApp.Infrastructure.Administration.ApplicationAdministratorGrant", b =>
-                {
-                    b.HasOne("BudgetApp.Infrastructure.Identity.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

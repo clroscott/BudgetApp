@@ -7,4 +7,5 @@ public interface IApplicationEmailLinkBuilder
     string BuildHouseholdInvitationLink(string token);
 
     string BuildEmailConfirmationLink(Guid userId, string token, bool changeEmail);
+    string BuildOperatorMfaRecoveryLink(Guid userId, string token);
 }
