@@ -86,6 +86,8 @@ public static class DependencyInjection
         services.AddScoped<ITransactionRepository, TransactionRepository>();
         services.AddScoped<TransactionManagementService>();
         services.AddScoped<TransactionCsvExportService>();
+        services.AddScoped<ISavedTransactionFilterRepository, SavedTransactionFilterRepository>();
+        services.AddScoped<SavedTransactionFilterService>();
         services.AddScoped<ITutorialProgressRepository, TutorialProgressRepository>();
         services.AddScoped<TutorialProgressService>();
         services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();

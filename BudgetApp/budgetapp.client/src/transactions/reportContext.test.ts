@@ -27,6 +27,6 @@ describe('annual drill-down context', () => {
     expect(readAnnualReportContext(search, { ...query, currency: undefined })).toBeNull()
   })
   it('returns to the same report selection without unsafe URL concatenation', () => {
-    expect(annualReportReturnLink(2026, 'Personal')).toBe('/annual-overview?year=2026&scope=Personal')
+    expect(annualReportReturnLink(2026, 'Personal')).toBe('/budgeting/annual-overview?year=2026&scope=Personal')
   })
 })

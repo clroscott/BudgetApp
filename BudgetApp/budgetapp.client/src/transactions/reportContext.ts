@@ -34,5 +34,5 @@ export function readAnnualReportContext(search: string, query: TransactionQuery)
 }
 
 export function annualReportReturnLink(year: number, scope: BudgetScope) {
-  return `/annual-overview?${new URLSearchParams({ year: String(year), scope })}`
+  return `/budgeting/annual-overview?${new URLSearchParams({ year: String(year), scope })}`
 }

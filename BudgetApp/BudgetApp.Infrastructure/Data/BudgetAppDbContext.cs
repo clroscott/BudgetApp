@@ -54,6 +54,8 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
 
+    public DbSet<SavedTransactionFilter> SavedTransactionFilters => Set<SavedTransactionFilter>();
+
     public DbSet<TutorialProgress> TutorialProgress => Set<TutorialProgress>();
 
     public DbSet<YearlyPlan> YearlyPlans => Set<YearlyPlan>();

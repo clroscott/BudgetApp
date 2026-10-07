@@ -11,12 +11,17 @@ import { household, householdsFixture, otherHousehold } from '../test/fixtures'
 import { downloadTransactionsCsv, getTransactions, updateTransaction, type TransactionItem } from '../transactions/transactionApi'
 import { AnnualBudgetOverviewPage } from './AnnualBudgetOverviewPage'
 import { TransactionManagementPage } from './TransactionManagementPage'
+import { checkSavedFilter, getSavedFilters, saveFilter } from '../transactions/savedFilterApi'
+import { createDefaultFilters, storedFilterIntent } from '../transactions/transactionFilters'
 
 vi.mock('../accounts/accountApi', () => ({ getAccounts: vi.fn() }))
 vi.mock('../categories/categoryApi', () => ({ getCategories: vi.fn() }))
 vi.mock('../budgets/annualBudgetOverviewApi', () => ({ getAnnualBudgetOverview: vi.fn() }))
 vi.mock('../transactions/transactionApi', () => ({
   getTransactions: vi.fn(), downloadTransactionsCsv: vi.fn(), updateTransaction: vi.fn(), updateBudgetInclusion: vi.fn(),
+}))
+vi.mock('../transactions/savedFilterApi', () => ({
+  getSavedFilters: vi.fn(), checkSavedFilter: vi.fn(), saveFilter: vi.fn(), renameFilter: vi.fn(), deleteFilter: vi.fn(),
 }))
 
 const categories: CategoryItem[] = [{ id: 'food', name: 'Food & Dining', type: 'Expense', displayOrder: 0,
@@ -41,7 +46,7 @@ const row: TransactionItem = { id: 'transaction-a', accountId: 'account-a', acco
 
 function Routes() {
   const { path } = useRouter()
-  return path === '/annual-overview' ? <AnnualBudgetOverviewPage /> : <TransactionManagementPage />
+  return path === '/budgeting/annual-overview' ? <AnnualBudgetOverviewPage /> : <TransactionManagementPage />
 }
 function show(path = transactionLink(2024, 'Personal', 'CAD', undefined, undefined, household.id), value = householdsFixture()) {
   window.history.replaceState(null, '', path)
@@ -64,11 +69,83 @@ beforeEach(() => {
   }))
   vi.mocked(downloadTransactionsCsv).mockResolvedValue()
   vi.mocked(updateTransaction).mockResolvedValue()
+  vi.mocked(getSavedFilters).mockReset().mockResolvedValue([])
+  vi.mocked(checkSavedFilter).mockReset()
+  vi.mocked(saveFilter).mockReset()
 })
 
 describe('annual report to transactions', () => {
+  it('applies a preset on page one, preserves export meaning, and marks different report context honestly', async () => {
+    const filters = storedFilterIntent({ ...createDefaultFilters(), dateMode: 'specificMonth', specificMonth: '2024-02',
+      categoryType: 'Expense', categoryId: 'food', subcategoryId: 'groceries', currency: 'CAD',
+      budgetInclusion: 'PersonalAndHousehold', description: 'Grocery', spendingOnly: true })
+    const preset = { id: 'preset-a', name: 'Shared groceries', version: 'v1', filters, unavailableReferences: [] }
+    vi.mocked(getSavedFilters).mockResolvedValue([preset])
+    vi.mocked(checkSavedFilter).mockResolvedValue(preset)
+    show()
+    await loaded()
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+    await screen.findByText('Page 2 of 2')
+    fireEvent.change(screen.getByLabelText('Saved filter'), { target: { value: preset.id } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply saved filter' }))
+    await screen.findByText('Applied Shared groceries. No transactions were changed.')
+    await loaded()
+    const expected = { page: 1, fromDate: '2024-02-01', toDate: '2024-02-29', categoryType: 'Expense', categoryId: 'groceries',
+      currency: 'CAD', budgetInclusion: 'PersonalAndHousehold', description: 'Grocery', spendingOnly: true }
+    expect(getTransactions).toHaveBeenLastCalledWith(household.id, expect.objectContaining(expected))
+    expect(screen.getByText(/View changed — no longer matches/)).toBeTruthy()
+    expect(screen.getByText('Active preset: Shared groceries')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Export matching transactions' }))
+    expect(downloadTransactionsCsv).toHaveBeenLastCalledWith(household.id, expect.objectContaining(expected))
+    expect(updateTransaction).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Restore report filters' }))
+    await loaded()
+    expect(screen.getByText('Annual overview drill-down')).toBeTruthy()
+    expect(screen.getByText('Custom filters')).toBeTruthy()
+  })
+
+  it('keeps a dirty transaction intact when preset application is canceled', async () => {
+    const preset = { id: 'preset-a', name: 'Default', version: 'v1', filters: storedFilterIntent(createDefaultFilters()), unavailableReferences: [] }
+    vi.mocked(getSavedFilters).mockResolvedValue([preset])
+    vi.mocked(checkSavedFilter).mockResolvedValue(preset)
+    show()
+    await loaded()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Unsaved edit' } })
+    fireEvent.change(screen.getByLabelText('Saved filter'), { target: { value: preset.id } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply saved filter' }))
+    await waitFor(() => expect(window.confirm).toHaveBeenCalledTimes(1))
+    expect((screen.getByLabelText('Description') as HTMLInputElement).value).toBe('Unsaved edit')
+    expect(getTransactions).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/Applied Default/)).toBeNull()
+  })
+
+  it('stages missing preset references, blocks unchanged choices, then allows explicit correction', async () => {
+    const preset = { id: 'preset-a', name: 'Missing account', version: 'v1',
+      filters: storedFilterIntent({ ...createDefaultFilters(), accountId: 'removed', dateMode: 'all' }),
+      unavailableReferences: ['The selected account is unavailable.'] }
+    vi.mocked(getSavedFilters).mockResolvedValue([preset])
+    vi.mocked(checkSavedFilter).mockResolvedValue(preset)
+    show()
+    await loaded()
+    fireEvent.change(screen.getByLabelText('Saved filter'), { target: { value: preset.id } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply saved filter' }))
+    await screen.findByText(/Preset not applied/)
+    expect((screen.getByLabelText('Account') as HTMLSelectElement).value).toBe('removed')
+    expect(getTransactions).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }))
+    await screen.findByText(/Correct the unavailable preset choices/)
+    expect(getTransactions).toHaveBeenCalledTimes(1)
+    fireEvent.change(screen.getByLabelText('Account'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }))
+    await loaded()
+    expect(getTransactions).toHaveBeenLastCalledWith(household.id, expect.objectContaining({ accountId: undefined, page: 1 }))
+    expect(vi.mocked(getTransactions).mock.lastCall?.[1].fromDate).toBeUndefined()
+    expect(screen.queryByText(/Preset not applied/)).toBeNull()
+  })
+
   it('preserves context in every spending link and returns to the original year and scope', async () => {
-    show('/annual-overview?year=2024&scope=Personal')
+    show('/budgeting/annual-overview?year=2024&scope=Personal')
     const summary = await screen.findByRole('region', { name: 'Annual summary' })
     expect(getAnnualBudgetOverview).toHaveBeenCalledWith(household.id, 2024, 'Personal')
     const totalLink = within(summary).getByRole('link')

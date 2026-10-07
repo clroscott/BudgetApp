@@ -38,6 +38,39 @@ Related issue links:
 Notes:
 ```
 
+## Saved transaction filters (#155)
+
+- [ ] Apply a search using account, date mode, category/subcategory, description,
+  currency, budget inclusion and spending-only. Save a named preset. Reload and
+  apply it; all choices, all-page totals and exported results match the search.
+- [ ] Repeat with uncategorized, all dates, a fixed date, a fixed month (including
+  leap February), a fixed range, and a rolling past-X-days period. Reapply rolling
+  filters later: dates move with the local calendar, fixed choices do not.
+- [ ] Apply from page two: results start on page one. Change filter controls but
+  do not apply: export still uses applied filters and saving a preset is blocked.
+- [ ] Rename and delete presets. Duplicate names ignoring case are rejected.
+  Deleting a preset leaves the current results and all transactions unchanged.
+- [ ] Another member (including Owner/Admin) cannot see your presets; a Viewer
+  can manage their own. Switch households: presets never carry into another
+  household. Verify isolation again after signing out and changing users.
+- [ ] Deactivate a referenced account/category: historical filtering still works.
+  For removed/inaccessible references, apply stages the original selections with
+  explained warnings, keeps current results, and blocks applying unchanged
+  invalid selections. Explicitly choose valid/all selections and apply again.
+- [ ] Cancel preset application while a transaction/inclusion edit is unsaved:
+  edits, filters and results remain intact. Name/rename edits also warn on route
+  changes, refresh and household switching; canceled navigation keeps them.
+- [ ] Simulate failed initial list load and refresh: no false empty state or
+  enabled stale actions; retry is available. Failed creation/rename keeps names;
+  retry after a lost creation response does not create duplicates. Concurrent
+  rename/delete returns a conflict with reload guidance.
+- [ ] Open annual overview drill-down, then apply a different preset: report
+  mismatch is explained. Restore report filters and return to the original year
+  and scope through `/budgeting/annual-overview`. No origin metadata is saved.
+- [ ] Keyboard-test selector, apply, details, naming, rename and delete controls.
+  Check visible focus, screen-reader labels/status messages, narrow widths and
+  200% zoom. Long preset names must not cause horizontal page overflow.
+
 ## Test data and roles
 
 Prepare reusable non-Production test data:
