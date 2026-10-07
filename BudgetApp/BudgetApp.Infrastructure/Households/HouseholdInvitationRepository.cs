@@ -168,7 +168,8 @@ internal sealed class HouseholdInvitationRepository(
             .Where(user => user.Id == userId)
             .Select(user => new UserEmailRecord(
                 user.Email ?? string.Empty,
-                user.NormalizedEmail ?? string.Empty))
+                user.NormalizedEmail ?? string.Empty,
+                user.EmailConfirmed))
             .SingleOrDefaultAsync(cancellationToken);
     }
 

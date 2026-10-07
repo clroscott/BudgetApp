@@ -147,21 +147,8 @@ public sealed class HouseholdOnboardingTests(BudgetAppWebApplicationFactory fact
             timeZoneId = "America/Vancouver"
         };
 
-    private static async Task Register(HttpClient client)
-    {
-        var response = await PostWithAntiforgeryToken(
-            client,
-            "/api/auth/register",
-            new
-            {
-                email = $"household-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Household Test"
-            },
-            await GetAntiforgeryToken(client));
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
+    private Task Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"household-{Guid.NewGuid():N}@example.test", displayName: "Household Test", confirmationHost: factory);
 
     private static async Task<string> GetAntiforgeryToken(HttpClient client)
     {

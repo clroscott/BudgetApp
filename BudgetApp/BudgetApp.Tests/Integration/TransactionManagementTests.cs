@@ -250,24 +250,8 @@ public sealed class TransactionManagementTests(BudgetAppWebApplicationFactory fa
     private static string TransactionPath(Guid householdId) =>
         $"/api/households/{householdId}/transactions";
 
-    private static async Task<Guid> Register(HttpClient client)
-    {
-        var response = await SendWithAntiforgery(
-            client,
-            HttpMethod.Post,
-            "/api/auth/register",
-            new
-            {
-                email = $"transactions-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Transaction Test"
-            },
-            await GetAntiforgeryToken(client));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var currentUser = await client.GetFromJsonAsync<CurrentUserResponse>("/api/auth/me");
-        return currentUser?.Id ?? throw new InvalidOperationException("Current user ID was missing.");
-    }
+    private Task<Guid> Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"transactions-{Guid.NewGuid():N}@example.test", displayName: "Transaction Test", confirmationHost: factory);
 
     private static async Task<Guid> CreateHousehold(HttpClient client)
     {

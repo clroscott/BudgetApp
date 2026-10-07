@@ -42,7 +42,7 @@ Categories, categorization rules, merchant aliases, and import profiles are seco
 
 1. The visitor enters account credentials and a display name.
 2. The application creates the Identity account.
-3. The user signs in or is signed in after confirmation, depending on the selected Identity flow.
+3. The registration form signs in through the normal credential check using the just-entered details. If unavailable, generic check-email guidance includes manual sign-in/recovery. Unverified users reach a dedicated confirmation page and must explicitly confirm the latest email link before accessing the app or creating/joining a household. Ordinary confirmation keeps sessions signed in; returning to the waiting tab updates status. Existing account data is preserved and access resumes after verification. See [Email ownership](email-ownership.md).
 4. The user enters a household name and basic defaults such as currency and time zone.
 5. The application creates the household and makes the user its Owner.
 6. The user is directed to initial setup or the Dashboard.

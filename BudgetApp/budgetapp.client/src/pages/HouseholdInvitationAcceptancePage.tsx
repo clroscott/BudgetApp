@@ -3,6 +3,7 @@ import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { BrandLogo } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { EmailVerificationNotice } from '../components/EmailVerificationNotice'
 import {
   acceptHouseholdInvitation,
   getHouseholdInvitationPreview,
@@ -25,12 +26,16 @@ export function HouseholdInvitationAcceptancePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAccepting, setIsAccepting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const [retry, setRetry] = useState(0)
   const token = new URLSearchParams(window.location.search).get('token') ?? ''
 
   useEffect(() => {
     let cancelled = false
 
     const load = async () => {
+      if (!user?.emailConfirmed) return
+      setIsLoading(true)
+      setErrors([])
       if (!token) {
         setErrors(['This household invitation link is incomplete.'])
         setIsLoading(false)
@@ -51,7 +56,7 @@ export function HouseholdInvitationAcceptancePage() {
     return () => {
       cancelled = true
     }
-  }, [token])
+  }, [token, user?.id, user?.emailConfirmed, retry])
 
   const accept = async () => {
     setIsAccepting(true)
@@ -82,9 +87,11 @@ export function HouseholdInvitationAcceptancePage() {
 
         <ErrorSummary errors={errors} />
 
-        {isLoading && <p className="empty-state">Loading invitation…</p>}
+        <EmailVerificationNotice />
+        {user?.emailConfirmed && isLoading && <p className="empty-state">Loading invitation…</p>}
+        {user?.emailConfirmed && !isLoading && errors.length > 0 && <button className="secondary-button" onClick={() => setRetry(value => value + 1)}>Retry loading invitation</button>}
 
-        {preview && (
+        {user?.emailConfirmed && preview && (
           <div className="invitation-preview">
             <div>
               <span>Household</span>
@@ -110,9 +117,9 @@ export function HouseholdInvitationAcceptancePage() {
           </div>
         )}
 
-        {preview?.isAvailable && !user && (
+        {!user && (
           <div className="invitation-auth-actions">
-            <p>Sign in or create the invited account to continue.</p>
+            <p>Sign in with the invited email address and confirm ownership before viewing this invitation, or create an account.</p>
             <AppLink className="primary-link-button" to={signInPath}>
               Sign in
             </AppLink>
@@ -122,7 +129,7 @@ export function HouseholdInvitationAcceptancePage() {
           </div>
         )}
 
-        {preview?.isAvailable && user && (
+        {preview?.isAvailable && user?.emailConfirmed && (
           <div className="invitation-auth-actions">
             <p>
               You are signed in as <strong>{user.email}</strong>.
@@ -146,7 +153,7 @@ export function HouseholdInvitationAcceptancePage() {
           </div>
         )}
 
-        {!isLoading && !preview && (
+        {user?.emailConfirmed && !isLoading && !preview && (
           <p className="auth-switch">
             <AppLink to="/login">Return to sign in</AppLink>
           </p>

@@ -286,26 +286,8 @@ public sealed class AccountManagementTests(BudgetAppWebApplicationFactory factor
             new { },
             token);
 
-    private static async Task<Guid> Register(HttpClient client)
-    {
-        var response = await SendWithAntiforgery(
-            client,
-            HttpMethod.Post,
-            "/api/auth/register",
-            new
-            {
-                email = $"accounts-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Account Test"
-            },
-            await GetAntiforgeryToken(client));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var currentUser = await client.GetFromJsonAsync<CurrentUserResponse>(
-            "/api/auth/me");
-        return currentUser?.Id ?? throw new InvalidOperationException(
-            "The current-user endpoint did not return an ID.");
-    }
+    private Task<Guid> Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"accounts-{Guid.NewGuid():N}@example.test", displayName: "Account Test", confirmationHost: factory);
 
     private static async Task<Guid> CreateHousehold(
         HttpClient client,

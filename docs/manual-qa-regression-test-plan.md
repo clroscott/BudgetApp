@@ -76,6 +76,9 @@ Run this shorter section before every merge, even when the change appears isolat
 
 - [ ] Application starts and the health endpoint succeeds.
 - [ ] A registered user can sign in and sign out.
+- [ ] Unverified users reach the dedicated confirmation page instead of app-data
+      pages. Direct data APIs are blocked; existing data is preserved and verified
+      recipients regain access and can accept matching invitations (#149).
 - [ ] Refreshing an authenticated page preserves the expected session and route.
 - [ ] Dashboard loads for the selected household.
 - [ ] Sidebar navigation reaches every primary and Settings page and can scroll.
@@ -93,8 +96,13 @@ Run this shorter section before every merge, even when the change appears isolat
 
 ## Authentication and recovery
 
-- [ ] Registration succeeds with valid details.
-- [ ] Duplicate email registration is rejected safely.
+- [ ] Registration with valid details requests confirmation, signs in with the
+      just-entered credentials, and reaches the verification gate without typing
+      the password again. Passwords are not saved in browser storage.
+- [ ] Duplicate registration has the same public status/message and sends no extra
+      registration message. Incorrect credentials retain generic guidance; correct
+      credentials use the normal sign-in behavior. A temporary sign-in failure
+      offers manual sign-in/recovery without creating or mailing twice.
 - [ ] Login succeeds with valid credentials.
 - [ ] Login fails with an incorrect password without revealing sensitive details.
 - [ ] Logout ends the authenticated session.
@@ -108,6 +116,68 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] An invalid or expired recovery token is rejected without changing the password.
 - [ ] No password, reset token, or secret is written to normal client-visible data or
       routine logs.
+
+## Email ownership and email changes (#149)
+
+Use Development/Scratch accounts and inboxes you control. Test email-change
+requests through the documented API until #156 supplies the settings interface.
+
+- [ ] Register a new address. Confirmation arrives in the configured File outbox
+      or SMTP inbox and uses the correct reachable HTTPS frontend.
+- [ ] Sign in unverified. Dashboard, household setup/settings, budgets, transactions,
+      imports, reports, tutorials, and invitation URLs lead to the dedicated
+      **Confirm your email** page; no sidebar or private data is displayed.
+- [ ] Direct read/create/edit/import/delete API requests receive confirmation-required
+      `403`, with no data writes/deletions. Account status, resend/confirmation,
+      recovery, and sign-out remain available without a redirect loop.
+- [ ] An existing unverified account's memberships, budgets/amounts, transactions,
+      and saved household selection remain intact while blocked. Verify, continue
+      to the intended page, and confirm those same records are accessible again.
+- [ ] Request confirmation for an older account that had never verified its address.
+      No migration, bulk mailing, or automatic verified flag is needed.
+- [ ] Open a confirmation link while signed out or in the wrong account. Guidance
+      explains how to sign in correctly and no verification occurs on page load.
+- [ ] Explicit confirmation verifies the address; refreshing preserves it. Reuse,
+      tampering, missing tokens, and expiry after one hour fail safely.
+- [ ] Confirm in a second tab using the same browser/profile and exact app host.
+      Neither tab requires another login. Returning to the waiting tab automatically
+      exposes **Continue**; manual **Check confirmation status** remains available.
+      Continue preserves the intended page, filters, and invitation URL. A different
+      browser/profile/device requires one matching-account sign-in, not another
+      after successful confirmation. Ordinary proof does not revoke existing sessions.
+- [ ] Background status refresh failures keep the page/session and allow retry;
+      a delayed response cannot overwrite successful confirmation or sign-out.
+      Reopening an old link for the already confirmed matching address provides
+      Continue instead of attempting to consume it again.
+- [ ] Rapid resend requests do not produce additional messages. After one minute,
+      one explicit retry generates a new link; the older unexpired link no longer works.
+- [ ] Resend cooldown survives application restart. Concurrent requests through
+      separate SQL Server-backed sessions do not bypass the delivery cooldown.
+- [ ] Request-rate rejection shows retry guidance and a usable retry action, not
+      an endless spinner. It does not silently send or queue extra mail.
+- [ ] For an account registered under someone else's address, every pending-list,
+      preview, token-accept, and ID-accept call is rejected without revealing invitation
+      metadata. A confirmed matching recipient can then accept exactly once.
+- [ ] Recover an impersonated test registration using its inbox, reset the password,
+      and confirm a fresh link. Old sessions/links cannot regain invitation access.
+- [ ] Request a new email with the current password. Before confirmation, the old
+      address, verification state, login, memberships, and financial data are unchanged.
+- [ ] Confirm the new-address link as the requesting account. New-address login and
+      invitations work; old-address login/invitation matching stops; other sessions
+      must sign in again. No membership/budget/transaction record is duplicated.
+- [ ] Wrong passwords, expired/used/wrong-account links, duplicate addresses, and
+      an address claimed after request leave the original email and username intact.
+- [ ] SQL Server concurrent target-address claims cannot produce duplicate emails
+      or a partially changed username/email pair; record any conflict/retry behavior.
+- [ ] Simulate Disabled or failed delivery. The account and data are preserved, but
+      unverified app access remains blocked. Resend, recovery, and sign-out remain
+      usable; the address is not changed and retry/support guidance is clear.
+      Restore delivery and complete a fresh request after the cooldown.
+- [ ] Routine logs contain no passwords, raw proofs, target addresses, or token-bearing
+      links. Development outbox files remain sensitive test artifacts.
+- [ ] Confirmation/resend pages and notices work with keyboard, screen reader,
+      narrow layout, long email addresses, and 200% zoom; meaningful status/errors
+      are announced and controls remain reachable.
 
 ## Email delivery
 
@@ -165,9 +235,11 @@ Run this shorter section before every merge, even when the change appears isolat
 ## First-time user and household onboarding
 
 - [ ] A new uninvited user is guided to create a household.
-- [ ] A new invited user who registers or signs in without using the email link sees
-      the matching pending invitation before the create-household form.
-- [ ] An invitation can be accepted after the invited user registers.
+- [ ] A new invited user who signs in and confirms their email sees the matching
+      pending invitation before the create-household form, without requiring the
+      invitation email link. Unverified users first see confirmation guidance.
+- [ ] An invitation can be accepted after the invited user registers, signs in,
+      and confirms email ownership.
 - [ ] Invitation acceptance selects the joined household.
 - [ ] An account with a different email cannot see or accept the invitation by ID.
 - [ ] Refreshing or signing in again does not restart completed onboarding.
@@ -181,7 +253,8 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] Pending, accepted, expired, and revoked invitations display correctly.
 - [ ] Resending and revoking an invitation behave correctly.
 - [ ] Invitation email links use the configured public base URL.
-- [ ] Accepting an invitation requires the matching signed-in email address.
+- [ ] Listing, previewing, and accepting an invitation require the matching,
+      verified signed-in email address.
 - [ ] A member can leave a household when household rules permit it.
 - [ ] The last owner cannot leave without satisfying the ownership rules.
 - [ ] A multi-household user can switch households from the persistent header.

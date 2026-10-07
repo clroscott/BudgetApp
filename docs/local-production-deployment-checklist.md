@@ -297,6 +297,13 @@ If it names any other environment or database, stop immediately.
 
 ## Phase 7: Smoke Test
 
+For the #149 release, no schema migration is added. Publish both server and
+client, check configured email delivery and reachable HTTPS links, and do not
+bulk-mark existing users verified. Existing unverified users reach the confirmation
+page and must confirm once to regain app access; their data is preserved. Test
+delivery before rollout so they are not stuck at the gate. See
+[Email ownership deployment notes](email-ownership.md#deployment-and-verification).
+
 Do read-only checks first:
 
 - [ ] `Invoke-RestMethod "https://localhost/api/health"` succeeds.

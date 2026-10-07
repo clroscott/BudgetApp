@@ -284,6 +284,28 @@ button:disabled {
   font-size: 0.88rem;
 }
 
+.notice-card {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  overflow-wrap: anywhere;
+}
+
+.notice-card h2,
+.notice-card p {
+  margin: 0 0 0.75rem;
+}
+
+.email-verification-notice {
+  border-inline-start: 0.25rem solid var(--accent);
+}
+
+.app-shell-content > .email-verification-notice {
+  margin: 1rem clamp(1rem, 3vw, 2.5rem) 0;
+}
+
 .household-invite-form,
 .household-management-section {
   margin-bottom: 1.5rem;

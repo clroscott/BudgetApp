@@ -5,9 +5,9 @@
 BudgetApp uses ASP.NET Core Identity with secure cookie authentication. The React client never stores a password, authentication token, or session identifier in JavaScript-accessible storage.
 
 The authentication scope includes registration, login, logout, current-user
-lookup, password changes, forgotten-password recovery, lockout protection, and
-antiforgery protection. Email confirmation, external login providers, and
-two-factor authentication are deferred.
+lookup, password changes, forgotten-password recovery, email ownership and
+email-change confirmation, lockout protection, and antiforgery protection.
+External login providers and two-factor authentication are deferred.
 
 ## Identity Storage
 
@@ -29,17 +29,36 @@ All authentication routes use the `/api/auth` prefix.
 | Method | Route | Authentication | Antiforgery | Purpose |
 |---|---|---|---|---|
 | `GET` | `/antiforgery` | Anonymous | No | Issue an antiforgery cookie and return its request token |
-| `POST` | `/register` | Anonymous | Yes | Create and sign in a user |
+| `POST` | `/register` | Anonymous | Yes | Request registration/confirmation with a generic 202 response; no automatic sign-in |
 | `POST` | `/login` | Anonymous | Yes | Validate credentials and issue the authentication cookie |
 | `POST` | `/forgot-password` | Anonymous | Yes | Generate password-recovery instructions when an account exists |
 | `POST` | `/reset-password` | Anonymous | Yes | Validate a recovery token and set a new password |
 | `POST` | `/logout` | Required | Yes | End the current session |
-| `GET` | `/me` | Required | No | Return the current user ID, email, and display name |
+| `GET` | `/me` | Required | No | Return ID, email, display name, and emailConfirmed |
 | `POST` | `/change-password` | Required | Yes | Change the current user's password |
+| `POST` | `/resend-confirmation` | Required | Yes | Request confirmation for the current account |
+| `POST` | `/confirm-email` | Required | Yes | Confirm a matching-account proof |
+| `POST` | `/request-email-change` | Required | Yes | Request proof of a new address, with the current password |
+| `POST` | `/confirm-email-change` | Required | Yes | Atomically confirm the new email and login username |
 
 Registration, login, forgotten-password, and password-reset requests are
 rate-limited per client address. Repeated failed password attempts lock the
 account for 15 minutes after five failures.
+
+Ownership endpoints also have per-account rate limits and durable resend
+cooldowns. See [Account email ownership](email-ownership.md) for user transitions,
+expiry, existing accounts, duplicate/privacy behavior, and the #156 API contract.
+
+Unverified users may sign in, but the app redirects them to `/verify-email`.
+After registration, the form uses the normal sign-in endpoint with the credentials
+just entered. Registration itself retains its generic response and issues no cookie;
+the separate credential check preserves account privacy and lockout/rate limits.
+The same signed-in browser stays signed in after ordinary confirmation. Returning
+to an unverified tab quietly refreshes status without sending another email.
+App-data APIs return confirmation-required `403` until ownership is proven;
+account maintenance and public endpoints remain available. Existing records
+are retained, not deleted or reset. Email delivery must work before rolling
+out this gate to existing unverified users.
 
 ## Antiforgery Flow
 
@@ -63,6 +82,9 @@ The authentication cookie:
 - Uses `SameSite=Strict`.
 - Uses an eight-hour lifetime with sliding expiration.
 - Is a session cookie unless login requests set `rememberMe` to `true`.
+- Checks Identity's security stamp on every request, so password and email-address
+  changes invalidate other sessions immediately. The finishing session is refreshed.
+  Ordinary confirmation preserves sessions; app access checks the DB confirmation flag.
 
 Authentication failures return HTTP `401`, and authorization failures return HTTP `403`; API requests are not redirected to an HTML login page.
 

@@ -39,7 +39,10 @@ public sealed class AuthenticationTests(BudgetAppWebApplicationFactory factory)
             },
             token);
 
-        Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, registerResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/auth/me")).StatusCode);
+        (await PostWithAntiforgeryToken(client, "/api/auth/login", new { email, password = "a long test password" },
+            await GetAntiforgeryToken(client))).EnsureSuccessStatusCode();
 
         var currentUserResponse = await client.GetAsync("/api/auth/me");
         Assert.Equal(HttpStatusCode.OK, currentUserResponse.StatusCode);
@@ -75,7 +78,7 @@ public sealed class AuthenticationTests(BudgetAppWebApplicationFactory factory)
     }
 
     [Fact]
-    public async Task Register_WithExistingEmail_IsRejected()
+    public async Task Register_WithExistingEmail_HasTheSameGenericResponse()
     {
         using var firstClient = factory.CreateAuthenticatedTestClient();
         using var secondClient = factory.CreateAuthenticatedTestClient();
@@ -98,8 +101,10 @@ public sealed class AuthenticationTests(BudgetAppWebApplicationFactory factory)
             registration,
             await GetAntiforgeryToken(secondClient));
 
-        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, duplicateResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, firstResponse.StatusCode);
+        Assert.Equal(firstResponse.StatusCode, duplicateResponse.StatusCode);
+        Assert.Equal(await firstResponse.Content.ReadAsStringAsync(), await duplicateResponse.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.Unauthorized, (await secondClient.GetAsync("/api/auth/me")).StatusCode);
     }
 
     [Fact]
@@ -120,7 +125,9 @@ public sealed class AuthenticationTests(BudgetAppWebApplicationFactory factory)
                 displayName = "Identity Test"
             },
             await GetAntiforgeryToken(signedInClient));
-        Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, registerResponse.StatusCode);
+        (await PostWithAntiforgeryToken(signedInClient, "/api/auth/login", new { email, password = oldPassword },
+            await GetAntiforgeryToken(signedInClient))).EnsureSuccessStatusCode();
 
         var changeResponse = await PostWithAntiforgeryToken(
             signedInClient,
@@ -190,7 +197,7 @@ public sealed class AuthenticationTests(BudgetAppWebApplicationFactory factory)
                 displayName = "Recovery Test"
             },
             await GetAntiforgeryToken(client));
-        Assert.Equal(HttpStatusCode.OK, registerResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, registerResponse.StatusCode);
 
         sender.Clear();
         var forgotResponse = await PostWithAntiforgeryToken(

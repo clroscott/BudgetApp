@@ -5,4 +5,6 @@ public interface IApplicationEmailLinkBuilder
     string BuildPasswordRecoveryLink(Guid userId, string token);
 
     string BuildHouseholdInvitationLink(string token);
+
+    string BuildEmailConfirmationLink(Guid userId, string token, bool changeEmail);
 }

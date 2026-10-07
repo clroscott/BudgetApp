@@ -116,21 +116,8 @@ public sealed class RecurringExpenseManagementTests(BudgetAppWebApplicationFacto
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    private static async Task Register(HttpClient client)
-    {
-        var response = await SendWithAntiforgery(
-            client,
-            HttpMethod.Post,
-            "/api/auth/register",
-            new
-            {
-                email = $"recurring-api-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Recurring API Test"
-            },
-            await GetAntiforgeryToken(client));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
+    private Task Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"recurring-api-{Guid.NewGuid():N}@example.test", displayName: "Recurring API Test", confirmationHost: factory);
 
     private static async Task<Guid> CreateHousehold(HttpClient client)
     {

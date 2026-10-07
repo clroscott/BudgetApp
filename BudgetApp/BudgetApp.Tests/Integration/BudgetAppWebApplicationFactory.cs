@@ -28,6 +28,7 @@ public sealed class BudgetAppWebApplicationFactory : WebApplicationFactory<Progr
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:BudgetApp", "Data Source=integration-tests");
         builder.UseSetting("AuthenticationRateLimit:PermitLimit", "1000");
+        builder.UseSetting("EmailOwnershipRateLimit:PermitLimit", "1000");
 
         builder.ConfigureServices(services =>
         {

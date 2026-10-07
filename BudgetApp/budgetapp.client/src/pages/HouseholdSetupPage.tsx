@@ -3,6 +3,7 @@ import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { BrandMark } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { EmailVerificationNotice } from '../components/EmailVerificationNotice'
 import { HouseholdForm } from '../households/HouseholdForm'
 import type { CreateHouseholdRequest } from '../households/householdApi'
 import {
@@ -35,6 +36,10 @@ export function HouseholdSetupPage() {
 
   useEffect(() => {
     let cancelled = false
+    if (!user?.emailConfirmed) {
+      // Never ask the server for email-matched invitation details before verification.
+      return () => { cancelled = true }
+    }
 
     const loadInvitations = async () => {
       try {
@@ -51,7 +56,7 @@ export function HouseholdSetupPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [user?.id, user?.emailConfirmed])
 
   const handleSubmit = async (request: CreateHouseholdRequest) => {
     setIsSubmitting(true)
@@ -122,12 +127,13 @@ export function HouseholdSetupPage() {
         </header>
 
         <ErrorSummary errors={errors} />
+        <EmailVerificationNotice />
 
-        {isLoadingInvitations && (
+        {user?.emailConfirmed && isLoadingInvitations && (
           <p className="empty-state">Checking for invitations...</p>
         )}
 
-        {invitations.length > 0 && (
+        {user?.emailConfirmed && invitations.length > 0 && (
           <section
             className="setup-invitations"
             aria-labelledby="pending-invitations-heading"
@@ -173,16 +179,16 @@ export function HouseholdSetupPage() {
           </section>
         )}
 
-        {!isLoadingInvitations && invitations.length > 0 && (
+        {user?.emailConfirmed && !isLoadingInvitations && invitations.length > 0 && (
           <div className="setup-divider">
             <span>Or create a new household</span>
           </div>
         )}
 
-        <HouseholdForm
+        {user?.emailConfirmed && <HouseholdForm
           isSubmitting={isBusy}
           onSubmit={handleSubmit}
-        />
+        />}
       </section>
     </main>
   )

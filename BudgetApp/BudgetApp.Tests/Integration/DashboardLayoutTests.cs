@@ -114,21 +114,8 @@ public sealed class DashboardLayoutTests(BudgetAppWebApplicationFactory factory)
         Assert.Equal(["future-forecast-page"], saved!.VisiblePanelKeys);
     }
 
-    private static async Task Register(HttpClient client)
-    {
-        var response = await SendWithAntiforgery(
-            client,
-            HttpMethod.Post,
-            "/api/auth/register",
-            new
-            {
-                email = $"dashboard-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Dashboard Test"
-            },
-            await GetAntiforgeryToken(client));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
+    private Task Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"dashboard-{Guid.NewGuid():N}@example.test", displayName: "Dashboard Test", confirmationHost: factory);
 
     private static async Task<Guid> CreateHousehold(HttpClient client)
     {

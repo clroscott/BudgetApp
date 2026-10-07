@@ -81,4 +81,5 @@ public sealed record HouseholdInvitationForUserRecord(
 
 public sealed record UserEmailRecord(
     string Email,
-    string NormalizedEmail);
+    string NormalizedEmail,
+    bool EmailConfirmed);

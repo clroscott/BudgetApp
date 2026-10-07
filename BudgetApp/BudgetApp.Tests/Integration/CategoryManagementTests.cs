@@ -175,22 +175,8 @@ public sealed class CategoryManagementTests(BudgetAppWebApplicationFactory facto
             new { },
             token);
 
-    private static async Task Register(HttpClient client)
-    {
-        var response = await SendWithAntiforgery(
-            client,
-            HttpMethod.Post,
-            "/api/auth/register",
-            new
-            {
-                email = $"categories-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Category Test"
-            },
-            await GetAntiforgeryToken(client));
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
+    private Task Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"categories-{Guid.NewGuid():N}@example.test", displayName: "Category Test", confirmationHost: factory);
 
     private static async Task<Guid> CreateHousehold(HttpClient client)
     {

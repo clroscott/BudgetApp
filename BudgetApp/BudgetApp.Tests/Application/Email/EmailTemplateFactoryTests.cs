@@ -48,6 +48,23 @@ public sealed class EmailTemplateFactoryTests
         Assert.Contains("expires", message.PlainTextBody, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Confirmation_IncludesExpiryAccountSafetyAndEscapedLink(bool changing)
+    {
+        var factory = new EmailTemplateFactory(new StubLinkBuilder("https://budget.example/reset", "https://budget.example/invite"));
+        var message = factory.CreateEmailConfirmation("person@example.test", Guid.NewGuid(), "<unsafe>&token",
+            DateTimeOffset.UtcNow.AddHours(1), changing);
+        Assert.Equal(changing ? EmailPurpose.EmailChange : EmailPurpose.EmailConfirmation, message.Purpose);
+        Assert.Contains("Sign in to the account", message.PlainTextBody);
+        Assert.Contains("can only be used once", message.PlainTextBody);
+        Assert.Contains("do not confirm it", message.PlainTextBody);
+        Assert.Contains("&lt;unsafe&gt;&amp;token", message.HtmlBody);
+        Assert.DoesNotContain("<unsafe>", message.HtmlBody);
+        if (changing) Assert.Contains("remains unchanged", message.PlainTextBody);
+    }
+
     private sealed class StubLinkBuilder(
         string passwordRecoveryLink,
         string householdInvitationLink) : IApplicationEmailLinkBuilder
@@ -57,5 +74,8 @@ public sealed class EmailTemplateFactoryTests
 
         public string BuildHouseholdInvitationLink(string token) =>
             householdInvitationLink;
+
+        public string BuildEmailConfirmationLink(Guid userId, string token, bool changeEmail) =>
+            $"https://budget.example/{(changeEmail ? "confirm-email-change" : "confirm-email")}?token={token}&userId={userId}";
     }
 }

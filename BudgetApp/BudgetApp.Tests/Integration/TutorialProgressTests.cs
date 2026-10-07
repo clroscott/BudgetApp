@@ -66,20 +66,8 @@ public sealed class TutorialProgressTests(BudgetAppWebApplicationFactory factory
             "/api/tutorial-progress"))!);
     }
 
-    private static async Task Register(HttpClient client)
-    {
-        var response = await SendWithAntiforgery(
-            client,
-            HttpMethod.Post,
-            "/api/auth/register",
-            new
-            {
-                email = $"tutorial-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Tutorial Test"
-            });
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
+    private Task Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"tutorial-{Guid.NewGuid():N}@example.test", displayName: "Tutorial Test", confirmationHost: factory);
 
     private static Task<HttpResponseMessage> Save(
         HttpClient client,

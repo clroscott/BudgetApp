@@ -214,21 +214,8 @@ public sealed class AnnualBudgetOverviewTests(BudgetAppWebApplicationFactory fac
             userId,
             DateTimeOffset.UtcNow);
 
-    private static async Task Register(HttpClient client)
-    {
-        var response = await SendWithAntiforgery(
-            client,
-            HttpMethod.Post,
-            "/api/auth/register",
-            new
-            {
-                email = $"annual-overview-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Annual Overview Test"
-            },
-            await GetAntiforgeryToken(client));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
+    private Task Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"annual-overview-{Guid.NewGuid():N}@example.test", displayName: "Annual Overview Test", confirmationHost: factory);
 
     private static async Task<Guid> CreateHousehold(HttpClient client)
     {

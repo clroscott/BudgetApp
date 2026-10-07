@@ -2,6 +2,8 @@ import { Fragment, Suspense, useEffect, type ReactNode } from 'react'
 import './App.css'
 import { AuthProvider } from './auth/AuthProvider'
 import { useAuth } from './auth/useAuth'
+import { emailVerificationPath, verificationAccessPaths } from './auth/emailVerification'
+import { getSafeReturnPath } from './auth/returnPath'
 import { BackToTopButton } from './components/BackToTopButton'
 import { AppShell } from './components/AppShell'
 import { BrandMark } from './components/Brand'
@@ -31,8 +33,14 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
 
 function AnonymousOnlyRoute({ children }: { children: ReactNode }) {
   const { user } = useAuth()
+  const requestedReturn = getSafeReturnPath()
+  const returnPath = requestedReturn && !['/login', '/register'].includes(requestedReturn.split(/[?#]/)[0])
+    ? requestedReturn : '/dashboard'
 
-  return user ? <Redirect to="/dashboard" /> : children
+  return user
+    ? <Redirect to={user.emailConfirmed || verificationAccessPaths.has(returnPath.split(/[?#]/)[0])
+      ? returnPath : emailVerificationPath(returnPath)} />
+    : children
 }
 
 function HouseholdRequiredRoute({ children }: { children: ReactNode }) {
@@ -111,7 +119,7 @@ function StatusError({ message, onRetry }: { message: string, onRetry: () => voi
 
 function AppRoutes() {
   const { path } = useRouter()
-  const { initializationError, isLoading, refresh } = useAuth()
+  const { user, initializationError, isLoading, refresh } = useAuth()
 
   if (isLoading) {
     return <LoadingScreen message="Checking your session…" />
@@ -119,6 +127,10 @@ function AppRoutes() {
 
   if (initializationError) {
     return <StatusError message={initializationError} onRetry={() => void refresh()} />
+  }
+
+  if (user && !user.emailConfirmed && !verificationAccessPaths.has(path)) {
+    return <Redirect to={emailVerificationPath(path + window.location.search)} />
   }
 
   if (path === '/') {

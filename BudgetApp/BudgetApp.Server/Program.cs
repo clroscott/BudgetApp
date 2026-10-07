@@ -69,6 +69,7 @@ try
         options.SlidingExpiration = true;
         options.Events = new CookieAuthenticationEvents
         {
+            OnValidatePrincipal = SecurityStampValidator.ValidatePrincipalAsync,
             OnRedirectToLogin = context =>
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -81,6 +82,9 @@ try
             }
         };
     });
+    // Password and email-address changes invalidate other sessions immediately.
+    builder.Services.Configure<SecurityStampValidatorOptions>(options =>
+        options.ValidationInterval = TimeSpan.Zero);
     builder.Services.AddAuthorization();
     builder.Services.AddHsts(options =>
     {
@@ -100,6 +104,18 @@ try
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.OnRejected = async (context, cancellationToken) =>
+        {
+            var seconds = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter)
+                ? Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds)) : 60;
+            context.HttpContext.Response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            await context.HttpContext.Response.WriteAsJsonAsync(new Microsoft.AspNetCore.Mvc.ProblemDetails
+            {
+                Status = StatusCodes.Status429TooManyRequests,
+                Title = "Too many requests",
+                Detail = $"Wait {seconds} seconds, then try again. No action was processed."
+            }, cancellationToken);
+        };
         var authenticationPermitLimit =
             builder.Configuration.GetValue<int?>(
                 "AuthenticationRateLimit:PermitLimit") ?? 10;
@@ -109,6 +125,17 @@ try
                 _ => new FixedWindowRateLimiterOptions
                 {
                     PermitLimit = authenticationPermitLimit,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true
+                }));
+        options.AddPolicy("emailOwnership", context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ??
+                    context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = builder.Configuration.GetValue<int?>("EmailOwnershipRateLimit:PermitLimit") ?? 5,
                     Window = TimeSpan.FromMinutes(1),
                     QueueLimit = 0,
                     AutoReplenishment = true
@@ -176,9 +203,12 @@ try
 
     app.UseRouting();
 
+    app.UseAuthentication();
+
     app.UseRateLimiter();
 
-    app.UseAuthentication();
+    // Account maintenance remains available; every other app API needs verified ownership.
+    app.UseMiddleware<RequireConfirmedEmailMiddleware>();
 
     app.UseAuthorization();
 
@@ -190,7 +220,7 @@ try
     {
         status = "ok",
         app = "BudgetApp.Server"
-    }));
+    })).AllowAnonymous();
 
     app.Run();
 }

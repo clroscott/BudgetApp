@@ -6,8 +6,11 @@ namespace BudgetApp.Tests.Infrastructure.Email;
 
 public sealed class FileEmailSenderTests
 {
-    [Fact]
-    public async Task SendAsync_WritesReadableTextAndEmlFiles()
+    [Theory]
+    [InlineData(EmailPurpose.Informational, "informational")]
+    [InlineData(EmailPurpose.EmailConfirmation, "email-confirmation")]
+    [InlineData(EmailPurpose.EmailChange, "email-change")]
+    public async Task SendAsync_WritesReadableTextAndEmlFiles(EmailPurpose purpose, string slug)
     {
         var outbox = Path.Combine(
             Path.GetTempPath(),
@@ -28,13 +31,14 @@ public sealed class FileEmailSenderTests
             "Test email",
             "Open https://budget.example/test",
             "<p>Open the test link.</p>",
-            EmailPurpose.Informational);
+            purpose);
 
         try
         {
             await sender.SendAsync(message);
 
             var textPath = Assert.Single(Directory.GetFiles(outbox, "*.txt"));
+            Assert.Contains(slug, Path.GetFileName(textPath));
             var emlPath = Assert.Single(Directory.GetFiles(outbox, "*.eml"));
             var text = await File.ReadAllTextAsync(textPath);
             var eml = await File.ReadAllTextAsync(emlPath);

@@ -230,21 +230,8 @@ public sealed class YearlyPlanManagementTests(BudgetAppWebApplicationFactory fac
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    private static async Task Register(HttpClient client)
-    {
-        var response = await SendWithAntiforgery(
-            client,
-            HttpMethod.Post,
-            "/api/auth/register",
-            new
-            {
-                email = $"yearly-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Yearly Plan Test"
-            },
-            await GetAntiforgeryToken(client));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
+    private Task Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"yearly-{Guid.NewGuid():N}@example.test", displayName: "Yearly Plan Test", confirmationHost: factory);
 
     private static async Task<Guid> CreateHousehold(HttpClient client)
     {
