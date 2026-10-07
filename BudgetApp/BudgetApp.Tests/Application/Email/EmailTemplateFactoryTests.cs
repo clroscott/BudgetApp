@@ -74,6 +74,8 @@ public sealed class EmailTemplateFactoryTests
 
         public string BuildHouseholdInvitationLink(string token) =>
             householdInvitationLink;
+        public string BuildOperatorMfaRecoveryLink(Guid userId, string token) =>
+            $"https://budget.example/recover-mfa?userId={userId}&token={token}";
 
         public string BuildEmailConfirmationLink(Guid userId, string token, bool changeEmail) =>
             $"https://budget.example/{(changeEmail ? "confirm-email-change" : "confirm-email")}?token={token}&userId={userId}";

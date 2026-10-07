@@ -21,6 +21,7 @@ using BudgetApp.Infrastructure.Data;
 using BudgetApp.Infrastructure.Email;
 using BudgetApp.Infrastructure.Households;
 using BudgetApp.Infrastructure.Identity;
+using BudgetApp.Infrastructure.Administration;
 using BudgetApp.Infrastructure.Imports;
 using BudgetApp.Infrastructure.RecurringExpenses;
 using BudgetApp.Infrastructure.Transactions;
@@ -93,6 +94,9 @@ public static class DependencyInjection
         services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();
         services.AddScoped<IEmailOwnershipService, EmailOwnershipService>();
         services.AddScoped<LoginVerificationService>();
+        services.AddScoped<ApplicationAdministratorAccess>();
+        services.AddScoped<ApplicationAdministrationService>();
+        services.AddScoped<ApplicationOwnerBootstrapService>();
         services.AddSingleton(TimeProvider.System);
         AddEmailInfrastructure(
             services,

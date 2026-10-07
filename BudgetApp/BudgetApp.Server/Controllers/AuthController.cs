@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authentication;
 using BudgetApp.Application.Authentication;
 using BudgetApp.Infrastructure.Identity;
+using BudgetApp.Infrastructure.Administration;
 using BudgetApp.Server.Security;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
@@ -22,6 +23,7 @@ public sealed class AuthController(
     IPasswordRecoveryService passwordRecoveryService,
     IEmailOwnershipService emailOwnershipService,
     LoginVerificationService verification,
+    ApplicationAdministratorAccess administrators,
     ILogger<AuthController> logger) : ControllerBase
 {
     [AllowAnonymous]
@@ -117,7 +119,7 @@ public sealed class AuthController(
         }
         await signInManager.SignInAsync(user, request.RememberMe);
         logger.LogInformation("Signed in user {UserId}", user.Id);
-        return Ok(ToResponse(user));
+        return Ok(await UserResponse(user));
     }
 
     [AllowAnonymous]
@@ -187,7 +189,7 @@ public sealed class AuthController(
     public async Task<ActionResult<CurrentUserResponse>> GetCurrentUser()
     {
         var user = await userManager.GetUserAsync(User);
-        return user is null ? Unauthorized() : Ok(ToResponse(user));
+        return user is null ? Unauthorized() : Ok(await UserResponse(user));
     }
 
     [Authorize]
@@ -232,7 +234,7 @@ public sealed class AuthController(
     });
 
     private async Task<AccountSettingsResponse> SettingsResponse(ApplicationUser user, CancellationToken cancellationToken) =>
-        new(ToResponse(user), await emailOwnershipService.GetPendingEmailChangeAsync(user.Id, cancellationToken),
+        new(await UserResponse(user), await emailOwnershipService.GetPendingEmailChangeAsync(user.Id, cancellationToken),
             user.ConcurrencyStamp!, await verification.StatusAsync(user, cancellationToken));
 
     [Authorize]
@@ -289,7 +291,7 @@ public sealed class AuthController(
                 detail: "This link is invalid, expired, replaced, already used, or belongs to another account. Sign in to the account that requested it or request a new link.");
         // The service updates this scoped Identity entity within its transaction.
         await signInManager.RefreshSignInAsync(user);
-        return Ok(ToResponse(user));
+        return Ok(await UserResponse(user));
     }
 
     private static EmailRequestedResponse ConfirmationRequested() => new(
@@ -345,8 +347,10 @@ public sealed class AuthController(
         return ValidationProblem(new ValidationProblemDetails(errors));
     }
 
-    internal static CurrentUserResponse ToResponse(ApplicationUser user) =>
-        new(user.Id, user.Email!, user.DisplayName, user.EmailConfirmed, user.TwoFactorEnabled);
+    private async Task<CurrentUserResponse> UserResponse(ApplicationUser user) => ToResponse(user,
+        await administrators.IsDesignatedAsync(user.Id), await administrators.IsOwnerAsync(user.Id));
+    internal static CurrentUserResponse ToResponse(ApplicationUser user, bool isApplicationAdministrator = false, bool isApplicationOwner = false) =>
+        new(user.Id, user.Email!, user.DisplayName, user.EmailConfirmed, user.TwoFactorEnabled, isApplicationAdministrator, isApplicationOwner);
 }
 
 public sealed record AntiforgeryResponse(string Token);
@@ -379,7 +383,7 @@ public sealed record CurrentUserResponse(
     Guid Id,
     string Email,
     string DisplayName,
-    bool EmailConfirmed, bool LoginVerificationEnabled);
+    bool EmailConfirmed, bool LoginVerificationEnabled, bool IsApplicationAdministrator, bool IsApplicationOwner = false);
 
 public sealed record EmailRequestedResponse(string Message);
 public sealed record ConfirmEmailRequest(Guid UserId,

@@ -131,7 +131,7 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
         <nav id="app-main-navigation" className="sidebar-navigation" aria-label="Main navigation">
           <NavigationLinks items={primaryNavigation} currentPath={path} />
           <p>Settings</p>
-          <NavigationLinks items={settingsNavigation} currentPath={path} />
+          <NavigationLinks items={settingsNavigation.filter(item => item.id !== 'application-administration' || user?.isApplicationAdministrator)} currentPath={path} />
         </nav>
 
         <div className="sidebar-footer">
@@ -164,7 +164,7 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
         </div>
       </aside>
       <div className="app-shell-content">
-        <div className="household-context-bar" hidden={!showHouseholdNavigation}>
+        <div className="household-context-bar" hidden={!showHouseholdNavigation || path.startsWith('/admin')}>
           <div className="household-context-current">
             <span className="household-context-label">Current household</span>
             {households.length > 1 ? (

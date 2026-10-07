@@ -5,12 +5,24 @@ namespace BudgetApp.Application.Email;
 
 public sealed class EmailTemplateFactory(IApplicationEmailLinkBuilder linkBuilder)
 {
+    public EmailMessage CreateOperatorMfaRecovery(string address, Guid userId, string token, DateTimeOffset expires)
+    {
+        var link = linkBuilder.BuildOperatorMfaRecoveryLink(userId, token);
+        var explanation = "An application administrator requested an email MFA reset. You must confirm this link and your current password. Old recovery codes and sessions will be invalidated; email MFA stays on. Opening the link alone makes no changes. If you did not request help, do not use the link and contact support.";
+        return new(address, "MC Budget: confirm your MFA recovery",
+            $"{explanation}\n\n{link}\n\nExpires {FormatExpiry(expires)}. This link works once. Never share it.",
+            $"<!doctype html><html lang=\"en\"><body><h1>Confirm your MFA recovery</h1><p>{WebUtility.HtmlEncode(explanation)}</p><p><a href=\"{WebUtility.HtmlEncode(link)}\">Review MFA recovery</a></p><p>Expires {WebUtility.HtmlEncode(FormatExpiry(expires))}. This link works once. Never share it.</p></body></html>", EmailPurpose.OperatorMfaRecovery);
+    }
+    public EmailMessage CreateAdministrativeSecurityNotice(string address, string explanation) =>
+        new(address, "MC Budget: account security notice", explanation,
+            $"<!doctype html><html lang=\"en\"><body><h1>Account security notice</h1><p>{WebUtility.HtmlEncode(explanation)}</p></body></html>", EmailPurpose.SecurityChange);
     public EmailMessage CreateLoginVerification(string address, string code, DateTimeOffset expires, string purpose)
     {
         var action = purpose switch {
             "Login" => "complete your MFA sign-in", "Enable" => "enable multi-factor authentication (MFA)",
             "Disable" => "turn off multi-factor authentication (MFA)", "RecoveryCodes" => "replace your recovery codes",
-            "ChangePassword" => "change your password", "ChangeEmail" => "request an email change", _ => "verify a security action"
+            "ChangePassword" => "change your password", "ChangeEmail" => "request an email change",
+            "Administration" => "approve the application-administration action you reviewed", _ => "verify a security action"
         };
         var expiry = FormatExpiry(expires);
         return new(address, "Your MC Budget verification code",

@@ -92,6 +92,10 @@ centre are not implemented. Losing both mailbox access and every recovery code h
 no self-service bypass. A separately reviewed operator recovery protocol is required;
 household Owner/Admin roles cannot reset another person's account verification.
 
+The limited #130 operator-assisted **email** recovery path is described in
+`docs/application-administration.md`. It still requires the registered mailbox and
+current password, keeps MFA on, and does not implement lost-email/no-code recovery.
+
 ## Verification
 
 Automated integration coverage uses isolated SQLite and recording/failing email

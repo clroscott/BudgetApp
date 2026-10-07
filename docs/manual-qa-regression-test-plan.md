@@ -150,6 +150,82 @@ Run this shorter section before every merge, even when the change appears isolat
 - [ ] No password, reset token, or secret is written to normal client-visible data or
       routine logs.
 
+## Application administration / account support (#130)
+
+Setup: `docs/application-administration.md`. Use disposable Development accounts and
+the audit/grant migrations. Never test recovery against real users or production.
+
+- [ ] No database grants: no account automatically becomes an app admin. Legacy
+      configured administrator IDs are ignored and cannot bypass the database grants.
+      Ordinary users and household Owner/Admin users cannot access any `/api/admin`
+      GET/POST even by direct URL or a modified browser navigation flag.
+- [ ] Run the email-based initial-owner tool: inspect Development server/catalog,
+      explicitly confirm, and verify private audit/notification. Cancellation, missing
+      account, unconfirmed email, disabled MFA or a second setup cannot grant access.
+      There is no browser-accessible bootstrap endpoint. No UUID lookup is required.
+- [ ] Password-only/no-MFA sign-in cannot
+      access operator APIs. Enable/complete MFA, then enter via sidebar or Account
+      settings; the page is also reachable without household membership.
+- [ ] Search/status returns only basic account/security metadata. App-admin access
+      does not grant access to another household's financial APIs or activity.
+- [ ] Open Application administration → Users: existing users appear without typing
+      a search. Check 20-row pagination, optional name/email filtering, filter retention
+      across pages, Show all users, and verified/unverified/MFA/role/lockout labels.
+      Ordinary users and password-only sessions cannot view the directory by direct URL.
+- [ ] User-row Account support/Manage administrator access shortcuts select the right
+      account with fresh server data and no automatic action or MFA request. Only owners
+      see access-management shortcuts. Failed linked loads stop loading and offer retry.
+      Canceled navigation away from existing support/access drafts preserves them.
+- [ ] Directory initial/refresh failures are not reported as zero users; stale lists
+      explain the refresh failure and disable shortcuts. A 401/403 hides retained rows.
+      Verify keyboard, screen-reader labels, narrow widths and 200% zoom.
+- [ ] Search, selected-account and audit loading/failure/empty/stale states are
+      distinct. Failed refresh disables actions; revoked access hides retained data.
+      Keyboard, labels, route title/skip link, narrow layouts and 200% zoom work.
+- [ ] A support action requires a reason, the operator's current password, and fresh
+      MFA. Prepared target/action/reason cannot be changed without starting again.
+      Wrong user/action/version/code, expired codes and canceled confirmation do not
+      execute the action. Resend/starting over does not reset attempt limits.
+- [ ] Password-reset mail goes only to the account's verified email; no password is
+      exposed/assigned by the operator. Resetting it leaves MFA on and invalidates
+      old sessions as the existing recovery flow specifies.
+- [ ] Sending/opening MFA recovery does not reset anything. Only the delivered,
+      unexpired latest link plus the recipient's current password completes it.
+      Old recovery codes/pending logins/sessions then fail; ten new codes appear once.
+      MFA stays on; recovery does not auto-login or modify financial data.
+- [ ] Replaced/used/expired/undelivered links, changed email/password, revoked actor
+      grant/session, and actor MFA disabled are rejected. Wrong recipient passwords
+      are limited by Identity lockout. There is no lost-email/no-codes recovery bypass.
+- [ ] Session revocation invalidates existing sessions immediately, preserves all
+      financial/account/MFA data, and attempts a private notification. Notification
+      failure does not claim the revocation failed or automatically repeat it.
+- [ ] Self/other application-administrator accounts cannot be changed by support tools.
+      There are no impersonation, arbitrary email, deletion or
+      unconditional MFA-disable controls.
+- [ ] Only installation owners can list/manage administrators. Support admins and
+      household owners cannot grant/revoke roles, including by direct API calls.
+      New grants require verified email and MFA; account/grant version conflicts,
+      altered action details, wrong/expired proof and canceled confirmation do not write.
+- [ ] Grant, promote/demote and remove administrators without restarting. Affected
+      sessions/proofs become invalid; new login reflects current privileges. Reasons,
+      actor/target, result and notification failure stay in the private audit only.
+      A failed notification does not undo or repeat a committed grant.
+- [ ] Keep the last eligible installation owner: reject removal, demotion and MFA
+      disabling. With another eligible owner, own-role removal signs out predictably.
+      Concurrent SQL Server owner-removal/MFA-disable requests cannot leave zero
+      eligible owners. Directly clearing grants does not reopen bootstrap.
+- [ ] All executions and completed recovery are in the private administrative audit,
+      not household activity. Reasons contain no credentials/financial details. Codes,
+      links and passwords are absent from audit/API metadata/browser storage/safe logs.
+- [ ] Simulate a lost response: Check recorded result performs only a read. Repeat
+      the same operation UUID: no duplicate email/write. Check real SQL Server
+      concurrent submissions: a recovery link/code is consumed at most once.
+- [ ] Failed SMTP provides an honest recorded delivery result, keeps security intact,
+      and permits only explicit later retry. Pending/unknown delivery is not reported
+      as success. Failed/canceled forms clear passwords but preserve safe draft context.
+- [ ] Unfinished forms/once-only recovery codes protect route and household switching;
+      canceled navigation preserves edits. Recovery-link tokens leave the address bar.
+
 ## Optional email multi-factor authentication (MFA) (#135)
 
 Use disposable Development accounts, never production credentials/recovery codes.

@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using BudgetApp.Application.Authentication;
 using BudgetApp.Infrastructure.Identity;
+using BudgetApp.Infrastructure.Administration;
 using BudgetApp.Server.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
@@ -16,7 +17,7 @@ namespace BudgetApp.Server.Controllers;
 [Authorize]
 [ResponseCache(Location = ResponseCacheLocation.None, NoStore = true)]
 public sealed class LoginVerificationController(UserManager<ApplicationUser> users,
-    SignInManager<ApplicationUser> signIn, LoginVerificationService verification) : ControllerBase
+    SignInManager<ApplicationUser> signIn, LoginVerificationService verification, ApplicationAdministratorAccess administrators) : ControllerBase
 {
     [AllowAnonymous]
     [HttpGet("pending")]
@@ -41,7 +42,7 @@ public sealed class LoginVerificationController(UserManager<ApplicationUser> use
                 new(request.ChallengeId, request.Code, request.UseRecoveryCode), ct);
             await HttpContext.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme);
             await signIn.SignInWithClaimsAsync(user, session.Value.Remember, [new Claim("amr", "mfa")]);
-            return Ok(AuthController.ToResponse(user));
+            return Ok(AuthController.ToResponse(user, await administrators.IsDesignatedAsync(user.Id, ct), await administrators.IsOwnerAsync(user.Id, ct)));
         }
         catch (VerificationException error) { return Failure(error); }
     }
@@ -68,7 +69,7 @@ public sealed class LoginVerificationController(UserManager<ApplicationUser> use
     [EnableRateLimiting("authentication")]
     public async Task<IActionResult> Challenge(SecurityChallengeRequest request, CancellationToken ct)
     {
-        if (!Enum.TryParse<VerificationPurpose>(request.Purpose, out var purpose) || purpose == VerificationPurpose.Login ||
+        if (!Enum.TryParse<VerificationPurpose>(request.Purpose, out var purpose) || purpose is VerificationPurpose.Login or VerificationPurpose.Administration ||
             !Enum.IsDefined(purpose)) return Failure();
         var user = await users.GetUserAsync(User);
         if (user is null) return Unauthorized();
@@ -81,7 +82,7 @@ public sealed class LoginVerificationController(UserManager<ApplicationUser> use
     [EnableRateLimiting("authentication")]
     public async Task<IActionResult> Resend(SecurityResendRequest request, CancellationToken ct)
     {
-        if (!Enum.TryParse<VerificationPurpose>(request.Purpose, out var purpose) || purpose == VerificationPurpose.Login ||
+        if (!Enum.TryParse<VerificationPurpose>(request.Purpose, out var purpose) || purpose is VerificationPurpose.Login or VerificationPurpose.Administration ||
             !Enum.IsDefined(purpose)) return Failure();
         var user = await users.GetUserAsync(User);
         if (user is null) return Unauthorized();
@@ -106,7 +107,7 @@ public sealed class LoginVerificationController(UserManager<ApplicationUser> use
             var result = await verification.ManageAsync(user.Id, purpose, request.CurrentPassword, request.Proof, null, ct);
             var session = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
             await signIn.SignInWithClaimsAsync(result.User, session.Properties?.IsPersistent == true, [new Claim("amr", "mfa")]);
-            return Ok(new { user = AuthController.ToResponse(result.User), recoveryCodes = result.Codes,
+            return Ok(new { user = AuthController.ToResponse(result.User, await administrators.IsDesignatedAsync(result.User.Id, ct), await administrators.IsOwnerAsync(result.User.Id, ct)), recoveryCodes = result.Codes,
                 verification = await verification.StatusAsync(result.User, ct) });
         }
         catch (VerificationException error) { return Failure(error); }

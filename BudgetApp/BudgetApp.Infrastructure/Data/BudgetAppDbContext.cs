@@ -10,6 +10,7 @@ using BudgetApp.Domain.RecurringExpenses;
 using BudgetApp.Domain.Transactions;
 using BudgetApp.Domain.Tutorials;
 using BudgetApp.Infrastructure.Identity;
+using BudgetApp.Infrastructure.Administration;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +22,9 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
     public DbSet<Account> Accounts => Set<Account>();
 
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+    public DbSet<AdministrativeAuditEvent> AdministrativeAuditEvents => Set<AdministrativeAuditEvent>();
+    public DbSet<ApplicationAdministratorGrant> ApplicationAdministratorGrants => Set<ApplicationAdministratorGrant>();
+    public DbSet<ApplicationAdministrationState> ApplicationAdministrationStates => Set<ApplicationAdministrationState>();
 
     public DbSet<BudgetLine> BudgetLines => Set<BudgetLine>();
 

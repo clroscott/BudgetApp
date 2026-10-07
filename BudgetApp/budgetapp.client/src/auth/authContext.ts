@@ -13,7 +13,7 @@ export interface AuthContextValue {
   initializationError: string | null
   login: (request: LoginRequest) => Promise<CurrentUser | PendingLogin>
   register: (request: RegisterRequest) => Promise<PasswordRecoveryRequestedResponse>
-  updateUser: (user: CurrentUser) => void
+  updateUser: (user: CurrentUser | null) => void
   logout: () => Promise<void>
   refresh: () => Promise<void>
 }

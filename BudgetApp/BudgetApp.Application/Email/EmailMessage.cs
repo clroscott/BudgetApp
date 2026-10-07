@@ -15,5 +15,6 @@ public enum EmailPurpose
     EmailConfirmation = 4,
     EmailChange = 5,
     LoginVerification = 6,
-    SecurityChange = 7
+    SecurityChange = 7,
+    OperatorMfaRecovery = 8
 }

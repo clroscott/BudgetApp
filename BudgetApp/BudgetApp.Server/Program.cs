@@ -5,6 +5,8 @@ using BudgetApp.Server.Middleware;
 using BudgetApp.Server.Security;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using BudgetApp.Infrastructure.Administration;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Serilog;
@@ -118,7 +120,11 @@ try
             return Task.CompletedTask;
         };
     });
-    builder.Services.AddAuthorization();
+    builder.Services.AddScoped<IAuthorizationHandler, ApplicationAdministratorAuthorization>();
+    builder.Services.AddAuthorization(options => {
+        options.AddPolicy("ApplicationAdministrator", policy => policy.RequireAuthenticatedUser().AddRequirements(new ApplicationAdministratorRequirement()));
+        options.AddPolicy("ApplicationOwner", policy => policy.RequireAuthenticatedUser().AddRequirements(new ApplicationAdministratorRequirement(OwnerOnly: true)));
+    });
     builder.Services.AddHsts(options =>
     {
         options.MaxAge = TimeSpan.FromDays(180);
@@ -203,6 +209,11 @@ try
             BudgetApp.Infrastructure.Identity.PasswordRecoveryService.TokenLifespan);
 
     var app = builder.Build();
+
+    // Local setup mode exits without opening any web listener or bootstrap API.
+    if (await ApplicationOwnerSetupCommand.TryRunAsync(app, args, databaseEnvironment)) return;
+    if (builder.Configuration.GetSection("AppAdministration:AdministratorUserIds").GetChildren().Any())
+        app.Logger.LogWarning("Legacy configured administrator IDs are ignored. Application-administrator grants now come only from the database; use the initial-owner setup tool or owner interface.");
 
     app.Logger.LogInformation(
         "Starting BudgetApp.Server in {EnvironmentName}, configured for SQL Server " +

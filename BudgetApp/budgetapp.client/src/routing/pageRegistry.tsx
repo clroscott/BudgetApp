@@ -47,6 +47,14 @@ function page(loader: () => Promise<Record<string, unknown>>, exportName: string
 }
 
 export const appPages: AppPageDefinition[] = [
+  { id: 'application-users', path: '/admin/users', label: 'Application users', access: 'account',
+    component: page(() => import('../pages/ApplicationUsersPage'), 'ApplicationUsersPage') },
+  { id: 'application-administrators', path: '/admin/administrators', label: 'Application administrators', access: 'account',
+    component: page(() => import('../pages/ApplicationAdministratorsPage'), 'ApplicationAdministratorsPage') },
+  { id: 'application-administration', path: '/admin', label: 'Application administration', icon: 'user', access: 'account',
+    navigation: { section: 'settings', order: 100 }, component: page(() => import('../pages/ApplicationAdministrationPage'), 'ApplicationAdministrationPage') },
+  { id: 'operator-mfa-recovery', path: '/recover-mfa', label: 'Recover email MFA', access: 'public',
+    component: page(() => import('../pages/OperatorMfaRecoveryPage'), 'OperatorMfaRecoveryPage') },
   {
     id: 'help', path: '/help', label: 'Help', icon: 'help', access: 'public',
     navigation: { section: 'settings', order: 90 },

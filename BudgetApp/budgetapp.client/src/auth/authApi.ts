@@ -7,6 +7,8 @@ export interface CurrentUser {
   displayName: string
   emailConfirmed: boolean
   loginVerificationEnabled: boolean
+  isApplicationAdministrator?: boolean
+  isApplicationOwner?: boolean
 }
 
 export interface RegisterRequest {
