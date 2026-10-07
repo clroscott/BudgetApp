@@ -11,5 +11,7 @@ public enum EmailPurpose
 {
     PasswordRecovery = 1,
     HouseholdInvitation = 2,
-    Informational = 3
+    Informational = 3,
+    EmailConfirmation = 4,
+    EmailChange = 5
 }

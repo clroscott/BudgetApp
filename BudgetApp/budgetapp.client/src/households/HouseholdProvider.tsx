@@ -56,12 +56,14 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   }, [persistSelection])
 
   const refresh = useCallback(async (preferredHouseholdId?: string) => {
-    if (!user) {
+    if (!user?.emailConfirmed) {
       setHouseholds([])
-      updateSelection(null)
+      // Clear only in-memory views, not the user's saved household choice or any server data.
+      selectedHouseholdIdRef.current = null
+      setSelectedHouseholdId(null)
       setInitializationError(null)
       setIsLoading(false)
-      setLoadedUserId(null)
+      setLoadedUserId(user?.id ?? null)
       return
     }
 
@@ -147,7 +149,7 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   const value = useMemo<HouseholdContextValue>(() => ({
     households,
     currentHousehold,
-    isLoading: isLoading || Boolean(user && loadedUserId !== user.id),
+    isLoading: isLoading || Boolean(user?.emailConfirmed && loadedUserId !== user.id),
     initializationError,
     selectHousehold,
     updateHousehold,

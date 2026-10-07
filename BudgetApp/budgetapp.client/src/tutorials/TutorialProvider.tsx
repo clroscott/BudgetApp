@@ -23,7 +23,7 @@ import { TutorialOverlay } from './TutorialOverlay'
 
 export function TutorialProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
-  const signedInUserId = user?.id
+  const signedInUserId = user?.emailConfirmed ? user.id : undefined
   const { navigate } = useRouter()
   const [progress, setProgress] = useState<TutorialProgress[]>([])
   const [activeTutorial, setActiveTutorial] =
@@ -97,6 +97,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const start = useCallback(async (tutorialKey: string, resume = false) => {
+    if (!signedInUserId) return
     const tutorial = tutorialByKey.get(tutorialKey)
     if (!tutorial) throw new Error('Tutorial was not found.')
     const saved = progress.find(item =>
@@ -109,7 +110,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     setActiveTutorial(tutorial)
     setActiveStepIndex(stepIndex)
     await record(tutorial, 'InProgress', stepIndex)
-  }, [navigate, progress, record])
+  }, [navigate, progress, record, signedInUserId])
 
   const dismiss = useCallback(async (tutorialKey: string) => {
     const tutorial = tutorialByKey.get(tutorialKey)

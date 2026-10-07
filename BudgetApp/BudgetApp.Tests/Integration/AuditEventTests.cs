@@ -205,26 +205,8 @@ public sealed class AuditEventTests(BudgetAppWebApplicationFactory factory)
     private static string Path(Guid householdId) =>
         $"/api/households/{householdId}/audit-events";
 
-    private static async Task<Guid> Register(HttpClient client)
-    {
-        var response = await SendWithAntiforgery(
-            client,
-            HttpMethod.Post,
-            "/api/auth/register",
-            new
-            {
-                email = $"audit-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Audit Test User"
-            },
-            await GetAntiforgeryToken(client));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var currentUser = await client.GetFromJsonAsync<CurrentUserResponse>(
-            "/api/auth/me");
-        return currentUser?.Id
-            ?? throw new InvalidOperationException("Current user ID was missing.");
-    }
+    private Task<Guid> Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"audit-{Guid.NewGuid():N}@example.test", displayName: "Audit Test User", confirmationHost: factory);
 
     private static async Task<Guid> CreateHousehold(HttpClient client)
     {

@@ -736,23 +736,8 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         return await client.SendAsync(request);
     }
 
-    private static async Task<Guid> Register(HttpClient client)
-    {
-        var response = await PostJson(
-            client,
-            "/api/auth/register",
-            new
-            {
-                email = $"csv-import-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "CSV Import Test"
-            },
-            await GetAntiforgeryToken(client));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var currentUser = await client.GetFromJsonAsync<CurrentUserResponse>("/api/auth/me");
-        return currentUser?.Id ?? throw new InvalidOperationException(
-            "The current-user endpoint did not return an ID.");
-    }
+    private Task<Guid> Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"csv-import-{Guid.NewGuid():N}@example.test", displayName: "CSV Import Test", confirmationHost: factory);
 
     private static async Task<Guid> CreateHousehold(HttpClient client)
     {

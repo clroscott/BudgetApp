@@ -179,13 +179,17 @@ public sealed class HouseholdInvitationService(
     }
 
     public async Task<HouseholdInvitationPreview> GetPreviewAsync(
+        Guid userId,
         string rawToken,
         CancellationToken cancellationToken = default)
     {
+        var userEmail = await RequireVerifiedEmailAsync(userId, cancellationToken);
         var record = await invitationRepository.GetPreviewByTokenHashAsync(
                 tokenService.Hash(rawToken),
                 cancellationToken)
             ?? throw new HouseholdInvitationUnavailableException();
+        if (!userEmail.NormalizedEmail.Equals(NormalizeEmail(record.Email).NormalizedEmail, StringComparison.Ordinal))
+            throw new HouseholdInvitationUnavailableException();
         var now = timeProvider.GetUtcNow();
         var available =
             record.Status == HouseholdInvitationStatus.Pending &&
@@ -210,10 +214,7 @@ public sealed class HouseholdInvitationService(
             Guid userId,
             CancellationToken cancellationToken = default)
     {
-        var userEmail = await invitationRepository.GetUserEmailAsync(
-                userId,
-                cancellationToken)
-            ?? throw new HouseholdInvitationEmailMismatchException();
+        var userEmail = await RequireVerifiedEmailAsync(userId, cancellationToken);
         var invitations = await invitationRepository
             .GetPendingInvitationsForEmailAsync(
                 userEmail.NormalizedEmail,
@@ -238,6 +239,7 @@ public sealed class HouseholdInvitationService(
         string rawToken,
         CancellationToken cancellationToken = default)
     {
+        await RequireVerifiedEmailAsync(userId, cancellationToken);
         var invitation = await invitationRepository.GetTrackedByTokenHashAsync(
                 tokenService.Hash(rawToken),
                 cancellationToken)
@@ -251,6 +253,7 @@ public sealed class HouseholdInvitationService(
         Guid invitationId,
         CancellationToken cancellationToken = default)
     {
+        await RequireVerifiedEmailAsync(userId, cancellationToken);
         var invitation = await invitationRepository.GetTrackedByIdAsync(
                 invitationId,
                 cancellationToken)
@@ -272,10 +275,7 @@ public sealed class HouseholdInvitationService(
             throw new HouseholdInvitationUnavailableException();
         }
 
-        var userEmail = await invitationRepository.GetUserEmailAsync(
-                userId,
-                cancellationToken)
-            ?? throw new HouseholdInvitationEmailMismatchException();
+        var userEmail = await RequireVerifiedEmailAsync(userId, cancellationToken);
         if (!userEmail.NormalizedEmail.Equals(
                 invitation.NormalizedEmail,
                 StringComparison.Ordinal))
@@ -303,6 +303,14 @@ public sealed class HouseholdInvitationService(
             invitation.Household.DefaultCurrency,
             invitation.Household.TimeZoneId,
             invitation.Role);
+    }
+
+    private async Task<UserEmailRecord> RequireVerifiedEmailAsync(Guid userId, CancellationToken ct)
+    {
+        var record = await invitationRepository.GetUserEmailAsync(userId, ct);
+        if (record is null || !record.EmailConfirmed || string.IsNullOrWhiteSpace(record.NormalizedEmail))
+            throw new EmailOwnershipRequiredException();
+        return record;
     }
 
     private async Task<HouseholdRole> RequireManagerAsync(

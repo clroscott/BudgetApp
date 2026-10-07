@@ -19,10 +19,11 @@ export function householdsFixture(): HouseholdContextValue {
   }
 }
 export function authFixture(): AuthContextValue {
-  const user = { id: 'test-user', email: 'sample@example.test', displayName: 'Sample user' }
+  const user = { id: 'test-user', email: 'sample@example.test', displayName: 'Sample user', emailConfirmed: true }
   return {
     user, isLoading: false, initializationError: null,
-    login: vi.fn(async () => user), register: vi.fn(async () => user),
+    login: vi.fn(async () => user), register: vi.fn(async () => ({ message: 'Check your email.' })),
+    updateUser: vi.fn(),
     logout: vi.fn(async () => {}), refresh: vi.fn(async () => {}),
   }
 }

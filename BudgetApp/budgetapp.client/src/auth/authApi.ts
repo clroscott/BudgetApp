@@ -4,6 +4,7 @@ export interface CurrentUser {
   id: string
   email: string
   displayName: string
+  emailConfirmed: boolean
 }
 
 export interface RegisterRequest {
@@ -44,8 +45,21 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   }
 }
 
-export function register(request: RegisterRequest): Promise<CurrentUser> {
-  return apiPost<CurrentUser>('/api/auth/register', request)
+export function register(request: RegisterRequest): Promise<PasswordRecoveryRequestedResponse> {
+  return apiPost<PasswordRecoveryRequestedResponse>('/api/auth/register', request)
+}
+
+export function resendConfirmation(): Promise<PasswordRecoveryRequestedResponse> {
+  return apiPost('/api/auth/resend-confirmation', {})
+}
+
+export function confirmEmail(userId: string, token: string, changeEmail = false): Promise<CurrentUser> {
+  return apiPost(`/api/auth/${changeEmail ? 'confirm-email-change' : 'confirm-email'}`, { userId, token })
+}
+
+// Shared backend flow for the account settings interface (#156).
+export function requestEmailChange(newEmail: string, currentPassword: string): Promise<PasswordRecoveryRequestedResponse> {
+  return apiPost('/api/auth/request-email-change', { newEmail, currentPassword })
 }
 
 export function login(request: LoginRequest): Promise<CurrentUser> {

@@ -227,21 +227,25 @@ public sealed class HouseholdInvitationAcceptanceController(
             return Unauthorized();
         }
 
-        var invitations = await invitationService.GetPendingForUserAsync(
-            userId,
-            cancellationToken);
-        return Ok(invitations.Select(ToResponse).ToList());
+        try
+        {
+            var invitations = await invitationService.GetPendingForUserAsync(userId, cancellationToken);
+            return Ok(invitations.Select(ToResponse).ToList());
+        }
+        catch (EmailOwnershipRequiredException) { return ConfirmationRequired(); }
     }
 
-    [AllowAnonymous]
+    [Authorize]
     [HttpGet("preview")]
     public async Task<ActionResult<HouseholdInvitationPreviewResponse>> Preview(
         [FromQuery, Required, StringLength(512)] string token,
         CancellationToken cancellationToken)
     {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
         try
         {
             var preview = await invitationService.GetPreviewAsync(
+                userId,
                 token,
                 cancellationToken);
             return Ok(new HouseholdInvitationPreviewResponse(
@@ -253,6 +257,7 @@ public sealed class HouseholdInvitationAcceptanceController(
                 preview.IsAvailable,
                 preview.Status));
         }
+        catch (EmailOwnershipRequiredException) { return ConfirmationRequired(); }
         catch (HouseholdInvitationUnavailableException)
         {
             return NotFound(new ProblemDetails
@@ -288,6 +293,7 @@ public sealed class HouseholdInvitationAcceptanceController(
                 membership.TimeZoneId,
                 membership.Role.ToString()));
         }
+        catch (EmailOwnershipRequiredException) { return ConfirmationRequired(); }
         catch (HouseholdInvitationEmailMismatchException exception)
         {
             return StatusCode(
@@ -331,6 +337,7 @@ public sealed class HouseholdInvitationAcceptanceController(
                 cancellationToken);
             return Ok(ToResponse(membership));
         }
+        catch (EmailOwnershipRequiredException) { return ConfirmationRequired(); }
         catch (HouseholdInvitationEmailMismatchException exception)
         {
             return StatusCode(
@@ -354,6 +361,15 @@ public sealed class HouseholdInvitationAcceptanceController(
                 });
         }
     }
+
+    private ObjectResult ConfirmationRequired() => StatusCode(StatusCodes.Status403Forbidden,
+        new ProblemDetails
+        {
+            Status = StatusCodes.Status403Forbidden,
+            Title = "Email confirmation required",
+            Detail = "Confirm your account email address before viewing or accepting household invitations.",
+            Extensions = { ["code"] = "EmailConfirmationRequired" }
+        });
 
     private bool TryGetUserId(out Guid userId) =>
         Guid.TryParse(

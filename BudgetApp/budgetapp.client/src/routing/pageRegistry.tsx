@@ -65,7 +65,7 @@ export const appPages: AppPageDefinition[] = [
     id: 'forgot-password',
     path: '/forgot-password',
     label: 'Forgot password',
-    access: 'anonymous',
+    access: 'public',
     component: page(
       () => import('../pages/ForgotPasswordPage'),
       'ForgotPasswordPage',
@@ -80,6 +80,34 @@ export const appPages: AppPageDefinition[] = [
       () => import('../pages/ResetPasswordPage'),
       'ResetPasswordPage',
     ),
+  },
+  {
+    id: 'confirm-email',
+    path: '/confirm-email',
+    label: 'Confirm email',
+    access: 'public',
+    component: page(() => import('../pages/EmailConfirmationPage'), 'EmailConfirmationPage'),
+  },
+  {
+    id: 'confirm-email-change',
+    path: '/confirm-email-change',
+    label: 'Confirm new email',
+    access: 'public',
+    component: page(() => import('../pages/EmailConfirmationPage'), 'EmailConfirmationPage'),
+  },
+  {
+    id: 'verify-email',
+    path: '/verify-email',
+    label: 'Confirm your email',
+    access: 'public',
+    component: page(() => import('../pages/ResendConfirmationPage'), 'ResendConfirmationPage'),
+  },
+  {
+    id: 'resend-confirmation',
+    path: '/resend-confirmation',
+    label: 'Email confirmation',
+    access: 'public',
+    component: page(() => import('../pages/ResendConfirmationPage'), 'ResendConfirmationPage'),
   },
   {
     id: 'household-invitation-accept',

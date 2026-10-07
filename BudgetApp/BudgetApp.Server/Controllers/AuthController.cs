@@ -1,20 +1,24 @@
 using System.ComponentModel.DataAnnotations;
 using BudgetApp.Application.Authentication;
 using BudgetApp.Infrastructure.Identity;
+using BudgetApp.Server.Security;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 
 namespace BudgetApp.Server.Controllers;
 
 [ApiController]
 [Route("api/auth")]
+[AllowUnverifiedEmail]
 public sealed class AuthController(
     UserManager<ApplicationUser> userManager,
     SignInManager<ApplicationUser> signInManager,
     IPasswordRecoveryService passwordRecoveryService,
+    IEmailOwnershipService emailOwnershipService,
     ILogger<AuthController> logger) : ControllerBase
 {
     [AllowAnonymous]
@@ -31,8 +35,8 @@ public sealed class AuthController(
     [AllowAnonymous]
     [EnableRateLimiting("authentication")]
     [HttpPost("register")]
-    public async Task<ActionResult<CurrentUserResponse>> Register(
-        RegisterRequest request)
+    public async Task<ActionResult<EmailRequestedResponse>> Register(
+        RegisterRequest request, CancellationToken cancellationToken)
     {
         var email = request.Email.Trim();
         var user = new ApplicationUser
@@ -43,17 +47,26 @@ public sealed class AuthController(
             DisplayName = request.DisplayName.Trim()
         };
 
-        var result = await userManager.CreateAsync(user, request.Password);
-
-        if (!result.Succeeded)
+        try
         {
-            return IdentityValidationProblem(result);
+            var result = await userManager.CreateAsync(user, request.Password);
+            if (result.Succeeded)
+            {
+                await emailOwnershipService.RequestConfirmationAsync(user.Id, cancellationToken);
+                logger.LogInformation("Registered user {UserId}; email confirmation requested", user.Id);
+            }
+            else if (result.Errors.Any(error => error.Code is not "DuplicateEmail" and not "DuplicateUserName"))
+            {
+                return IdentityValidationProblem(result);
+            }
         }
-
-        await signInManager.SignInAsync(user, isPersistent: false);
-        logger.LogInformation("Registered and signed in user {UserId}", user.Id);
-
-        return Ok(ToResponse(user));
+        catch (DbUpdateException)
+        {
+            // Concurrent duplicate registration has the same response as an existing address.
+            logger.LogWarning("Registration could not be completed due to an account write conflict");
+        }
+        return Accepted(new EmailRequestedResponse(
+            "If registration can be completed for that address, a confirmation link has been requested. If you already have an account, sign in or reset your password."));
     }
 
     [AllowAnonymous]
@@ -162,6 +175,63 @@ public sealed class AuthController(
     }
 
     [Authorize]
+    [EnableRateLimiting("emailOwnership")]
+    [HttpPost("resend-confirmation")]
+    public async Task<ActionResult<EmailRequestedResponse>> ResendConfirmation(CancellationToken cancellationToken)
+    {
+        var user = await userManager.GetUserAsync(User);
+        if (user is null) return Unauthorized();
+        await emailOwnershipService.RequestConfirmationAsync(user.Id, cancellationToken);
+        return Accepted(ConfirmationRequested());
+    }
+
+    [Authorize]
+    [EnableRateLimiting("emailOwnership")]
+    [HttpPost("request-email-change")]
+    public async Task<ActionResult<EmailRequestedResponse>> RequestEmailChange(
+        RequestEmailChangeRequest request, CancellationToken cancellationToken)
+    {
+        var user = await userManager.GetUserAsync(User);
+        if (user is null) return Unauthorized();
+        if (!await emailOwnershipService.RequestEmailChangeAsync(user.Id, request.NewEmail,
+                request.CurrentPassword, cancellationToken))
+            return Problem(statusCode: StatusCodes.Status400BadRequest,
+                title: "Email change not requested", detail: "Check your current password and the email address, then try again.");
+        return Accepted(ConfirmationRequested());
+    }
+
+    [Authorize]
+    [EnableRateLimiting("emailOwnership")]
+    [HttpPost("confirm-email")]
+    public Task<ActionResult<CurrentUserResponse>> ConfirmEmail(
+        ConfirmEmailRequest request, CancellationToken cancellationToken) =>
+        ConfirmEmail(request, false, cancellationToken);
+
+    [Authorize]
+    [EnableRateLimiting("emailOwnership")]
+    [HttpPost("confirm-email-change")]
+    public Task<ActionResult<CurrentUserResponse>> ConfirmEmailChange(
+        ConfirmEmailRequest request, CancellationToken cancellationToken) =>
+        ConfirmEmail(request, true, cancellationToken);
+
+    private async Task<ActionResult<CurrentUserResponse>> ConfirmEmail(
+        ConfirmEmailRequest request, bool changeEmail, CancellationToken cancellationToken)
+    {
+        var user = await userManager.GetUserAsync(User);
+        if (user is null) return Unauthorized();
+        if (!await emailOwnershipService.ConfirmAsync(user.Id, request.UserId, request.Token,
+                changeEmail, cancellationToken))
+            return Problem(statusCode: StatusCodes.Status400BadRequest, title: "Confirmation unavailable",
+                detail: "This link is invalid, expired, replaced, already used, or belongs to another account. Sign in to the account that requested it or request a new link.");
+        // The service updates this scoped Identity entity within its transaction.
+        await signInManager.RefreshSignInAsync(user);
+        return Ok(ToResponse(user));
+    }
+
+    private static EmailRequestedResponse ConfirmationRequested() => new(
+        "If the address can be confirmed, a confirmation link has been requested. Check your inbox and spam folder. Wait at least one minute before requesting another link. If no email arrives, retry or contact the person who manages this installation.");
+
+    [Authorize]
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
     {
@@ -200,7 +270,7 @@ public sealed class AuthController(
     }
 
     private static CurrentUserResponse ToResponse(ApplicationUser user) =>
-        new(user.Id, user.Email!, user.DisplayName);
+        new(user.Id, user.Email!, user.DisplayName, user.EmailConfirmed);
 }
 
 public sealed record AntiforgeryResponse(string Token);
@@ -232,4 +302,12 @@ public sealed record ChangePasswordRequest(
 public sealed record CurrentUserResponse(
     Guid Id,
     string Email,
-    string DisplayName);
+    string DisplayName,
+    bool EmailConfirmed);
+
+public sealed record EmailRequestedResponse(string Message);
+public sealed record ConfirmEmailRequest(Guid UserId,
+    [param: Required, StringLength(4096)] string Token);
+public sealed record RequestEmailChangeRequest(
+    [param: Required, EmailAddress, StringLength(256)] string NewEmail,
+    [param: Required, StringLength(128)] string CurrentPassword);

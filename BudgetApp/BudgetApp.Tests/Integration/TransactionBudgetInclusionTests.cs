@@ -318,7 +318,7 @@ public sealed class TransactionBudgetInclusionTests(BudgetAppWebApplicationFacto
     {
         using var isolated = new BudgetAppWebApplicationFactory();
         using var owner = isolated.CreateAuthenticatedTestClient();
-        var userId = await Register(owner);
+        var userId = await TestIdentity.RegisterAndSignIn(owner, confirmationHost: isolated);
         var householdId = await CreateHousehold(owner);
         using var scope = isolated.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
@@ -399,14 +399,8 @@ public sealed class TransactionBudgetInclusionTests(BudgetAppWebApplicationFacto
         request.Headers.Add("X-XSRF-TOKEN", token);
         return await client.SendAsync(request);
     }
-    private static async Task<Guid> Register(HttpClient client)
-    {
-        var result = await Send(client, HttpMethod.Post, "/api/auth/register", JsonContent.Create(new {
-            email = $"budget-inclusion-{Guid.NewGuid():N}@example.test", password = "a long test password", displayName = "Test"
-        }));
-        Assert.Equal(HttpStatusCode.OK, result.StatusCode);
-        return (await client.GetFromJsonAsync<IdResult>("/api/auth/me"))!.Id;
-    }
+    private Task<Guid> Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"budget-inclusion-{Guid.NewGuid():N}@example.test", displayName: "Test", confirmationHost: factory);
     private static async Task<Guid> CreateHousehold(HttpClient client)
     {
         var result = await Send(client, HttpMethod.Post, "/api/households", JsonContent.Create(new {

@@ -89,6 +89,7 @@ public static class DependencyInjection
         services.AddScoped<ITutorialProgressRepository, TutorialProgressRepository>();
         services.AddScoped<TutorialProgressService>();
         services.AddScoped<IPasswordRecoveryService, PasswordRecoveryService>();
+        services.AddScoped<IEmailOwnershipService, EmailOwnershipService>();
         services.AddSingleton(TimeProvider.System);
         AddEmailInfrastructure(
             services,

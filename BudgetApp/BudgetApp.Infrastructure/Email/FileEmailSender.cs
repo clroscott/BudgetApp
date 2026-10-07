@@ -122,6 +122,8 @@ public sealed class FileEmailSender(
         {
             EmailPurpose.PasswordRecovery => "password-recovery",
             EmailPurpose.HouseholdInvitation => "household-invitation",
+            EmailPurpose.EmailConfirmation => "email-confirmation",
+            EmailPurpose.EmailChange => "email-change",
             _ => "informational"
         };
 }

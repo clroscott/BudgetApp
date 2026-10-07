@@ -16,6 +16,10 @@ public sealed class ApplicationEmailLinkBuilder(ApplicationUrlOptions options)
     public string BuildHouseholdInvitationLink(string token) =>
         BuildLink("/household-invitations/accept", ("token", token));
 
+    public string BuildEmailConfirmationLink(Guid userId, string token, bool changeEmail) =>
+        BuildLink(changeEmail ? "/confirm-email-change" : "/confirm-email",
+            ("userId", userId.ToString()), ("token", token));
+
     private string BuildLink(
         string relativePath,
         params (string Name, string Value)[] parameters)

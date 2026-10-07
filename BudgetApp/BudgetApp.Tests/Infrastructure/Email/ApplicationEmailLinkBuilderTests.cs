@@ -31,6 +31,20 @@ public sealed class ApplicationEmailLinkBuilderTests
     }
 
     [Theory]
+    [InlineData(false, "/confirm-email")]
+    [InlineData(true, "/confirm-email-change")]
+    public void ConfirmationLinks_EncodeTokensAndContainNoTargetEmail(bool changing, string path)
+    {
+        var builder = new ApplicationEmailLinkBuilder(new ApplicationUrlOptions { PublicBaseUrl = "https://budget.example" });
+        var userId = Guid.NewGuid();
+        var link = builder.BuildEmailConfirmationLink(userId, "token +/&?", changing);
+        Assert.StartsWith($"https://budget.example{path}?", link, StringComparison.Ordinal);
+        Assert.Contains($"userId={userId}", link);
+        Assert.Contains("token=token%20%2B%2F%26%3F", link);
+        Assert.DoesNotContain("email=", link, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
     [InlineData("http://budget.example")]
     [InlineData("file:///C:/BudgetApp")]
     [InlineData("https://user:password@budget.example")]

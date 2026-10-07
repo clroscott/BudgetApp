@@ -19,6 +19,8 @@ public sealed class HouseholdInvitationTests(
     public async Task Invitation_DeliveryFailurePreservesPendingInvitationAndResendDoesNotDuplicateIt()
     {
         using var initializeDatabase = factory.CreateAuthenticatedTestClient();
+        var ownerEmail = $"owner-failure-{Guid.NewGuid():N}@example.test";
+        var household = await RegisterAndCreateHousehold(initializeDatabase, ownerEmail);
         using var failingHost = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IEmailSender>();
@@ -29,7 +31,7 @@ public sealed class HouseholdInvitationTests(
             BaseAddress = new Uri("https://localhost"),
             AllowAutoRedirect = false
         });
-        var household = await RegisterAndCreateHousehold(client, $"owner-failure-{Guid.NewGuid():N}@example.test");
+        (await Post(client, "/api/auth/login", new { email = ownerEmail, password = TestIdentity.Password })).EnsureSuccessStatusCode();
         var recipient = $"invite-failure-{Guid.NewGuid():N}@example.test";
 
         var create = await Post(client, $"/api/households/{household.Id}/invitations", new { email = recipient, role = "Viewer" });
@@ -232,6 +234,7 @@ public sealed class HouseholdInvitationTests(
             ownerClient,
             $"owner-{Guid.NewGuid():N}@example.test");
         var sender = factory.Services.GetRequiredService<RecordingEmailSender>();
+        var inviteeEmail = $"invitee-{Guid.NewGuid():N}@example.test";
         sender.Clear();
 
         var createResponse = await Post(
@@ -239,7 +242,7 @@ public sealed class HouseholdInvitationTests(
             $"/api/households/{household.Id}/invitations",
             new
             {
-                email = $"invitee-{Guid.NewGuid():N}@example.test",
+                email = inviteeEmail,
                 role = "Editor"
             });
         var created = await createResponse.Content
@@ -267,7 +270,10 @@ public sealed class HouseholdInvitationTests(
         var secondToken = ExtractToken(Assert.Single(sender.Messages).PlainTextBody);
         Assert.NotEqual(firstToken, secondToken);
 
-        var oldPreview = await ownerClient.GetAsync(
+        using var inviteeClient = factory.CreateAuthenticatedTestClient();
+        await Register(inviteeClient, inviteeEmail);
+
+        var oldPreview = await inviteeClient.GetAsync(
             $"/api/household-invitations/preview?token={Uri.EscapeDataString(firstToken)}");
         Assert.Equal(HttpStatusCode.NotFound, oldPreview.StatusCode);
 
@@ -277,7 +283,7 @@ public sealed class HouseholdInvitationTests(
             new { });
         Assert.Equal(HttpStatusCode.NoContent, revokeResponse.StatusCode);
 
-        var revokedPreview = await ownerClient.GetFromJsonAsync<
+        var revokedPreview = await inviteeClient.GetFromJsonAsync<
             PreviewResponse>(
             $"/api/household-invitations/preview?token={Uri.EscapeDataString(secondToken)}");
         Assert.False(revokedPreview?.IsAvailable);
@@ -460,7 +466,7 @@ public sealed class HouseholdInvitationTests(
         Assert.Equal(HttpStatusCode.Conflict, customizedDelete.StatusCode);
     }
 
-    private static async Task<HouseholdResponse> RegisterAndCreateHousehold(
+    private async Task<HouseholdResponse> RegisterAndCreateHousehold(
         HttpClient client,
         string email)
     {
@@ -478,18 +484,15 @@ public sealed class HouseholdInvitationTests(
         return (await response.Content.ReadFromJsonAsync<HouseholdResponse>())!;
     }
 
-    private static async Task Register(HttpClient client, string email)
+    private async Task Register(HttpClient client, string email)
     {
-        var response = await Post(
-            client,
-            "/api/auth/register",
-            new
-            {
-                email,
-                password = "a long test password",
-                displayName = "Invitation Test"
-            });
-        response.EnsureSuccessStatusCode();
+        await TestIdentity.RegisterAndSignIn(client, email, displayName: "Invitation Test");
+        var confirmation = factory.Services.GetRequiredService<RecordingEmailSender>().Messages
+            .LastOrDefault(message => message.Purpose == EmailPurpose.EmailConfirmation && message.RecipientAddress == email);
+        Assert.NotNull(confirmation);
+        var link = TestIdentity.LinkParameters(confirmation.PlainTextBody);
+        (await Post(client, "/api/auth/confirm-email", new { userId = link["userId"], token = link["token"] }))
+            .EnsureSuccessStatusCode();
     }
 
     private static async Task<HttpResponseMessage> Post<T>(

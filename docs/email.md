@@ -1,7 +1,7 @@
 # Email Infrastructure
 
 BudgetApp has provider-neutral backend email infrastructure for password recovery,
-household invitations, and future application messages. It can send real mail
+household invitations, email confirmation/address changes, and future application messages. It can send real mail
 using an authenticated SMTP service, including a dedicated personal Gmail account.
 The application itself can remain local while sending email over the internet.
 
@@ -232,7 +232,7 @@ The Application project owns:
 
 - `IEmailSender`;
 - provider-neutral email messages and purposes;
-- the password-recovery and household-invitation templates;
+- the password-recovery, household-invitation, and email-ownership templates;
 - `IApplicationEmailLinkBuilder`;
 - a dispatch service that reports delivery failure without throwing into the
   underlying household or authentication operation.
@@ -312,7 +312,8 @@ Provider credentials must be supplied to the backend through local secrets or
 environment configuration and must never be placed in React configuration,
 source control, normal logs, or generated client assets.
 
-Account email confirmation is tracked in #149 and is not enabled by this delivery
-change. Its future messages can use the same sender. External public hosting,
+[Account email confirmation (#149)](email-ownership.md) uses the same sender and
+configured URL. File-mode confirmation messages use `email-confirmation` and
+`email-change` filenames. External public hosting,
 verified-domain sending, and production volume/bounce management still require
 the later deployment/provider work; this phase is real email from the local app.

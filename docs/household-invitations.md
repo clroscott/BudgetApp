@@ -23,9 +23,10 @@ them, or revoke them.
 2. BudgetApp creates a pending invitation that expires after seven days.
 3. The configured backend email sender receives a link containing the
    one-time invitation token.
-4. The invited person opens the link and signs in or registers.
-5. BudgetApp requires the signed-in account's normalized email address to match
-   the invitation.
+4. The invited person signs in or registers, then confirms account email ownership.
+5. BudgetApp requires the signed-in account's verified normalized email address to
+   match before listing, previewing, or accepting the invitation. Anonymous and
+   unverified visitors see sign-in/confirmation guidance, not invitation details.
 6. Acceptance creates an active `HouseholdMember` and marks the invitation
    accepted in the same database operation.
 
@@ -34,10 +35,9 @@ link immediately stops working. Revoking an invitation also prevents
 acceptance. Accepted, revoked, and expired invitations remain visible as
 history.
 
-BudgetApp currently allows an account to participate in one active household.
-An account that already has an active household cannot accept another
-invitation until it leaves that household or deletes an eligible unused
-household.
+An account may participate in multiple households. Accepting adds a separate
+membership; it does not move or combine financial records. Email verification
+does not alter any existing memberships. See [Account email ownership](email-ownership.md).
 
 ## Recovering From the Wrong Household
 
@@ -86,7 +86,9 @@ To test the full flow:
 3. Open **Household**, invite a different fictional email, and select a role.
 4. Open the newest household-invitation file in the Development outbox.
 5. Follow its link and register using exactly the invited email address.
-6. Accept the invitation and confirm the shared household opens.
+6. Sign in, open the new email-confirmation message, and explicitly confirm the
+   address. Return to the invitation (or refresh the original tab), accept it, and
+   confirm the shared household opens.
 7. Sign back in as the Owner and confirm the new member and accepted invitation
    appear on the Household page.
 
@@ -101,7 +103,9 @@ POST /api/households/{householdId}/invitations
 POST /api/households/{householdId}/invitations/{invitationId}/resend
 POST /api/households/{householdId}/invitations/{invitationId}/revoke
 GET  /api/household-invitations/preview?token={token}
+GET  /api/household-invitations/pending
 POST /api/household-invitations/accept
+POST /api/household-invitations/pending/{invitationId}/accept
 POST /api/households/{householdId}/leave
 DELETE /api/households/{householdId}/unused
 ```

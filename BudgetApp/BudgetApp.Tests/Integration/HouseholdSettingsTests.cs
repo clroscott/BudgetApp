@@ -280,12 +280,8 @@ public sealed class HouseholdSettingsTests(BudgetAppWebApplicationFactory factor
         request.Headers.Add("X-XSRF-TOKEN", token);
         return await client.SendAsync(request);
     }
-    private static async Task<Guid> Register(HttpClient client)
-    {
-        var response = await Send(client, "/api/auth/register", new { email = $"settings-{Guid.NewGuid():N}@example.test", password = "a long test password", displayName = "Settings Test" }, HttpMethod.Post);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return (await response.Content.ReadFromJsonAsync<Membership>())!.Id;
-    }
+    private Task<Guid> Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"settings-{Guid.NewGuid():N}@example.test", displayName: "Settings Test", confirmationHost: factory);
     private static async Task<Guid> Create(HttpClient client)
     {
         var response = await Send(client, "/api/households", new { name = "Settings household", defaultCurrency = "CAD", timeZoneId = "America/Vancouver" }, HttpMethod.Post);

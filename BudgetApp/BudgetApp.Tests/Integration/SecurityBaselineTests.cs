@@ -37,19 +37,22 @@ public sealed class SecurityBaselineTests(BudgetAppWebApplicationFactory factory
     {
         using var client = factory.CreateAuthenticatedTestClient();
         var token = await GetAntiforgeryToken(client);
+        var email = $"security-{Guid.NewGuid():N}@example.test";
 
-        var response = await Send(
+        var registration = await Send(
             client,
             HttpMethod.Post,
             "/api/auth/register",
             new
             {
-                email = $"security-{Guid.NewGuid():N}@example.test",
+                email,
                 password = "a long test password",
                 displayName = "Security Test"
             },
             token);
 
+        registration.EnsureSuccessStatusCode();
+        var response = await TestIdentity.Post(client, "/api/auth/login", new { email, password = TestIdentity.Password });
         response.EnsureSuccessStatusCode();
         var cookie = Assert.Single(
             response.Headers.GetValues("Set-Cookie"),
@@ -106,6 +109,7 @@ public sealed class SecurityBaselineTests(BudgetAppWebApplicationFactory factory
         $"/api/households/{HouseholdId}/import-profiles",
         $"/api/households/{HouseholdId}/imports",
         $"/api/households/{HouseholdId}/members",
+        $"/api/households/{HouseholdId}/settings",
         $"/api/households/{HouseholdId}/recurring-expenses",
         $"/api/households/{HouseholdId}/transactions",
         $"/api/households/{HouseholdId}/yearly-plans/2026?scope=Household",
@@ -113,21 +117,8 @@ public sealed class SecurityBaselineTests(BudgetAppWebApplicationFactory factory
         "/api/tutorial-progress"
     };
 
-    private static async Task Register(HttpClient client)
-    {
-        var response = await Send(
-            client,
-            HttpMethod.Post,
-            "/api/auth/register",
-            new
-            {
-                email = $"security-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Security Test"
-            },
-            await GetAntiforgeryToken(client));
-        response.EnsureSuccessStatusCode();
-    }
+    private Task Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"security-{Guid.NewGuid():N}@example.test", displayName: "Security Test", confirmationHost: factory);
 
     private static async Task<string> GetAntiforgeryToken(HttpClient client)
     {

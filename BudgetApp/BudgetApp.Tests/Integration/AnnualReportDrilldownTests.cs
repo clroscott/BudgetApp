@@ -201,14 +201,8 @@ public sealed class AnnualReportDrilldownTests(BudgetAppWebApplicationFactory fa
     }
     private static async Task<TransactionListResult> List(HttpClient client, Guid householdId, string query) =>
         (await client.GetFromJsonAsync<TransactionListResult>($"/api/households/{householdId}/transactions?{query}"))!;
-    private static async Task<Guid> Register(HttpClient client)
-    {
-        var result = await Send(client, "/api/auth/register", new {
-            email = $"drill-down-{Guid.NewGuid():N}@example.test", password = "a long test password", displayName = "Test"
-        });
-        Assert.Equal(HttpStatusCode.OK, result.StatusCode);
-        return (await client.GetFromJsonAsync<IdResult>("/api/auth/me"))!.Id;
-    }
+    private Task<Guid> Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"drill-down-{Guid.NewGuid():N}@example.test", displayName: "Test", confirmationHost: factory);
     private static async Task<Guid> CreateHousehold(HttpClient client)
     {
         var result = await Send(client, "/api/households", new {

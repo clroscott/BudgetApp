@@ -40,6 +40,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh()
   }, [refresh])
 
+  useEffect(() => {
+    if (!user || user.emailConfirmed) return
+    const userId = user.id
+    let disposed = false
+    let checking = false
+    const checkVerification = async () => {
+      if (checking || document.visibilityState === 'hidden') return
+      checking = true
+      try {
+        const currentUser = await getCurrentUser()
+        if (!disposed) {
+          setUser(existing => existing?.id === userId && !existing.emailConfirmed ? currentUser : existing)
+        }
+      } catch {
+        // Keep the page and entered values on a transient failure. Explicit status
+        // checking still offers the normal error/retry flow; never resend an email.
+      } finally { checking = false }
+    }
+    const onReturn = () => { void checkVerification() }
+    window.addEventListener('focus', onReturn)
+    document.addEventListener('visibilitychange', onReturn)
+    return () => {
+      disposed = true
+      window.removeEventListener('focus', onReturn)
+      document.removeEventListener('visibilitychange', onReturn)
+    }
+  }, [user])
+
   const login = useCallback(async (request: LoginRequest) => {
     const currentUser = await loginRequest(request)
     setUser(currentUser)
@@ -47,9 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const register = useCallback(async (request: RegisterRequest) => {
-    const currentUser = await registerRequest(request)
-    setUser(currentUser)
-    return currentUser
+    return registerRequest(request)
   }, [])
 
   const logout = useCallback(async () => {
@@ -63,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializationError,
     login,
     register,
+    updateUser: setUser,
     logout,
     refresh,
   }), [initializationError, isLoading, login, logout, refresh, register, user])

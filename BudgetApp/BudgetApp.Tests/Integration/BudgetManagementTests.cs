@@ -353,20 +353,8 @@ public sealed class BudgetManagementTests(BudgetAppWebApplicationFactory factory
         Assert.Equal(1, budget.CurrencyMismatchTransactionCount);
     }
 
-    private static async Task<Guid> Register(HttpClient client)
-    {
-        var response = await SendWithAntiforgery(
-            client, HttpMethod.Post, "/api/auth/register",
-            new
-            {
-                email = $"budgets-{Guid.NewGuid():N}@example.test",
-                password = "a long test password",
-                displayName = "Budget Test"
-            },
-            await GetAntiforgeryToken(client));
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        return (await client.GetFromJsonAsync<CurrentUserResponse>("/api/auth/me"))!.Id;
-    }
+    private Task<Guid> Register(HttpClient client) =>
+        TestIdentity.RegisterAndSignIn(client, $"budgets-{Guid.NewGuid():N}@example.test", displayName: "Budget Test", confirmationHost: factory);
 
     private static async Task<Guid> CreateHousehold(HttpClient client)
     {

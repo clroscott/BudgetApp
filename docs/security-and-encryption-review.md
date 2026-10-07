@@ -26,9 +26,15 @@ BudgetApp already has a useful application-security foundation:
   strings, transaction contents, or uploaded files.
 
 The application must not be placed on the public Internet yet. The principal
-blockers are verified email ownership, a selected and hardened hosting perimeter,
+blockers include a selected and hardened hosting perimeter,
 explicit Data Protection key storage, and an encryption plan for the SQL Server
 Express database and its backups.
+
+2026-10-06 follow-up: #149 implements account email ownership with a full app-access gate,
+generic registration responses, and immediate security-stamp session checks.
+Automated coverage is recorded in [Email ownership](email-ownership.md); live SMTP,
+recipient-device, and concurrent SQL Server checks still require QA. This does
+not change the overall public-hosting decision or close other launch gates.
 
 ## Lightweight threat model
 
@@ -45,25 +51,31 @@ Express database and its backups.
 
 ## Findings and launch gates
 
-### SEC-001 — Email ownership is not verified (launch blocker)
+### SEC-001 — Email ownership (#149 implementation; live verification pending)
 
-`RequireConfirmedAccount` is currently false. Public registration therefore does
-not prove that the registrant owns the supplied email address. This is especially
-important now that first-time users can discover pending invitations by matching
-their account email.
+Identity confirmation and change-email tokens now provide expiring, single-use
+proof for account email ownership. Pending listing, invitation previews, and
+both acceptance paths require a confirmed matching address. Possession of an
+invitation token alone is no longer enough to reveal details to an unverified
+account. The registration API is generic and does not issue a login cookie. The
+registration interface follows it with the normal rate-limited credential check
+using the already entered password, rather than making the user type it twice.
 
-Before public launch:
+`RequireConfirmedAccount` remains false intentionally so users can sign in to
+confirm, resend, recover, or sign out. A separate backend gate requires
+`EmailConfirmed` for app-data APIs, and the client redirects unverified users
+to a dedicated confirmation page without loading financial/household data.
+Existing accounts must confirm once; their data is kept, not deleted or reset.
+Password and email-address changes invalidate other sessions immediately through
+security-stamp validation. Ordinary confirmation of the unchanged address keeps
+existing sessions usable; all app access checks the DB verification flag. A proof
+cannot sign in an anonymous visitor and must still match the signed-in account.
 
-1. Add an email-confirmation token and template through `IEmailSender`.
-2. Require confirmation before normal sign-in or before revealing/accepting an
-   account-matched invitation.
-3. Keep the existing invitation-token flow: possession of the emailed invitation
-   link remains an independent proof for that invitation.
-4. Add tests for unconfirmed users, token expiry/replay, email changes, and an
-   attacker registering the invited address first.
-
-ASP.NET Core Identity exposes confirmed-email/account requirements; use those
-framework mechanisms rather than a custom verification scheme.
+Automated regression coverage includes expiry/replacement/replay, existing
+accounts, impersonated registration and password recovery, email changes,
+duplicate addresses, resend limits, delivery failures, and invitation metadata
+privacy. Complete the corresponding live QA and hosting-provider checks before
+public launch; see [Email ownership](email-ownership.md).
 
 ### SEC-002 — Internet hosting topology is undecided (launch blocker)
 
