@@ -43,6 +43,15 @@ function AnonymousOnlyRoute({ children }: { children: ReactNode }) {
     : children
 }
 
+function AccountRoute({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  const { currentHousehold } = useHouseholds()
+  if (!user) return <Redirect to={`/login?returnTo=${encodeURIComponent('/settings/account')}`} />
+  const content = <Fragment key={user.id}>{children}</Fragment>
+  // Account maintenance must not depend on household loading or membership.
+  return <AppShell showHouseholdNavigation={user.emailConfirmed && Boolean(currentHousehold)}>{content}</AppShell>
+}
+
 function HouseholdRequiredRoute({ children }: { children: ReactNode }) {
   const {
     currentHousehold,
@@ -156,6 +165,8 @@ function AppRoutes() {
   if (page.access === 'public') {
     return content
   }
+
+  if (page.access === 'account') return <AccountRoute>{content}</AccountRoute>
 
   if (page.access === 'household-setup') {
     return (

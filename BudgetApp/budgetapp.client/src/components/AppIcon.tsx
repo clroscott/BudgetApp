@@ -12,8 +12,10 @@ export type AppIconName =
   | 'recurring'
   | 'review'
   | 'transactions'
+  | 'user'
 
 const paths: Record<AppIconName, string[]> = {
+  user: ['M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0', 'M4 21v-2a8 8 0 0 1 16 0v2'],
   accounts: ['M4 7h16v12H4z', 'M4 10h16', 'M16 15h1'],
   activity: ['M12 8v5l3 2', 'M3.1 12a9 9 0 1 0 2.6-6.3', 'M3 4v5h5'],
   budget: ['M12 2v20', 'M17 6.5c-1-1-2.5-1.5-5-1.5-3 0-5 1.5-5 3.5s2 3 5 3.5 5 1.5 5 3.5-2 3.5-5 3.5c-2.5 0-4-.5-5-1.5'],

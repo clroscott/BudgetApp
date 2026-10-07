@@ -13,6 +13,7 @@ import {
 } from '../households/householdInvitationApi'
 import { useHouseholds } from '../households/useHouseholds'
 import { useRouter } from '../routing/useRouter'
+import { AppLink } from '../routing/AppLink'
 
 const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'long',
@@ -112,6 +113,7 @@ export function HouseholdSetupPage() {
         <header className="auth-header">
           <div className="setup-header-row">
             <BrandMark />
+            <AppLink to="/settings/account">Account settings</AppLink>
             <button
               className="text-button"
               type="button"

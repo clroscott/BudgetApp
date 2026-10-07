@@ -3163,6 +3163,29 @@ a {
   margin-top: 1rem;
 }
 
+.account-settings-stack { display: grid; gap: 1.25rem; margin-top: 1rem; }
+.account-settings-card {
+  display: grid;
+  gap: 0.6rem;
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface);
+}
+.account-settings-card form { display: grid; gap: 0.6rem; min-width: 0; }
+.account-settings-card h2, .account-settings-card h3 { margin: 0 0 0.25rem; }
+.account-settings-card label { margin-top: 0.6rem; font-weight: 650; }
+.account-settings-card input { min-width: 0; width: 100%; }
+.account-settings-card p { margin: 0; overflow-wrap: anywhere; }
+.account-settings-details { display: grid; gap: 0.75rem; margin: 0.5rem 0; }
+.account-settings-details dt { color: var(--muted-text); font-size: 0.88rem; }
+.account-settings-details dd { margin: 0.15rem 0 0; font-weight: 650; overflow-wrap: anywhere; }
+.account-email-address { overflow-wrap: anywhere; }
+.app-shell.standalone-account-shell { grid-template-columns: minmax(0, 1fr); }
+.standalone-account-shell > .app-sidebar[hidden],
+.standalone-account-shell .household-context-bar[hidden] { display: none; }
+
 .yearly-target-sections {
   display: grid;
   gap: 1rem;

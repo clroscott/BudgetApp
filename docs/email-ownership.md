@@ -9,7 +9,7 @@
 - Invitation listing, link previews, and both acceptance endpoints require a verified, matching account. Anonymous visitors must sign in first. An unverified account does not receive household names, invitation counts, or acceptance access just because its email matches.
 - If someone registered an address they do not own, the recipient should not confirm an unexpected request. They can recover the password, sign in, request a fresh confirmation link, and then confirm. Password recovery invalidates old sessions and old confirmation links; it does not automatically verify an address.
 
-## Reusable backend contract for #156
+## Reusable backend contract used by #156
 
 All writes require a signed-in session and an antiforgery header.
 
@@ -33,7 +33,11 @@ intended return URL and saved household selection for afterwards.
 
 Email changes require the current password. The old address and its verification status stay in effect while confirmation is pending. The pending address is stored server-side and the link does not include it as a query parameter. Successful completion atomically updates both email and email-based username, marks the new address verified, and consumes the proof. The completing session is then refreshed. Household/financial ownership remains attached to the same user ID.
 
-Duplicate target addresses, cooldowns, and delivery failures share the same request response. A target claimed between request and confirmation cannot partly change the original account. The server rechecks availability at completion. #156 owns the account-settings form; this issue supplies its service/API/client helpers and completion page, not a second settings implementation.
+Duplicate target addresses, cooldowns, and delivery failures share the same request response. A target claimed between request and confirmation cannot partly change the original account. The server rechecks availability at completion. [Account settings (#156)](account-settings.md) now supplies the form and own-account pending-status view; it reuses this service/API rather than implementing another confirmation system.
+
+`/settings/account` is a client-gate account-maintenance exception, including for
+unverified users without households. It can correct a mistyped address, change a
+password/name, and resend current-address proof. Financial access remains blocked.
 
 ## Tokens, resend limits, and delivery
 

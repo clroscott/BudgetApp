@@ -35,6 +35,8 @@ All authentication routes use the `/api/auth` prefix.
 | `POST` | `/reset-password` | Anonymous | Yes | Validate a recovery token and set a new password |
 | `POST` | `/logout` | Required | Yes | End the current session |
 | `GET` | `/me` | Required | No | Return ID, email, display name, and emailConfirmed |
+| `GET` | `/settings` | Required | No | Return own account settings and safe pending replacement details |
+| `PUT` | `/profile` | Required | Yes | Save own display name with optimistic concurrency |
 | `POST` | `/change-password` | Required | Yes | Change the current user's password |
 | `POST` | `/resend-confirmation` | Required | Yes | Request confirmation for the current account |
 | `POST` | `/confirm-email` | Required | Yes | Confirm a matching-account proof |
@@ -59,6 +61,10 @@ App-data APIs return confirmation-required `403` until ownership is proven;
 account maintenance and public endpoints remain available. Existing records
 are retained, not deleted or reset. Email delivery must work before rolling
 out this gate to existing unverified users.
+
+The [personal Account settings page](account-settings.md) is available even without
+a household or before verification. It reuses confirmation/password APIs and never
+publishes account security details to shared household activity.
 
 ## Antiforgery Flow
 

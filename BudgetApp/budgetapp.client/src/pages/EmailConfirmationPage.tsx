@@ -50,13 +50,13 @@ export function EmailConfirmationPage() {
       <ErrorSummary errors={errors} />
       {success ? <div className="notice-card" role="status">
         <h2>Email confirmed</h2><p>{user?.email} is verified. You can now access MC Budget and invitations sent to this address.</p>
-        <AppLink to="/household">Continue to your household</AppLink>
+        <AppLink to={changing ? '/settings/account' : '/household'}>{changing ? 'Return to account settings' : 'Continue to your household'}</AppLink>
       </div> : !changing && user?.emailConfirmed && (!userId || user.id === userId) ? <>
         <p role="status">Your current account email, {user.email}, is already confirmed.</p>
         <AppLink to="/household">Continue to your household</AppLink>
       </> : !userId || !token ? <>
         <p>This confirmation link is incomplete. Request a new link.</p>
-        {changing ? <p>Repeat your email-change request to receive a complete link.</p> : <AppLink to="/resend-confirmation">Request confirmation</AppLink>}
+        {changing ? <AppLink to="/settings/account">Request a new email-change link in account settings</AppLink> : <AppLink to="/resend-confirmation">Request confirmation</AppLink>}
       </> : !user ? <>
         <p>Sign in to the account that requested this link before confirming it. Opening this page does not change your account.</p>
         <AppLink className="primary-button" to={loginPath}>Sign in to confirm</AppLink>
@@ -71,7 +71,7 @@ export function EmailConfirmationPage() {
         <p>Links expire after one hour. Only the latest link can be used.</p>
         <button className="primary-button" disabled={busy} onClick={() => void confirm()}>{busy ? 'Confirming…' : 'Confirm email address'}</button>
         {!changing && <p><AppLink to="/resend-confirmation">Request a new confirmation link</AppLink></p>}
-        {changing && <p>For a new email-change link, request the change again from account settings when available. Resending confirmation for your current address does not confirm the new address.</p>}
+        {changing && <p><AppLink to="/settings/account">Request a fresh link in account settings</AppLink>. Resending confirmation for your current address does not confirm the new address.</p>}
       </>}
     </section></main>
   )

@@ -66,6 +66,7 @@ export function ResendConfirmationPage() {
         <p>Confirmed in another tab? Your status updates when you return here. You can also check it below.</p>
         <button className="secondary-button" disabled={busy} onClick={() => void checkStatus()}>{action === 'check' ? 'Checking…' : 'Check confirmation status'}</button>
         <p>Check your spam folder. If messages still do not arrive, contact the person who manages this installation.</p>
+        <p><AppLink to="/settings/account">Account settings</AppLink> — correct your address, update your name, or change your password.</p>
         <p><AppLink to="/forgot-password">Recover your account</AppLink></p>
         <button className="text-button" disabled={busy} onClick={() => void signOut()}>{action === 'logout' ? 'Signing out…' : 'Sign out'}</button>
       </>}

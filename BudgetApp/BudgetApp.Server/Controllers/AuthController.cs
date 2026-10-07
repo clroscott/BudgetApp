@@ -175,6 +175,51 @@ public sealed class AuthController(
     }
 
     [Authorize]
+    [HttpGet("settings")]
+    public async Task<ActionResult<AccountSettingsResponse>> GetSettings(CancellationToken cancellationToken)
+    {
+        var user = await userManager.GetUserAsync(User);
+        return user is null ? Unauthorized() : Ok(await SettingsResponse(user, cancellationToken));
+    }
+
+    [Authorize]
+    [HttpPut("profile")]
+    public async Task<ActionResult<AccountSettingsResponse>> UpdateProfile(
+        UpdateProfileRequest request, CancellationToken cancellationToken)
+    {
+        var user = await userManager.GetUserAsync(User);
+        if (user is null) return Unauthorized();
+        var name = request.DisplayName.Trim();
+        if (name.Length == 0)
+        {
+            ModelState.AddModelError(nameof(request.DisplayName), "Enter a display name.");
+            return ValidationProblem(ModelState);
+        }
+        if (request.Version != user.ConcurrencyStamp) return ProfileConflict();
+        user.DisplayName = name;
+        var result = await userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            if (result.Errors.Any(error => error.Code == "ConcurrencyFailure")) return ProfileConflict();
+            return IdentityValidationProblem(result);
+        }
+        await signInManager.RefreshSignInAsync(user);
+        logger.LogInformation("Updated display name for user {UserId}", user.Id);
+        return Ok(await SettingsResponse(user, cancellationToken));
+    }
+
+    private ActionResult ProfileConflict() => Conflict(new ProblemDetails
+    {
+        Status = StatusCodes.Status409Conflict,
+        Title = "Account settings changed",
+        Detail = "Your account settings changed elsewhere. Your entered name is kept; reload the current settings before saving again."
+    });
+
+    private async Task<AccountSettingsResponse> SettingsResponse(ApplicationUser user, CancellationToken cancellationToken) =>
+        new(ToResponse(user), await emailOwnershipService.GetPendingEmailChangeAsync(user.Id, cancellationToken),
+            user.ConcurrencyStamp!);
+
+    [Authorize]
     [EnableRateLimiting("emailOwnership")]
     [HttpPost("resend-confirmation")]
     public async Task<ActionResult<EmailRequestedResponse>> ResendConfirmation(CancellationToken cancellationToken)
@@ -232,6 +277,7 @@ public sealed class AuthController(
         "If the address can be confirmed, a confirmation link has been requested. Check your inbox and spam folder. Wait at least one minute before requesting another link. If no email arrives, retry or contact the person who manages this installation.");
 
     [Authorize]
+    [EnableRateLimiting("emailOwnership")]
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword(ChangePasswordRequest request)
     {
@@ -311,3 +357,8 @@ public sealed record ConfirmEmailRequest(Guid UserId,
 public sealed record RequestEmailChangeRequest(
     [param: Required, EmailAddress, StringLength(256)] string NewEmail,
     [param: Required, StringLength(128)] string CurrentPassword);
+
+public sealed record AccountSettingsResponse(CurrentUserResponse User, PendingEmailChange? PendingEmailChange, string Version);
+public sealed record UpdateProfileRequest(
+    [param: Required, StringLength(100)] string DisplayName,
+    [param: Required, StringLength(100)] string Version);

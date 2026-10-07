@@ -35,7 +35,7 @@ function NavigationLinks({
   ))
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, showHouseholdNavigation = true }: { children: ReactNode, showHouseholdNavigation?: boolean }) {
   const { logout, user } = useAuth()
   const {
     currentHousehold,
@@ -100,8 +100,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className={`app-shell${isSidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
-      <aside className={`app-sidebar${isNavigationOpen ? ' open' : ''}${isSidebarCollapsed ? ' collapsed' : ''}`}>
+    <div className={`app-shell${isSidebarCollapsed ? ' sidebar-collapsed' : ''}${!showHouseholdNavigation ? ' standalone-account-shell' : ''}`}>
+      <aside hidden={!showHouseholdNavigation} className={`app-sidebar${isNavigationOpen ? ' open' : ''}${isSidebarCollapsed ? ' collapsed' : ''}`}>
         <div className="sidebar-top">
           <AppLink className="sidebar-brand" to="/dashboard" title="Dashboard">
             <BrandLockup />
@@ -164,7 +164,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <div className="app-shell-content">
-        <div className="household-context-bar">
+        <div className="household-context-bar" hidden={!showHouseholdNavigation}>
           <div className="household-context-current">
             <span className="household-context-label">Current household</span>
             {households.length > 1 ? (
