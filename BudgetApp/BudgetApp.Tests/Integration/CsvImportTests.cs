@@ -596,10 +596,11 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         Assert.NotNull(uploaded);
         Assert.Equal(1, uploaded.DuplicateRows);
 
-        var imports = await client.GetFromJsonAsync<ImportListResponse[]>(
-            $"/api/households/{householdId}/imports");
+        var listResponse = await client.GetAsync($"/api/households/{householdId}/imports");
+        Assert.True(listResponse.IsSuccessStatusCode, await listResponse.Content.ReadAsStringAsync());
+        var imports = await listResponse.Content.ReadFromJsonAsync<ImportListPageResponse>();
         Assert.NotNull(imports);
-        Assert.Contains(imports, item => item.Id == uploaded.ImportFileId);
+        Assert.Contains(imports.Items, item => item.Id == uploaded.ImportFileId);
 
         var review = await client.GetFromJsonAsync<ImportReviewResponse>(
             $"/api/households/{householdId}/imports/{uploaded.ImportFileId}");
@@ -850,6 +851,7 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         int ApprovedRows,
         IReadOnlyList<ImportDraftResponse> Drafts);
     private sealed record ImportListResponse(Guid Id);
+    private sealed record ImportListPageResponse(IReadOnlyList<ImportListResponse> Items);
     private sealed record ImportDraftResponse(
         Guid Id,
         int SourceRowNumber,

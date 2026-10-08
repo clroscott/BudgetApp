@@ -4,7 +4,15 @@ namespace BudgetApp.Application.Imports;
 
 public interface IImportRepository
 {
-    Task<IReadOnlyList<ImportListRecord>> ListVisibleAsync(
+    Task<ImportListQueryResult> ListVisibleAsync(
+        Guid householdId,
+        Guid userId,
+        ImportListFilter filter,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken);
+
+    Task<ImportSummary> GetSummaryAsync(
         Guid householdId,
         Guid userId,
         CancellationToken cancellationToken);

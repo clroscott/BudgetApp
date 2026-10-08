@@ -1,5 +1,16 @@
 namespace BudgetApp.Application.Imports;
 
+public enum ImportListFilter { Unfinished, Completed, All, ReadyForReview }
+
+public sealed record ImportSummary(int TotalCount, int UnfinishedCount, int ReadyForReviewCount);
+
+public sealed record ImportListResult(
+    IReadOnlyList<ImportListItem> Items, int Page, int PageSize, int TotalCount, int TotalPages,
+    int TotalVisibleCount);
+
+public sealed record ImportListQueryResult(
+    IReadOnlyList<ImportListRecord> Items, int Page, int TotalCount, int TotalVisibleCount);
+
 public sealed record ImportDraftUpdateInput(
     Guid DraftId,
     DateOnly? TransactionDate,

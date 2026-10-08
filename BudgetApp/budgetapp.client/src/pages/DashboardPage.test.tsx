@@ -25,7 +25,7 @@ const tutorial: TutorialContextValue = { activeTutorial: null, activeStepIndex: 
   progress: [{ tutorialKey: 'getting-started', tutorialVersion: 1, status: 'Dismissed', currentStepIndex: 0, startedAtUtc: '2026-10-07T00:00:00Z', updatedAtUtc: '', completedAtUtc: null, dismissedAtUtc: '' }],
   start: vi.fn(), dismiss: vi.fn(), exit: vi.fn(), next: vi.fn(), back: vi.fn() }
 function snapshot(): DashboardSnapshot {
-  return { budget: budgetFixture(), accounts: [], imports: [],
+  return { budget: budgetFixture(), accounts: [], importSummary: { totalCount: 0, unfinishedCount: 0, readyForReviewCount: 0 },
     recent: { items: [], totalCount: 1, page: 1, pageSize: 50, totalPages: 1, hasMore: false, totalsByCurrency: {} },
     uncategorized: { items: [], totalCount: 2, page: 1, pageSize: 50, totalPages: 1, hasMore: false, totalsByCurrency: {} } }
 }
@@ -49,6 +49,16 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/dashboard')
 })
 describe('mixed dashboard', () => {
+  it('shows the uncapped server review count and links to ready imports', async () => {
+    const data = snapshot()
+    data.importSummary = { totalCount: 220, unfinishedCount: 125, readyForReviewCount: 120 }
+    vi.mocked(readDashboardSnapshot).mockResolvedValue(data)
+    show('Viewer')
+    const link = await screen.findByRole('link', { name: 'Imports awaiting review' })
+    await waitFor(() => expect(link.closest('li')!.querySelector('strong')!.textContent).toBe('120'))
+    expect(link.getAttribute('href')).toBe('/imports/review?filter=ready')
+    expect(screen.getByText(/You can still review imports from your own personal accounts/)).toBeTruthy()
+  })
   it('shows three default cards with labeled amounts, scoped attention and read-only links', async () => {
     show()
     await loadedAmounts()

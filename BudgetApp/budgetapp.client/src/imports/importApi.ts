@@ -26,6 +26,21 @@ export interface ImportListItem {
   canEdit: boolean
 }
 
+export type ImportListFilter = 'inProgress' | 'completed' | 'all' | 'ready'
+export interface ImportListResult {
+  items: ImportListItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+  totalVisibleCount: number
+}
+export interface ImportSummary {
+  totalCount: number
+  unfinishedCount: number
+  readyForReviewCount: number
+}
+
 export interface ImportDraftItem {
   id: string
   sourceRowNumber: number
@@ -90,15 +105,25 @@ export function uploadCsvImport(
   )
 }
 
-export function getImports(householdId: string): Promise<ImportListItem[]> {
-  return apiGet(`/api/households/${householdId}/imports`)
+export function getImports(householdId: string, filter: ImportListFilter = 'inProgress', page = 1): Promise<ImportListResult> {
+  const status = { inProgress: 'Unfinished', completed: 'Completed', all: 'All', ready: 'ReadyForReview' }[filter]
+  const query = new URLSearchParams({ filter: status, page: String(page) })
+  return apiGet(`/api/households/${householdId}/imports?${query}`)
+}
+
+export function getImportSummary(householdId: string): Promise<ImportSummary> {
+  return apiGet(`/api/households/${householdId}/imports/summary`)
 }
 
 export function getImport(
   householdId: string,
   importFileId: string,
 ): Promise<ImportReviewDetail> {
-  return apiGet(`/api/households/${householdId}/imports/${importFileId}`)
+  // A malformed deep link must not resolve to the literal /summary endpoint.
+  if (!/^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})$/i.test(importFileId)) {
+    return Promise.reject(new Error('This import link is invalid. Choose an import from the list.'))
+  }
+  return apiGet(`/api/households/${householdId}/imports/${encodeURIComponent(importFileId)}`)
 }
 
 export function checkImportDuplicates(

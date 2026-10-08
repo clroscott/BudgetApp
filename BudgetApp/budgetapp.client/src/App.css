@@ -2242,6 +2242,23 @@ a {
   gap: 1rem;
 }
 
+.import-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.import-section-heading > div {
+  min-width: 0;
+}
+
+.import-section-heading h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .import-control-groups {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2319,6 +2336,7 @@ a {
   font-size: 0.78rem;
 }
 
+.import-file-picker,
 .import-review-summary,
 .complete-import-panel {
   margin-bottom: 1.25rem;
@@ -2335,7 +2353,7 @@ a {
 
 .import-draft-list {
   display: grid;
-  gap: 0.3rem;
+  gap: 0;
 }
 
 .import-row-toolbar {
@@ -2367,15 +2385,39 @@ a {
   font-size: 0.82rem;
 }
 
+.import-review-grid {
+  --import-review-columns: 8rem 6rem minmax(10rem, 1fr) 8rem 8rem 11.5rem 6.75rem 16.5rem;
+  --import-review-row-alt: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  overflow-x: auto;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.4rem;
+  background: var(--surface);
+}
+
+.import-review-grid:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .import-draft-column-headings,
-.import-draft-fields {
+.import-draft-line {
   display: grid;
-  grid-template-columns: minmax(8rem, 0.8fr) minmax(7rem, 0.7fr) minmax(13rem, 2fr) minmax(11rem, 1fr) minmax(11rem, 1fr);
-  gap: 0.5rem;
+  grid-template-columns: var(--import-review-columns);
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.import-draft-column-headings,
+.import-draft-list {
+  min-width: 79.5rem;
+  box-sizing: border-box;
 }
 
 .import-draft-column-headings {
-  padding: 0 0.8rem 0.35rem;
+  padding: 0.5rem 0.65rem;
+  border-left: 0.25rem solid transparent;
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--page-bg);
   color: var(--muted-text);
   font-size: 0.72rem;
   font-weight: 800;
@@ -2383,12 +2425,91 @@ a {
   letter-spacing: 0.04em;
 }
 
+/* Use the shared grid tracks to keep dividers aligned through every row. */
+.import-draft-column-headings > span,
+.import-draft-fields > label,
+.import-draft-line > .import-budget-choices,
+.import-draft-line > .import-row-badges,
+.import-draft-line > .import-row-actions {
+  position: relative;
+  align-self: stretch;
+  min-width: 0;
+}
+
+.import-draft-column-headings > span + span::before,
+.import-draft-fields > label + label::before,
+.import-draft-line > .import-budget-choices::before,
+.import-draft-line > .import-row-badges::before,
+.import-draft-line > .import-row-actions::before {
+  content: '';
+  position: absolute;
+  left: calc(-0.2rem - 0.5px);
+  top: -0.35rem;
+  bottom: -0.35rem;
+  border-left: 1px solid var(--border-strong);
+  pointer-events: none;
+}
+
+.import-draft-column-headings > span + span::before {
+  top: -0.5rem;
+  bottom: -0.5rem;
+}
+
+.import-draft-column-headings > span:nth-child(n + 7),
+.import-draft-line > .import-row-badges,
+.import-draft-line > .import-row-actions {
+  padding-left: 0.35rem;
+}
+
 .import-draft-card {
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--border);
+  position: relative;
+  padding: 0.35rem 0.65rem;
+  border-bottom: 1px solid var(--border-strong);
   border-left: 0.25rem solid var(--border-strong);
-  border-radius: 0.35rem;
   background: var(--surface);
+}
+
+.import-draft-card:nth-child(even) {
+  background: var(--import-review-row-alt, var(--page-bg));
+}
+
+.import-draft-card:last-child {
+  border-bottom: 0;
+}
+
+.import-draft-form {
+  gap: 0.35rem;
+}
+
+.import-draft-fields {
+  display: contents;
+}
+
+.import-draft-card .import-budget-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.import-budget-choices .checkbox-row {
+  flex-shrink: 0;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0.3rem 0.1rem;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.import-budget-choices input[type='checkbox'] {
+  flex: 0 0 1rem;
+  margin: 0;
+  padding: 0;
 }
 
 .import-decision-approved {
@@ -2400,8 +2521,7 @@ a {
 }
 
 .import-row-badges,
-.import-row-actions,
-.import-row-footer {
+.import-row-actions {
   display: flex;
   align-items: center;
   gap: 0.4rem;
@@ -2412,10 +2532,17 @@ a {
   font-size: 0.7rem;
 }
 
+.import-row-badges {
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
 .import-row-badges span {
+  max-width: 100%;
   padding: 0.18rem 0.35rem;
   border-radius: 0.3rem;
   background: var(--page-bg);
+  overflow-wrap: anywhere;
 }
 
 .import-row-badges .possible-duplicate-badge {
@@ -2435,55 +2562,72 @@ a {
   font-size: 0.8rem;
 }
 
-.import-draft-fields label {
+.import-draft-card .import-draft-fields label {
   display: grid;
-  align-content: start;
+  align-content: center;
+  min-width: 0;
+  margin-top: 0;
   gap: 0;
-}
-
-.import-draft-fields label > span:first-child {
-  display: none;
 }
 
 .import-draft-fields input,
 .import-draft-fields select {
-  min-height: 2.15rem;
-  padding: 0.42rem 0.5rem;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.25rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: 0.3rem;
   font-size: 0.82rem;
 }
 
-.import-row-footer {
-  justify-content: space-between;
-  margin-top: 0.4rem;
-  padding-top: 0.35rem;
-  border-top: 1px solid var(--border);
-}
-
 .import-row-actions {
+  justify-content: flex-start;
   flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
-.import-row-preparation-actions,
 .import-row-decision-actions,
-.import-row-destructive-actions {
+.import-row-detail-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
 }
 
-.import-row-destructive-actions {
-  margin-left: 0.15rem;
-  padding-left: 0.55rem;
-  border-left: 1px solid var(--border);
+.import-row-decision-actions {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .import-row-actions button,
-.import-row-actions .primary-button {
+.import-row-detail-actions button {
+  max-width: 100%;
   margin-top: 0;
-  padding: 0.35rem 0.55rem;
+  min-height: 2.25rem;
+  padding: 0.3rem 0.5rem;
   font-size: 0.76rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.import-row-details {
+  margin-top: 0.15rem;
+  padding: 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--surface);
+}
+
+.import-row-details .field-help {
+  margin: 0 0 0.5rem;
+}
+
+.import-row-details,
+.import-draft-card .import-rule-editor,
+.import-draft-card .rule-created-message {
+  position: sticky;
+  left: 0;
+  box-sizing: border-box;
+  width: min(65rem, calc(100vw - 4rem));
 }
 
 .import-rule-editor {
@@ -2564,6 +2708,7 @@ a {
 
 .import-pagination {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 1rem;
@@ -4268,40 +4413,8 @@ a {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .import-draft-column-headings {
-    display: none;
-  }
-
-  .import-draft-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .import-draft-fields label {
-    gap: 0.25rem;
-  }
-
-  .import-draft-fields label > span:first-child {
-    display: block;
-    color: var(--heading);
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-
-  .import-row-footer {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .import-row-actions {
-    justify-content: flex-start;
-  }
-
   .import-rule-editor {
     grid-template-columns: 1fr;
-  }
-
-  .import-description-field {
-    grid-column: 1 / -1;
   }
 }
 
@@ -4472,7 +4585,6 @@ a {
   }
 
   .import-review-summary .import-stat-grid,
-  .import-draft-fields,
   .import-selector-row,
   .import-control-groups {
     grid-template-columns: 1fr;
@@ -4481,16 +4593,6 @@ a {
   .import-row-toolbar {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .import-row-destructive-actions {
-    margin-left: 0;
-    padding-left: 0;
-    border-left: 0;
-  }
-
-  .import-description-field {
-    grid-column: 1;
   }
 
   .import-draft-heading {
