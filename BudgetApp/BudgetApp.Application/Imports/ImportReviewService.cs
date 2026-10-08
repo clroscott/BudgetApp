@@ -589,12 +589,12 @@ public sealed class ImportReviewService(
         }
 
         var now = timeProvider.GetUtcNow();
-        var transactions = drafts
-            .Where(draft =>
-                draft.ReviewDecision == ImportDraftReviewDecision.Approved &&
-                !draft.ApprovedTransactionId.HasValue)
-            .Select(draft => {
-                var transaction = Transaction.CreateImported(
+        var transactions = new List<Transaction>();
+        foreach (var draft in drafts.Where(draft =>
+                     draft.ReviewDecision == ImportDraftReviewDecision.Approved &&
+                     !draft.ApprovedTransactionId.HasValue))
+        {
+            var transaction = Transaction.CreateImported(
                 importFile.HouseholdId,
                 importFile.AccountId,
                 draft.SelectedCategoryId,
@@ -610,21 +610,14 @@ public sealed class ImportReviewService(
                 isExcludedFromBudget: false,
                 userId,
                 now);
-                transaction.InitializeBudgetInclusion(!access.IsPersonalAccount, access.AccountOwnerUserId);
-                if (draft.IncludeInHouseholdBudget.HasValue)
-                    transaction.SetBudgetInclusionForUser(
-                        draft.PersonalBudgetUserId ?? userId, draft.IncludeInHouseholdBudget,
-                        draft.PersonalBudgetUserId.HasValue, now);
-                transaction.MarkReviewed(userId, now);
-                return transaction;
-            })
-            .ToList();
-
-        foreach (var transaction in transactions)
-        {
-            var draft = drafts.Single(candidate =>
-                candidate.SourceRowNumber == transaction.ImportRowNumber);
+            transaction.InitializeBudgetInclusion(!access.IsPersonalAccount, access.AccountOwnerUserId);
+            if (draft.IncludeInHouseholdBudget.HasValue)
+                transaction.SetBudgetInclusionForUser(
+                    draft.PersonalBudgetUserId ?? userId, draft.IncludeInHouseholdBudget,
+                    draft.PersonalBudgetUserId.HasValue, now);
+            transaction.MarkReviewed(userId, now);
             draft.LinkApprovedTransaction(transaction, now);
+            transactions.Add(transaction);
         }
 
         await importRepository.AddTransactionsAsync(transactions, cancellationToken);
@@ -717,23 +710,44 @@ public sealed class ImportReviewService(
             dated.Min(draft => draft.TransactionDate!.Value),
             dated.Max(draft => draft.TransactionDate!.Value),
             cancellationToken);
+        // TryAdd preserves FirstOrDefault's first supplied match for duplicate keys.
+        var candidateIds = new Dictionary<DuplicateMatchKey, Guid>(DuplicateMatchKeyComparer.Instance);
+        foreach (var candidate in candidates)
+        {
+            candidateIds.TryAdd(new DuplicateMatchKey(
+                candidate.TransactionDate, candidate.Amount, candidate.Description.Trim()), candidate.TransactionId);
+        }
+
         var now = timeProvider.GetUtcNow();
         foreach (var draft in drafts)
         {
-            var match = candidates.FirstOrDefault(candidate =>
-                draft.TransactionDate == candidate.TransactionDate &&
-                draft.Amount == candidate.Amount &&
-                string.Equals(
-                    draft.Description?.Trim(),
-                    candidate.Description.Trim(),
-                    StringComparison.OrdinalIgnoreCase));
+            Guid? matchingId = null;
+            if (draft.TransactionDate is { } date && draft.Amount is { } amount && draft.Description is { } description &&
+                candidateIds.TryGetValue(new DuplicateMatchKey(date, amount, description.Trim()), out var candidateId))
+            {
+                matchingId = candidateId;
+            }
             draft.SetDuplicateResult(
-                match is null
+                matchingId is null
                     ? ImportDraftDuplicateStatus.NoMatch
                     : ImportDraftDuplicateStatus.PossibleDuplicate,
-                match?.TransactionId,
+                matchingId,
                 now);
         }
+    }
+
+    private readonly record struct DuplicateMatchKey(DateOnly Date, decimal Amount, string Description);
+
+    private sealed class DuplicateMatchKeyComparer : IEqualityComparer<DuplicateMatchKey>
+    {
+        internal static readonly DuplicateMatchKeyComparer Instance = new();
+
+        public bool Equals(DuplicateMatchKey x, DuplicateMatchKey y) =>
+            x.Date == y.Date && x.Amount == y.Amount &&
+            StringComparer.OrdinalIgnoreCase.Equals(x.Description, y.Description);
+
+        public int GetHashCode(DuplicateMatchKey key) => HashCode.Combine(
+            key.Date, key.Amount, StringComparer.OrdinalIgnoreCase.GetHashCode(key.Description));
     }
 
     private async Task<(ImportAccessRecord Access, HouseholdRole Role)> GetAuthorized(

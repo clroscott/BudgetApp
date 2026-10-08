@@ -19,6 +19,24 @@ the [local Production deployment checklist](local-production-deployment-checklis
 - **After Production deployment:** run only the safe smoke tests in the deployment
   checklist. Do not perform the full destructive regression suite in Production.
 
+## Product acceptance and internet-hosting preparation
+
+The manual pass is also the owner's opportunity to go through every workflow and
+record what they like, dislike, find confusing, or want improved before hosting
+the app on an internet-accessible address (even with restricted registration/access).
+
+- [ ] Review each page/workflow as a user, not only as a pass/fail test. Record
+      confusing wording, excessive steps, layout/readability problems, missing
+      guidance, and useful improvements with the page and reproduction/screenshot.
+- [ ] Separate functional defects, privacy/security concerns, usability preferences,
+      and new feature ideas. Decide which are required before internet hosting and
+      which can wait; do not treat every visual preference as a release blocker.
+- [ ] Create/link actionable board items and retest required fixes. Record known
+      limitations instead of silently considering an untested flow complete.
+- [ ] Complete the separate actual-host deployment/security/recovery checks before
+      exposure. Liking the UI or passing this checklist alone does not establish
+      internet-hosting readiness. Hosting #107 and encryption #151/#204 remain deferred.
+
 ## Test run record
 
 Copy this block into the pull request, release notes, or a dated QA record.
@@ -35,6 +53,9 @@ Screen sizes tested:
 Result: Pass / Pass with known issues / Fail
 Failed or skipped checks:
 Related issue links:
+Usability/visual feedback:
+Required before internet hosting:
+Later improvements / accepted limitations:
 Notes:
 ```
 
@@ -808,6 +829,16 @@ initial findings and pending live tasks.
 - [ ] File size, row limit, required column, date, and amount errors are explained.
 - [ ] Import profiles map columns and amount conventions correctly.
 - [ ] Uploading the same file is detected and requires explicit confirmation.
+- [ ] Submit an invalid or repeated file while scrolled to the Upload button:
+      failure/confirmation feedback must become visible without searching up the
+      page, preserve the selected file/form, explain the next action, and be
+      announced accessibly. It must not disappear before the user can act.
+
+      Known deferred usability finding (2026-10-08, #201): the current upload
+      error summary appears above the form and can remain outside the viewport.
+      Plan a persistent top-of-viewport feedback pattern with accessible focus/
+      announcement behavior and clearance for the app header; retain relevant
+      inline details. This is not fixed by the #208 algorithm change.
 - [ ] Duplicate checking identifies plausible existing matches.
 - [ ] A staged row can be corrected and saved.
 - [ ] Leaving with unsaved staged corrections warns the user where applicable.
@@ -820,6 +851,35 @@ initial findings and pending live tasks.
 - [ ] Discarding an in-progress import requires confirmation and removes only staging
       data.
 - [ ] Completed imports remain understandable as historical records.
+
+### Duplicate lookup and completion regression (#208)
+
+Use disposable Development/Scratch data; never import large synthetic files into
+the real local Production household.
+
+- [ ] Seed an existing transaction, then import the same date/exact amount with
+      leading/trailing whitespace and different description case. It is still a
+      possible duplicate and requires acknowledgment; merely similar descriptions,
+      different dates, opposite signs, or different four-decimal amounts do not match.
+- [ ] Include valid, invalid/missing-field, unmatched, and duplicate rows in one
+      file. Duplicate feedback and validation remain separate; rechecking resets
+      prior decisions/acknowledgment as before.
+- [ ] Approve some rows and exclude/remove others. Complete and verify exactly
+      the approved rows, original source-row provenance, category, exact amount,
+      and Personal/Household inclusion choices. Excluded rows create no transaction.
+- [ ] Reopen/retry the completed import: counts/history stay correct and no extra
+      transactions or approval audit events are created.
+- [ ] Verify household Viewers cannot complete shared-account imports, but retain
+      permitted actions on their own personal-account imports. Other members'
+      private imports remain inaccessible.
+- [ ] Stage/recheck/complete a larger synthetic file within the configured upload
+      and row limits. Record row count and observed responsiveness; no browser
+      millisecond threshold is a pass/fail requirement. See the opt-in CPU harness
+      in tools/ImportPerformanceBenchmarks for 100/1,000/10,000-row measurements.
+- [ ] In automated isolated tests, interrupt completion after a transaction insert
+      with a database error and cancellation: official rows, draft links, import
+      status, and audit all roll back. Retry succeeds once. Do not provoke failures
+      or disconnect the real Production database to test this case.
 
 ## Transactions and export
 
