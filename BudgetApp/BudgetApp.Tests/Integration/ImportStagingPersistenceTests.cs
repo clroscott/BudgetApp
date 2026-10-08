@@ -1,12 +1,18 @@
+using System.Data.Common;
+using BudgetApp.Application.Imports;
 using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Households;
 using BudgetApp.Domain.Imports;
 using BudgetApp.Domain.Transactions;
 using BudgetApp.Infrastructure.Data;
+using BudgetApp.Infrastructure;
+using BudgetApp.Infrastructure.Email;
 using BudgetApp.Infrastructure.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BudgetApp.Tests.Integration;
 
@@ -113,6 +119,97 @@ public sealed class ImportStagingPersistenceTests
 
         await Assert.ThrowsAsync<DbUpdateException>(() =>
             context.SaveChangesAsync());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Completion_InterruptedAfterInsertRollsBackEverythingAndCanRetry(bool cancel)
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var interruption = new InterruptSecondTransactionInsert(cancel);
+        var options = new DbContextOptionsBuilder<BudgetAppDbContext>()
+            .UseSqlite(connection).AddInterceptors(interruption).Options;
+        await using var context = new BudgetAppDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        var data = await AddDependencies(context);
+        var file = await AddImportFile(context, data);
+        var drafts = new[] { CreateDraft(file.Id, 2, "First"), CreateDraft(file.Id, 8, "Second"),
+            CreateDraft(file.Id, 90, "Excluded") };
+        foreach (var draft in drafts)
+        {
+            draft.SetDuplicateResult(ImportDraftDuplicateStatus.NoMatch, null, DateTimeOffset.UtcNow);
+            draft.Approve(data.UserId, false, DateTimeOffset.UtcNow);
+        }
+        drafts[2].Exclude(data.UserId, DateTimeOffset.UtcNow);
+        drafts[0].SetBudgetInclusion(true, data.UserId, DateTimeOffset.UtcNow);
+        file.StartProcessing(DateTimeOffset.UtcNow);
+        file.MarkReadyForReview(new ImportStatistics(3, 3, 0, 2, 1, 0), DateTimeOffset.UtcNow);
+        context.ImportTransactionDrafts.AddRange(drafts);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        // Registration only; the externally supplied SQLite context always wins.
+        services.AddInfrastructure("Server=unused;Database=unused;Integrated Security=True;",
+            new EmailOptions(), new ApplicationUrlOptions(), false);
+        services.AddSingleton(context);
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<ImportReviewService>();
+        interruption.Enabled = true;
+
+        var attempt = () => service.CompleteAsync(data.Household.Id, data.UserId, file.Id, CancellationToken.None);
+        if (cancel) await Assert.ThrowsAnyAsync<OperationCanceledException>(attempt);
+        else await Assert.ThrowsAsync<DbUpdateException>(attempt);
+        Assert.Equal(2, interruption.InsertAttempts);
+        interruption.Enabled = false;
+        context.ChangeTracker.Clear();
+
+        Assert.Empty(await context.Transactions.ToListAsync());
+        Assert.Empty(await context.AuditEvents.ToListAsync());
+        Assert.Equal(ImportFileStatus.ReadyForReview, (await context.ImportFiles.SingleAsync()).Status);
+        Assert.All(await context.ImportTransactionDrafts.ToListAsync(), draft => Assert.Null(draft.ApprovedTransactionId));
+
+        var completed = await attempt();
+        var retry = await attempt();
+        Assert.Equal(2, completed.CreatedTransactionCount);
+        Assert.Equal(0, retry.CreatedTransactionCount);
+        context.ChangeTracker.Clear();
+        var transactions = await context.Transactions.Include(transaction => transaction.PersonalBudgetInclusions).ToListAsync();
+        Assert.Equal(2, transactions.Count);
+        Assert.Single(await context.AuditEvents.ToListAsync());
+        Assert.Equal(ImportFileStatus.Completed, (await context.ImportFiles.SingleAsync()).Status);
+        var savedDrafts = await context.ImportTransactionDrafts.ToListAsync();
+        foreach (var transaction in transactions)
+        {
+            var linked = Assert.Single(savedDrafts, draft => draft.SourceRowNumber == transaction.ImportRowNumber);
+            Assert.Equal(transaction.Id, linked.ApprovedTransactionId);
+            Assert.Equal(linked.Amount, transaction.Amount);
+        }
+        Assert.Null(Assert.Single(savedDrafts, draft => draft.SourceRowNumber == 90).ApprovedTransactionId);
+        Assert.Contains(Assert.Single(transactions, transaction => transaction.ImportRowNumber == 2).PersonalBudgetInclusions,
+            inclusion => inclusion.UserId == data.UserId);
+    }
+
+    private sealed class InterruptSecondTransactionInsert(bool cancel) : DbCommandInterceptor
+    {
+        internal bool Enabled { get; set; }
+        internal int InsertAttempts { get; private set; }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            if (Enabled && command.CommandText.Contains("INSERT INTO \"Transactions\"", StringComparison.Ordinal) &&
+                ++InsertAttempts == 2)
+            {
+                if (cancel) throw new OperationCanceledException(new CancellationToken(true));
+                throw new InvalidOperationException("Synthetic second-insert failure.");
+            }
+            return ValueTask.FromResult(result);
+        }
     }
 
     [Fact]

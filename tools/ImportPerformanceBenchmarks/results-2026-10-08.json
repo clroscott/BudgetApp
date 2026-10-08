@@ -1,0 +1,145 @@
+{
+  "recordedDate": "2026-10-08",
+  "runtime": "10.0.12",
+  "methodology": "Release; median of 5 warm runs; fixture setup excluded; actual duplicate service includes index construction; actual completion includes transaction construction/linkage and in-memory save; no database/network; no timing assertions",
+  "results": [
+    {
+      "rows": 100,
+      "candidates": 100,
+      "scenario": "no matches",
+      "actualDuplicateService": {
+        "MedianMs": 0.057,
+        "MedianAllocatedBytes": 22552
+      },
+      "originalScanReference": {
+        "MedianMs": 0.361,
+        "MedianAllocatedBytes": 8872
+      }
+    },
+    {
+      "rows": 100,
+      "candidates": 100,
+      "scenario": "mixed matches",
+      "actualDuplicateService": {
+        "MedianMs": 0.056,
+        "MedianAllocatedBytes": 22552
+      },
+      "originalScanReference": {
+        "MedianMs": 0.299,
+        "MedianAllocatedBytes": 8872
+      }
+    },
+    {
+      "rows": 100,
+      "candidates": 100,
+      "scenario": "duplicate keys",
+      "actualDuplicateService": {
+        "MedianMs": 0.055,
+        "MedianAllocatedBytes": 3016
+      },
+      "originalScanReference": {
+        "MedianMs": 0.044,
+        "MedianAllocatedBytes": 8872
+      }
+    },
+    {
+      "rows": 100,
+      "actualCompleteService": {
+        "MedianMs": 0.068,
+        "MedianAllocatedBytes": 32024
+      }
+    },
+    {
+      "rows": 1000,
+      "candidates": 1000,
+      "scenario": "no matches",
+      "actualDuplicateService": {
+        "MedianMs": 0.535,
+        "MedianAllocatedBytes": 226768
+      },
+      "originalScanReference": {
+        "MedianMs": 5.254,
+        "MedianAllocatedBytes": 88072
+      }
+    },
+    {
+      "rows": 1000,
+      "candidates": 1000,
+      "scenario": "mixed matches",
+      "actualDuplicateService": {
+        "MedianMs": 0.536,
+        "MedianAllocatedBytes": 226768
+      },
+      "originalScanReference": {
+        "MedianMs": 6.889,
+        "MedianAllocatedBytes": 88072
+      }
+    },
+    {
+      "rows": 1000,
+      "candidates": 1000,
+      "scenario": "duplicate keys",
+      "actualDuplicateService": {
+        "MedianMs": 0.464,
+        "MedianAllocatedBytes": 10216
+      },
+      "originalScanReference": {
+        "MedianMs": 0.194,
+        "MedianAllocatedBytes": 88072
+      }
+    },
+    {
+      "rows": 1000,
+      "actualCompleteService": {
+        "MedianMs": 0.599,
+        "MedianAllocatedBytes": 305720
+      }
+    },
+    {
+      "rows": 10000,
+      "candidates": 10000,
+      "scenario": "no matches",
+      "actualDuplicateService": {
+        "MedianMs": 2.393,
+        "MedianAllocatedBytes": 2098392
+      },
+      "originalScanReference": {
+        "MedianMs": 519.814,
+        "MedianAllocatedBytes": 880320
+      }
+    },
+    {
+      "rows": 10000,
+      "candidates": 10000,
+      "scenario": "mixed matches",
+      "actualDuplicateService": {
+        "MedianMs": 1.846,
+        "MedianAllocatedBytes": 2098392
+      },
+      "originalScanReference": {
+        "MedianMs": 679.456,
+        "MedianAllocatedBytes": 880320
+      }
+    },
+    {
+      "rows": 10000,
+      "candidates": 10000,
+      "scenario": "duplicate keys",
+      "actualDuplicateService": {
+        "MedianMs": 1.377,
+        "MedianAllocatedBytes": 82464
+      },
+      "originalScanReference": {
+        "MedianMs": 1.484,
+        "MedianAllocatedBytes": 880320
+      }
+    },
+    {
+      "rows": 10000,
+      "actualCompleteService": {
+        "MedianMs": 12.5,
+        "MedianAllocatedBytes": 3144584
+      }
+    }
+  ]
+}
