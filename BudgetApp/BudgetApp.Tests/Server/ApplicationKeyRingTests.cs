@@ -291,6 +291,62 @@ public sealed class ApplicationKeyRingTests : IDisposable
     }
 
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task WindowsPowerShellHelperPreservesOwnerWithoutWriteOwnerPermission(bool isDirectory)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory != null && !File.Exists(Path.Combine(directory.FullName, "tools", "KeyRing-Windows.Common.ps1"))) directory = directory.Parent;
+        Assert.NotNull(directory);
+        var helper = Path.Combine(directory!.FullName, "tools", "KeyRing-Windows.Common.ps1").Replace("'", "''");
+        var target = Path.Combine(root, isDirectory ? "modify-only-directory" : "fictional-private-key-file").Replace("'", "''");
+        var command = $$"""
+            . '{{helper}}'
+            $taskDirectory = ${{isDirectory.ToString().ToLowerInvariant()}}
+            $taskPath = '{{target}}'
+            $taskItemType = if ($taskDirectory) { 'Directory' } else { 'File' }
+            New-Item -ItemType $taskItemType -Path $taskPath | Out-Null
+            $taskSid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+            $taskOwnerBefore = (Get-Acl -LiteralPath $taskPath).GetOwner([Security.Principal.SecurityIdentifier]).Value
+            if ($taskOwnerBefore -ne $taskSid.Value) { throw 'Fixture must belong to the test identity.' }
+            $taskAcl = if ($taskDirectory) { New-Object Security.AccessControl.DirectorySecurity } else { New-Object Security.AccessControl.FileSecurity }
+            $taskInheritance = if ($taskDirectory) { 'ContainerInherit,ObjectInherit' } else { 'None' }
+            $taskAcl.SetAccessRuleProtection($true, $false)
+            foreach ($taskAllowedSid in @($taskSid.Value, 'S-1-5-18', 'S-1-5-32-544')) {
+                $taskRights = if ($taskAllowedSid -eq $taskSid.Value) { 'Modify' } else { 'FullControl' }
+                $taskRule = New-Object Security.AccessControl.FileSystemAccessRule([Security.Principal.SecurityIdentifier]::new($taskAllowedSid), $taskRights, $taskInheritance, 'None', 'Allow')
+                $taskAcl.AddAccessRule($taskRule)
+            }
+            # Deny WRITE_OWNER explicitly so elevated/group grants cannot mask a regression.
+            $taskAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($taskSid, [Security.AccessControl.FileSystemRights]::TakeOwnership, [Security.AccessControl.AccessControlType]::Deny))
+            $taskItem = Get-Item -LiteralPath $taskPath
+            $taskItem.SetAccessControl($taskAcl)
+            Set-KeyRingRestrictedAcl -Path $taskPath -Directory:$taskDirectory
+            $taskAfter = Get-Acl -LiteralPath $taskPath
+            if ($taskAfter.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $taskOwnerBefore) { throw 'Owner was changed.' }
+            if (-not $taskAfter.AreAccessRulesProtected) { throw 'Inheritance was not removed.' }
+            $taskRules = @($taskAfter.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))
+            if ($taskRules.Count -ne 3) { throw 'Unexpected restricted permission count.' }
+            $taskExpectedSids = @($taskSid.Value, 'S-1-5-18', 'S-1-5-32-544')
+            foreach ($taskRule in $taskRules) {
+                if ($taskRule.IdentityReference.Value -notin $taskExpectedSids -or $taskRule.AccessControlType -ne 'Allow' -or $taskRule.FileSystemRights -ne 'FullControl' -or $taskRule.IsInherited) { throw 'Unexpected access grant.' }
+                if ($taskRule.InheritanceFlags -ne [Security.AccessControl.InheritanceFlags]$taskInheritance) { throw 'Unexpected inheritance flags.' }
+            }
+            'Owner-preserving permission checks passed.'
+            """;
+        var start = new System.Diagnostics.ProcessStartInfo("powershell.exe") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+        foreach (var argument in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command }) start.ArgumentList.Add(argument);
+        using var process = System.Diagnostics.Process.Start(start)!;
+        var output = process.StandardOutput.ReadToEndAsync();
+        var error = process.StandardError.ReadToEndAsync();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await process.WaitForExitAsync(timeout.Token);
+        Assert.True(process.ExitCode == 0, await error);
+        Assert.Contains("Owner-preserving permission checks passed", await output);
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("relative-keys")]
     public void InvalidLocationsAreRejected(string path) => Assert.Throws<InvalidOperationException>(() => ApplicationKeyRing.ValidateLocation(path, root));
