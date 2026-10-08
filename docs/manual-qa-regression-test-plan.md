@@ -278,6 +278,18 @@ Record SMTP mode, browser/assistive technology, viewport, and results. Setup det
 - [ ] Sign out/in: password-only success does not authorize account or financial APIs.
       The second screen is keyboard reachable and announces its purpose. Correct code
       completes without another password and preserves a safe intended destination.
+- [ ] On login only, type the sixth digit, paste a full code (including leading zeros
+      or copied spaces/hyphens), and use one-time-code autofill: verification starts
+      once without pressing **Verify and sign in**. Partial/invalid/expired entries
+      do not auto-submit. The button remains available; no timer/render retry occurs.
+      While checking, repeated input, clicks and Enter do not duplicate requests.
+- [ ] A wrong code/network failure keeps the challenge, shows the error, clears the
+      field, and returns keyboard focus. Re-entering the same attempted code waits
+      for the button/Enter; a different complete code checks once automatically.
+      Successful explicit resend resets this guard and clears the old entry; failed
+      resend does not. Leaving the challenge prevents late responses from updating
+      the page or navigating back into the app.
+      Recovery codes and enabling/disabling MFA still require explicit submission.
 - [ ] Refresh the pending screen or reopen it in the same browser: resume the challenge
       without sending another email. Cancel returns to password sign-in; canceled,
       consumed, wrong-user, wrong-purpose, or expired challenges cannot complete.
