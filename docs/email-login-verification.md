@@ -36,6 +36,15 @@ exhaust real-account recovery codes or simulate failures on production email.
   digits, or use ordinary keyboard editing/autofill. Spaces/hyphens in pasted codes
   are ignored, but longer or nonnumeric codes are not silently truncated. Recovery
   codes retain their separate, full-length text field and unchanged entropy.
+- On the login screen only, completing a six-digit email code automatically runs
+  the same server verification as **Verify and sign in**. Partial/invalid or locally
+  expired codes do not trigger an automatic request. In-flight requests cannot be
+  duplicated; renders/countdown updates never submit. Failed requests clear the
+  field and return focus; re-entering the last automatically attempted code does
+  not retry it automatically, but the button/Enter remain available for explicit
+  retry. A different code or a successful explicit resend allows a new automatic
+  attempt. The last attempted value exists only in the mounted challenge's memory
+  and clears on success/exit. Recovery codes and security settings remain manual.
 - **Resend code** is the single resend action. In settings, an expired or unavailable
   challenge can be replaced on explicit retry using the current password; no save
   happens automatically. An expired login session requires password sign-in again.
