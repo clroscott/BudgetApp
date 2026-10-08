@@ -482,6 +482,14 @@ destructive actions against records that must be kept.
 - [ ] Oversized import and import-profile inspection files are rejected before parsing.
 - [ ] Application and error logs contain no passwords, bearer tokens, connection
       strings, complete CSV rows, or unnecessary financial details.
+- [ ] Local Production Gmail setup prompts for a hidden Google app password,
+      stores only a Windows-protected credential outside Git/publish with restricted
+      file permissions, refuses existing destinations, and does not change database
+      or key settings. Its emitted SMTP startup block replaces the legacy File
+      block, preserves the reachable HTTPS URL, and never prints a password.
+- [ ] Production real email delivery succeeds to an inbox you control; no localhost
+      link is sent to another device. A missing/inaccessible SMTP credential fails
+      without reverting to File/Disabled delivery or claiming success.
 - [ ] Dependency and secret scanning are enabled and have no unresolved High/Critical
       finding accepted without a documented decision.
 - [ ] CodeQL has analyzed the current PR commit. New High/Critical findings are
@@ -1047,6 +1055,11 @@ Follow [Windows key storage and recovery](production-key-storage.md).
       SYSTEM, and trusted local Administrators. A different ordinary Windows
       account cannot read/write key XML or decrypt it. Web app administrator
       grants do not grant Windows secret access.
+- [ ] As a non-elevated Windows user, owned disposable directories/private-file
+      fixtures with Modify access but without WRITE_OWNER can be restricted;
+      ownership stays unchanged and only the three intended access grants remain.
+      For a confirmed pre-certificate folder-permission failure, the documented
+      retry preserves the empty incomplete folder and refuses a nonempty target.
 - [ ] Sign in, obtain an antiforgery token, confirmation/reset/change-email link,
       and pending email-MFA challenge. Restart/redeploy into another release
       directory with the same ring/configuration; each remains valid until its

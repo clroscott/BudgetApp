@@ -113,6 +113,11 @@ dotnet publish `
 - [ ] Package verification reports `READY`.
 - [ ] `wwwroot\index.html` exists in the staged package.
 - [ ] The staged package contains no local secrets or data.
+- [ ] Production startup uses configured SMTP, not an old `File`-delivery block.
+      Development Gmail user secrets are not Production configuration. Complete
+      [local Production Gmail setup](email.md#gmail-setup-for-the-local-deployed-app)
+      once, preserve its protected credential outside publish/Git, and verify the
+      email links use the HTTPS address recipients actually reach.
 
 Do not stop the working Production app merely because a build fails. Correct
 the source or package first.

@@ -98,38 +98,54 @@ dotnet user-secrets set "Email:DeliveryMode" "File" --project "C:\Users\clayb\so
 
 Production does not load Development user secrets. For the current Windows local
 deployment, save a separate Windows-protected SMTP credential while signed in as
-the Windows user who runs the app. This is analogous to the certificate credential
-already used by the startup script:
+the normal Windows user who runs the app. The setup tool prompts for the dedicated
+Gmail address and hidden Google app password, checks inputs, reserves a NEW file,
+restricts its permissions, and verifies a Windows-encrypted credential round-trip.
+It never overwrites an existing credential or sends a test message. It leaves the
+database, key ring, Development secrets, and startup file unchanged.
 
 ```powershell
-New-Item -ItemType Directory -Path "C:\Apps\BudgetApp\secrets" -Force | Out-Null
-$gmailCredential = Get-Credential -UserName "your-dedicated-account@gmail.com" `
-    -Message "MC Budget Gmail: enter the Google app password, not the account password"
-$gmailCredential | Export-Clixml -LiteralPath "C:\Apps\BudgetApp\secrets\gmail.credential"
-$gmailCredential = $null
+.\tools\Configure-ProductionGmail.cmd -ApplicationUrl 'https://mcbudgetapp'
 ```
 
-Add the following before launching `BudgetApp.Server.exe` in the existing startup
-script. Keep its existing database and HTTPS certificate settings:
+Replace the URL above with the HTTPS frontend address recipients actually use.
+The default credential file is `C:\Apps\BudgetApp\secrets\gmail.credential`;
+its parent folder must already exist. The file permits only the current Windows
+identity, SYSTEM, and trusted local Administrators. Ownership is preserved.
+For an intentional password replacement, use `-CredentialPath` with a NEW
+`.credential` filename and update startup to that path; do not delete/overwrite
+the working credential as a troubleshooting shortcut. A failed save can leave a
+new partial protected file: inspect it rather than blindly rerunning.
+
+The tool prints a password-free startup block using the actual credential path
+and frontend URL. Replace the OLD `Email__DeliveryMode = "File"` and
+`Email__FileOutboxPath` block with it, before launching `BudgetApp.Server.exe`.
+Keep the existing database, HTTPS certificate, and Data Protection settings.
+Do not leave a later `File` assignment overriding `Smtp`. Example:
 
 ```powershell
-$gmailCredential = Import-Clixml -LiteralPath "C:\Apps\BudgetApp\secrets\gmail.credential"
-$env:Email__DeliveryMode = "Smtp"
-$env:Email__SenderName = "MC Budget"
-$env:Email__SenderAddress = $gmailCredential.UserName
-$env:Email__Smtp__Host = "smtp.gmail.com"
-$env:Email__Smtp__Port = "587"
-$env:Email__Smtp__Security = "StartTls"
-$env:Email__Smtp__Username = $gmailCredential.UserName
-$env:Email__Smtp__Password = $gmailCredential.GetNetworkCredential().Password.Replace(' ', '')
-$env:Email__Smtp__TimeoutSeconds = "30"
-$gmailCredential = $null
-# Set this to the local HTTPS frontend address recipients actually use.
-$env:Application__PublicBaseUrl = "https://localhost"
+$taskGmailCredential = Import-Clixml -LiteralPath 'C:\Apps\BudgetApp\secrets\gmail.credential' -ErrorAction Stop
+if ($taskGmailCredential -isnot [Management.Automation.PSCredential]) { throw 'The Gmail credential is invalid. Do not start Production.' }
+try {
+    $env:Email__DeliveryMode = 'Smtp'
+    $env:Email__SenderName = 'MC Budget'
+    $env:Email__SenderAddress = $taskGmailCredential.UserName
+    $env:Email__Smtp__Host = 'smtp.gmail.com'
+    $env:Email__Smtp__Port = '587'
+    $env:Email__Smtp__Security = 'StartTls'
+    $env:Email__Smtp__Username = $taskGmailCredential.UserName
+    $env:Email__Smtp__Password = $taskGmailCredential.GetNetworkCredential().Password
+    $env:Email__Smtp__TimeoutSeconds = '30'
+    $env:Application__PublicBaseUrl = 'https://mcbudgetapp'
+} finally {
+    $taskGmailCredential.Password.Dispose()
+    $taskGmailCredential = $null
+}
 ```
 
 On Windows, the exported credential is encrypted for that Windows user and
-computer. Restrict access to the secrets folder. A different service identity or
+computer ([Microsoft credential export guidance](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/export-clixml?view=powershell-7.4)).
+Restrict access to the secrets folder. A different service identity or
 host requires its own credential provisioning. Environment variables are process
 configuration, not an encrypted storage mechanism; remove the email variables
 when the app exits if reusing that shell. Do not copy credentials into the publish

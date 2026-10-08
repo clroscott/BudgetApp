@@ -37,6 +37,12 @@ function Resolve-KeyRingPath([string]$Path) {
 
 function Set-KeyRingRestrictedAcl([string]$Path, [switch]$Directory) {
     $taskSid = [Security.Principal.WindowsIdentity]::GetCurrent().User
+    $taskAllowedSids = @($taskSid.Value, 'S-1-5-18', 'S-1-5-32-544')
+    $taskExistingAcl = Get-Acl -LiteralPath $Path
+    $taskOwnerSid = $taskExistingAcl.GetOwner([Security.Principal.SecurityIdentifier]).Value
+    if ($taskOwnerSid -notin $taskAllowedSids) {
+        throw 'The existing owner is not the app-running identity, SYSTEM, or local Administrators. Stop and review the Windows identity/ownership; this helper does not take ownership.'
+    }
     if ($Directory) {
         $taskAcl = New-Object Security.AccessControl.DirectorySecurity
         $taskInheritance = [Security.AccessControl.InheritanceFlags]'ContainerInherit,ObjectInherit'
@@ -45,14 +51,15 @@ function Set-KeyRingRestrictedAcl([string]$Path, [switch]$Directory) {
         $taskInheritance = [Security.AccessControl.InheritanceFlags]::None
     }
     $taskAcl.SetAccessRuleProtection($true, $false)
-    $taskAcl.SetOwner($taskSid)
-    foreach ($taskAllowedSid in @($taskSid.Value, 'S-1-5-18', 'S-1-5-32-544')) {
+    foreach ($taskAllowedSid in $taskAllowedSids) {
         $taskIdentity = New-Object Security.Principal.SecurityIdentifier($taskAllowedSid)
         $taskRule = New-Object Security.AccessControl.FileSystemAccessRule($taskIdentity, 'FullControl', $taskInheritance, 'None', 'Allow')
         $taskAcl.AddAccessRule($taskRule)
     }
-    # Persist only the changed owner/DACL sections. Set-Acl can attempt SACL
-    # writes and require SeSecurityPrivilege even for a folder the user owns.
+    # Persist only the DACL; preserve the Windows-assigned owner. An owner can
+    # change permissions without WRITE_OWNER, so even resetting the same owner
+    # can fail on an otherwise writable folder/private-key file. Set-Acl can
+    # also attempt privileged SACL writes that are not needed here.
     if ($Directory) {
         ([IO.DirectoryInfo]::new($Path)).SetAccessControl($taskAcl)
     } else {

@@ -62,7 +62,8 @@ describe('email login verification', () => {
     expect(auth.updateUser).not.toHaveBeenCalled()
     expect(window.location.pathname).toBe('/login')
     expect(screen.queryByLabelText('Password')).toBeNull()
-    expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Multi-factor authentication' }))
+    // The heading can render before its mount effect moves keyboard focus.
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Multi-factor authentication' })))
     fireEvent.change(screen.getByLabelText('Email verification code'), { target: { value: '001234' } })
     fireEvent.click(screen.getByRole('button', { name: 'Verify and sign in' }))
     await screen.findByText('Signed-in destination')

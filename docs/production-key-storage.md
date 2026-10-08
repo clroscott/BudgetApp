@@ -83,6 +83,47 @@ inspect them rather than blindly rerunning. If a key was created but the manifes
 could not be saved, do not initialize over it: review the incomplete first setup
 before any deployment. Live/old rings are never removed automatically.
 
+### Retry after a folder-permission setup failure
+
+The permission helper preserves the existing trusted Windows owner and changes
+only the access rules. It refuses ownership outside the app-running identity,
+SYSTEM, or local Administrators rather than taking ownership. Folder/file
+ownership changes require `WRITE_OWNER`, which is not
+needed just to restrict access to a location the launching user already owns.
+Regression tests cover owned folders and private-file fixtures with Modify access
+and `WRITE_OWNER` denied, without requiring an elevated shell.
+
+For a **confirmed initial folder-permission failure before certificate creation**,
+use the corrected helper and preserve the EMPTY incomplete directory before
+retrying. No application republish or database update is required for this helper
+fix. Run as the same normal Windows account with Production still stopped:
+
+```powershell
+$taskFailedRingPath = 'C:\Apps\BudgetApp\data\protection-keys\production'
+$taskFailedRing = Get-Item -LiteralPath $taskFailedRingPath -Force -ErrorAction Stop
+if (-not $taskFailedRing.PSIsContainer -or
+    $taskFailedRing.FullName -ne $taskFailedRingPath -or
+    ($taskFailedRing.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+    @(Get-ChildItem -LiteralPath $taskFailedRingPath -Force -ErrorAction Stop).Count -ne 0) {
+    throw 'Stop: this is not the expected empty incomplete directory. Do not rename or reinitialize existing key material.'
+}
+$taskPreservedName = 'production-incomplete-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
+$taskPreservedPath = Join-Path $taskFailedRing.Parent.FullName $taskPreservedName
+if (Test-Path -LiteralPath $taskPreservedPath) { throw 'Preservation destination already exists.' }
+Rename-Item -LiteralPath $taskFailedRingPath -NewName $taskPreservedName -ErrorAction Stop
+
+.\tools\Initialize-ProductionKeyRing.cmd `
+  -ServerExecutable 'C:\Apps\BudgetApp\publish\BudgetApp.Server.exe'
+```
+
+The old empty directory is retained as `production-incomplete-<timestamp>`; no
+keys are deleted or overwritten. The initializer still refuses any existing
+destination. If setup progressed to certificate/key creation, the directory is
+nonempty, or the failure stage is uncertain, stop and inspect instead of using
+this retry procedure. Never use it to replace an established ring.
+
+### Configure the Production startup
+
 The tool prints two non-secret startup settings. Add them to your existing
 process-scoped Production startup procedure (substitute the actual thumbprint):
 
@@ -103,8 +144,8 @@ All examples use placeholder paths; choose an actual staged server and a NEW
 backup/rehearsal directory outside publish/Git. `.cmd` wrappers permit only their
 child Windows PowerShell 5.1 invocation; no permanent execution-policy change is
 needed. The PKI scripts deliberately require this host, not PowerShell 7.
-They explicitly load this host's modules and apply only owner/access permissions,
-not privileged system-audit ACL changes.
+They explicitly load this host's modules, restrict access permissions while
+preserving ownership, and do not make privileged system-audit ACL changes.
 
 ```powershell
 .\tools\Test-ProductionKeyRing.cmd `
@@ -228,8 +269,9 @@ They cover encrypted persistence, restart, cookie/MFA/antiforgery and Identity
 tokens, isolated restore with exported decryption material, environment isolation,
 rotation/retained certificates, missing/empty/partial/corrupt rings, manifest
 continuity, unsafe paths, Windows broad permissions, and non-overwrite behavior.
-Windows helper smoke coverage also checks directory/private-file permissions,
-unsafe-path rejection, and restoration of process settings after a command fails.
+Windows helper coverage also checks directory/private-file permissions without
+WRITE_OWNER, ownership preservation, unsafe-path rejection, and restoration of
+process settings after a command fails.
 
 Complete the permanent key-storage cases in
 [Manual QA](manual-qa-regression-test-plan.md) before deploying. Record the actual
