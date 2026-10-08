@@ -81,6 +81,44 @@ function fixture(narrow = false) {
   return { sidebar, context, heading, scroll, margin: () => scrollMargin }
 }
 describe('visible heading scroll offset', () => {
+  it('keeps the shared page start and section tabs visible while focusing a page heading', () => {
+    const root = document.createElement('section')
+    root.dataset.focusFixture = ''
+    root.className = 'management-content'
+    root.innerHTML = '<nav class="budgeting-section-nav"><a href="/import">Import transactions</a></nav><div class="page-title-row"><h1>Import CSV</h1></div>'
+    document.body.append(root)
+    const heading = root.querySelector('h1')!
+    vi.spyOn(heading, 'getBoundingClientRect').mockReturnValue(box(250, 180, 700, 45))
+    const scroll = vi.fn()
+    Object.defineProperty(heading, 'scrollIntoView', { configurable: true, value: scroll })
+    const restore = focusPageElement(heading)
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'instant' })
+    expect(scroll).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(heading)
+    restore()
+    expect(heading.hasAttribute('tabindex')).toBe(false)
+  })
+  it('still reveals a heading if it does not fit in a short zoomed viewport', () => {
+    const root = document.createElement('section')
+    root.dataset.focusFixture = ''
+    root.className = 'management-content'
+    root.innerHTML = '<h1>Long page heading</h1>'
+    document.body.append(root)
+    const heading = root.querySelector('h1')!
+    vi.spyOn(heading, 'getBoundingClientRect').mockReturnValue(box(0, window.innerHeight + 50, 200, 70))
+    const scroll = vi.fn()
+    Object.defineProperty(heading, 'scrollIntoView', { configurable: true, value: scroll })
+    focusPageElement(heading)()
+    expect(scroll).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' })
+    expect(document.activeElement).toBe(heading)
+  })
+  it.each([false, true])('accounts for the consolidated context/profile header (narrow=%s)', narrow => {
+    const { heading, context, margin } = fixture(narrow)
+    context.className = 'app-context-header'
+    focusPageElement(heading)()
+    expect(margin()).toBe(narrow ? '146px' : '76px')
+    expect(heading.style.scrollMarginTop).toBe('12px')
+  })
   it('keeps desktop topic headings below the household header without treating the side rail as a header', () => {
     const { heading, scroll, margin } = fixture()
     const restore = focusPageElement(heading)

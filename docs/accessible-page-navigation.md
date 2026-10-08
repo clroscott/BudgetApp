@@ -7,8 +7,10 @@ the app route boundary. No database migration or configuration change is needed.
 ## Current location and skip navigation
 
 The sidebar exposes `aria-current="page"` on the exact active pathname, matching
-the existing budgeting section menu. Query filters do not change which page is
-current. A child budgeting route does not also mark Monthly budget as current.
+the section menus. Query filters do not change which page is current. Since
+[UI cleanup (#200)](ui-cleanup.md), the main group exposes `aria-current="location"`
+when a child is current; its child link exposes `page`. A child budgeting route
+does not also mark Monthly budget as the current page.
 
 Skip to main content is the first app-level keyboard link. It becomes visible on
 focus and moves to the current visible main heading, or the main landmark if no
@@ -33,6 +35,13 @@ rule. If someone starts interacting while a destination is delayed, its later
 arrival is still announced but does not take their focus away. An active tutorial
 owns focus and announcements; exiting one does not release a stale pending page
 focus request.
+
+With the shared page alignment from #200, section tabs precede page headings.
+Heading focus begins at the natural page top to keep that tab row visible and
+avoid changing its vertical position between pages. A heading that cannot fit in
+a short/zoomed viewport still scrolls into view. Other programmatic focus stops,
+such as dashboard card headings, retain local scrolling rather than resetting
+the entire page.
 
 Programmatic focus stops use temporary `tabindex="-1"` and a visible focus marker,
 not extra Tab stops. Original attributes are restored on blur/cleanup. Scrolling

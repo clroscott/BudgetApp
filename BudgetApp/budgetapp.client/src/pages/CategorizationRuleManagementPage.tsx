@@ -21,6 +21,7 @@ import {
 } from '../categorizationRules/categorizationRuleApi'
 import { getCategories, type CategoryItem } from '../categories/categoryApi'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { TransactionsSectionNav } from '../components/TransactionsSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
 import { useUnsavedForm } from '../routing/useUnsavedForm'
 
@@ -302,9 +303,10 @@ export function CategorizationRuleManagementPage() {
   return (
     <main className="management-page">
       <section className="management-content">
+        <TransactionsSectionNav />
         <div className="page-title-row">
           <div>
-            <p className="eyebrow">Settings</p>
+            <p className="eyebrow">Transactions</p>
             <h1>Categorization rules</h1>
             <p>Automatically categorize uncategorized imported rows using predictable household rules.</p>
           </div>

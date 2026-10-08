@@ -7,6 +7,7 @@ import {
 } from '../auditing/auditApi'
 import { ApiError } from '../api/apiClient'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { HouseholdSectionNav } from '../components/HouseholdSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
 
 const emptyFilters: AuditFilterOptions = {
@@ -84,10 +85,11 @@ export function ActivityPage() {
   return (
     <main className="management-page">
       <section className="management-content activity-content">
+        <HouseholdSectionNav current="activity" />
         <div className="page-title-row">
           <div>
             <p className="eyebrow">Household</p>
-            <h1>Activity</h1>
+            <h1>Change history</h1>
             <p>
               See meaningful changes to household data and your own personal
               finances. Other members&apos; personal activity remains private.

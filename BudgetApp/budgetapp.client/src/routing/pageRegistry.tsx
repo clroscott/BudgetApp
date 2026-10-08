@@ -30,6 +30,7 @@ export interface AppPageDefinition {
 }
 
 export interface DashboardPanelDefinition {
+  live?: boolean
   icon: AppIconName
   key: string
   label: string
@@ -206,7 +207,7 @@ export const appPages: AppPageDefinition[] = [
     navigation: { section: 'primary', order: 20 },
     dashboard: {
       panelKey: 'import-review',
-      panelLabel: 'Import & Review',
+      panelLabel: 'Import & review',
       panelTitle: 'Bank transactions',
       panelDescription:
         'Upload CSV activity, then review it before creating transactions.',
@@ -224,7 +225,7 @@ export const appPages: AppPageDefinition[] = [
     navigation: { section: 'primary', order: 30 },
     dashboard: {
       panelKey: 'import-review',
-      panelLabel: 'Import & Review',
+      panelLabel: 'Import & review',
       panelTitle: 'Bank transactions',
       panelDescription:
         'Upload CSV activity, then review it before creating transactions.',
@@ -242,7 +243,7 @@ export const appPages: AppPageDefinition[] = [
     navigation: { section: 'primary', order: 40 },
     dashboard: {
       panelKey: 'monthly-budget',
-      panelLabel: 'Monthly Budget',
+      panelLabel: 'Monthly budget',
       panelTitle: 'Plan this month',
       panelDescription:
         'Review household or personal spending plans by category.',
@@ -263,7 +264,7 @@ export const appPages: AppPageDefinition[] = [
     navigation: { section: 'primary', order: 45 },
     dashboard: {
       panelKey: 'annual-targets',
-      panelLabel: 'Annual Targets',
+      panelLabel: 'Annual targets',
       panelTitle: 'Plan the fiscal year',
       panelDescription:
         'Set annual category targets and create independent monthly drafts.',
@@ -283,7 +284,7 @@ export const appPages: AppPageDefinition[] = [
     navigation: { section: 'primary', order: 47 },
     dashboard: {
       panelKey: 'annual-overview',
-      panelLabel: 'Annual Overview',
+      panelLabel: 'Annual overview',
       panelTitle: 'Review the year',
       panelDescription:
         'Compare monthly budgets, actual spending, income, and cash flow.',
@@ -303,7 +304,7 @@ export const appPages: AppPageDefinition[] = [
     navigation: { section: 'primary', order: 50 },
     dashboard: {
       panelKey: 'recurring-expenses',
-      panelLabel: 'Recurring Expenses',
+      panelLabel: 'Recurring expenses',
       panelTitle: 'Monthly expectations',
       panelDescription:
         'Maintain predictable expenses used to prepare future budgets.',
@@ -318,13 +319,13 @@ export const appPages: AppPageDefinition[] = [
   {
     id: 'accounts',
     path: '/accounts',
-    label: 'Accounts',
+    label: 'Financial accounts',
     icon: 'accounts',
     access: 'household',
     navigation: { section: 'primary', order: 60 },
     dashboard: {
       panelKey: 'accounts',
-      panelLabel: 'Accounts',
+      panelLabel: 'Financial accounts',
       panelTitle: 'Financial accounts',
       panelDescription: 'Manage shared and personal transaction sources.',
       linkLabel: 'Manage accounts',
@@ -338,17 +339,17 @@ export const appPages: AppPageDefinition[] = [
   {
     id: 'activity',
     path: '/activity',
-    label: 'Activity',
+    label: 'Change history',
     icon: 'activity',
     access: 'household',
     navigation: { section: 'primary', order: 70 },
     dashboard: {
       panelKey: 'activity',
-      panelLabel: 'Activity',
+      panelLabel: 'Change history',
       panelTitle: 'Household history',
       panelDescription:
         'Review meaningful household changes and your personal activity.',
-      linkLabel: 'View activity',
+      linkLabel: 'View change history',
     },
     component: page(() => import('../pages/ActivityPage'), 'ActivityPage'),
   },
@@ -408,7 +409,7 @@ export const appPages: AppPageDefinition[] = [
     navigation: { section: 'settings', order: 20 },
     dashboard: {
       panelKey: 'categorization-rules',
-      panelLabel: 'Categorization Rules',
+      panelLabel: 'Categorization rules',
       panelTitle: 'Automatic categorization',
       panelDescription:
         'Manage predictable description rules used during import review.',
@@ -428,7 +429,7 @@ export const appPages: AppPageDefinition[] = [
     navigation: { section: 'settings', order: 30 },
     dashboard: {
       panelKey: 'import-profiles',
-      panelLabel: 'CSV Profiles',
+      panelLabel: 'CSV profiles',
       panelTitle: 'Saved import structures',
       panelDescription:
         'Reuse mappings for bank and custom transaction file formats.',
@@ -478,12 +479,17 @@ for (const pageDefinition of appPages) {
   })
 }
 
-export const dashboardPanels = [...pageDashboardPanels.values()]
+const livePanels: DashboardPanelDefinition[] = [
+  { key: 'financial-overview', label: 'Financial overview', title: 'Financial overview', description: 'Monthly budget and actual spending.', icon: 'budget', live: true, links: [] },
+  { key: 'needs-attention', label: 'Needs attention', title: 'Needs attention', description: 'Imports and uncategorized spending.', icon: 'review', live: true, links: [] },
+  { key: 'quick-actions', label: 'Quick actions', title: 'Quick actions', description: 'Common tasks within easy reach.', icon: 'dashboard', live: true, links: [] },
+  { key: 'recent-transactions', label: 'Recent transactions', title: 'Recent transactions', description: 'The latest transactions visible to you.', icon: 'transactions', live: true, links: [] },
+]
+
+export const dashboardPanels = [...livePanels, ...pageDashboardPanels.values()]
   .sort((left, right) =>
     (left.defaultOrder ?? Number.MAX_SAFE_INTEGER) -
       (right.defaultOrder ?? Number.MAX_SAFE_INTEGER) ||
     left.label.localeCompare(right.label))
 
-export const defaultDashboardPanelKeys = dashboardPanels
-  .filter(panel => panel.defaultOrder !== undefined)
-  .map(panel => panel.key)
+export const defaultDashboardPanelKeys = ['financial-overview', 'needs-attention', 'quick-actions']

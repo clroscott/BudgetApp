@@ -57,6 +57,9 @@ export function useTutorialTarget(step: TutorialStep | undefined, kind: Tutorial
       let element = candidates.find(candidate => isTutorialVisible(candidate) &&
         (step.advance !== 'click' || isEnabledTarget(candidate))) ?? null
       if (!element && step.targetId.startsWith('nav-')) {
+        // Expand the requested navigation section, including on desktop. This
+        // reveals an existing link without clicking it or changing financial data.
+        window.dispatchEvent(new CustomEvent(revealTutorialNavigationEvent, { detail: { targetId: step.targetId } }))
         const menu = tutorialElement('sidebar-menu').find(candidate => isTutorialVisible(candidate) && isEnabledTarget(candidate))
         if (menu?.getAttribute('aria-expanded') === 'false') {
           // Reveal UI only. Never synthesize a click on a task/action control.

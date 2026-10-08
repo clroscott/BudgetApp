@@ -84,13 +84,13 @@ export function HouseholdSettingsPage() {
 
   return <main className="management-page">
     <section className="management-content narrow-management-content">
+      {currentHousehold && <HouseholdSectionNav current="settings" />}
       <header className="page-title-row">
         <div><p className="eyebrow">Household</p><h1>Household settings</h1>
           <p>{currentHousehold ? `Shared settings for ${currentHousehold.name}.` : 'No household is selected.'}</p></div>
         <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
       </header>
       {currentHousehold ? <>
-        <HouseholdSectionNav current="settings" />
         <PageLoadFeedback subject="household settings" status={loadState.status} errors={loadState.errors}
           disabled={isSaving} onReload={reload} />
         <ErrorSummary errors={errors} />

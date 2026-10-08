@@ -205,8 +205,8 @@ export function RecurringExpenseManagementPage() {
   return <main className="management-page">
     <header className="app-header"><BrandLockup /><AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink></header>
     <section className="management-content recurring-content">
-      <div className="page-title-row"><div><p className="eyebrow">Budgeting</p><h1>Recurring expenses</h1><p>Configure predictable monthly expenses once and use them to build future budgets.</p></div><label className="checkbox-row"><input type="checkbox" checked={showInactive} onChange={event => setShowInactive(event.target.checked)} /><span>Show deactivated</span></label></div>
       <BudgetingSectionNav current="recurring-expenses" />
+      <div className="page-title-row"><div><p className="eyebrow">Budgeting</p><h1>Recurring expenses</h1><p>Configure predictable monthly expenses once and use them to build future budgets.</p></div><label className="checkbox-row"><input type="checkbox" checked={showInactive} onChange={event => setShowInactive(event.target.checked)} /><span>Show deactivated</span></label></div>
       <ErrorSummary errors={errors} />
       <div className="recurring-summary"><div><span>Household monthly</span><strong>{formatMoney(monthlyTotal('Household'))}</strong></div><div><span>My personal monthly</span><strong>{formatMoney(monthlyTotal('Personal'))}</strong></div></div>
       <form className="recurring-form" onSubmit={event => void handleCreate(event)}><div className="recurring-form-heading"><div><h2>Add recurring expense</h2><p>This creates an expectation, not a transaction.</p></div><span className="currency-pill">{currentHousehold.defaultCurrency}</span></div>{renderFields(createDraft, setCreateDraft)}<button className="primary-button account-submit" type="submit" disabled={isSaving}>Add recurring expense</button></form>

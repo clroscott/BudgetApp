@@ -273,7 +273,9 @@ describe('personal account settings', () => {
     const { households } = show({ shell: true })
     fireEvent.change(await ready(), { target: { value: 'Unsaved personal name' } })
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
-    expect(within(nav).getByRole('link', { name: 'Account settings' }).getAttribute('aria-current')).toBe('page')
+    const menu = screen.getByText('Sample user').closest('details')!
+    menu.open = true
+    expect(within(menu).getByRole('link', { name: 'Account settings' }).getAttribute('aria-current')).toBe('page')
     fireEvent.click(within(nav).getByRole('link', { name: 'Dashboard' }))
     expect(window.location.pathname).toBe('/settings/account')
     expect(screen.getByRole('combobox', { name: 'Current household' })).toBeTruthy()

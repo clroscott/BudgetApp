@@ -19,6 +19,7 @@ import {
   type CategoryType,
 } from '../categories/categoryApi'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
@@ -379,9 +380,10 @@ export function CategoryManagementPage() {
       </header>
 
       <section className="management-content">
+        <BudgetingSectionNav current="categories" />
         <div className="page-title-row">
           <div>
-            <p className="eyebrow">Settings</p>
+            <p className="eyebrow">Budgeting</p>
             <h1>Categories</h1>
             <p>Manage the categories shared by {currentHousehold.name}.</p>
           </div>

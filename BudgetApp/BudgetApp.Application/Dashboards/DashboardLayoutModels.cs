@@ -13,13 +13,9 @@ public static class DashboardPanelCatalog
 
     public static readonly IReadOnlyList<string> DefaultPanelKeys =
     [
-        "monthly-budget",
-        "transactions",
-        "import-review",
-        "recurring-expenses",
-        "accounts",
-        "categories",
-        "household"
+        "financial-overview",
+        "needs-attention",
+        "quick-actions"
     ];
 
     public static bool IsValidPanelKey(string? panelKey)

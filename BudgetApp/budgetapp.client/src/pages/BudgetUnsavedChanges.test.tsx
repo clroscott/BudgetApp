@@ -109,7 +109,7 @@ describe('monthly budget guard integration', () => {
   it('protects section links and does not ask twice when leaving is approved', async () => {
     show(<BudgetManagementPage />, '/budgeting?year=2026&month=1')
     fireEvent.change(await screen.findByLabelText('Housing budget'), { target: { value: '250' } })
-    fireEvent.click(screen.getByRole('link', { name: 'Annual Targets' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Annual targets' }))
     expect(window.location.pathname).toBe('/budgeting')
     expect(window.confirm).toHaveBeenCalledTimes(1)
     vi.mocked(window.confirm).mockReturnValue(true)

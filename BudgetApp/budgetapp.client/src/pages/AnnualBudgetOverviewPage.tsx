@@ -48,6 +48,7 @@ export function AnnualBudgetOverviewPage() {
       <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
     </header>
     <section className="management-content annual-overview-content">
+      <BudgetingSectionNav current="annual-overview" />
       <div className="page-title-row">
         <div>
           <p className="eyebrow">Budgeting</p>
@@ -60,7 +61,6 @@ export function AnnualBudgetOverviewPage() {
           </p>
         </div>
       </div>
-      <BudgetingSectionNav current="annual-overview" />
 
       <section className="panel annual-overview-controls">
         <label>

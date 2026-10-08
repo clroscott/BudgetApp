@@ -26,10 +26,21 @@ export function focusPageElement(element: HTMLElement) {
     element.removeEventListener('blur', restore)
   }
   element.addEventListener('blur', restore, { once: true })
+  // Page headings now follow a shared section-tab row. Begin at the page's
+  // natural top instead of scrolling the heading past that navigation. Other
+  // focus stops (editors, cards, tutorial controls) retain their local position.
+  if (element.matches('h1') && element.closest('.management-content, .dashboard-content')) {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    const bounds = element.getBoundingClientRect()
+    if (bounds.top >= 0 && bounds.bottom <= window.innerHeight) {
+      element.focus({ preventScroll: true })
+      return restore
+    }
+  }
   const oldMargin = element.style.scrollMarginTop
   const hadStyle = element.hasAttribute('style')
   const target = element.getBoundingClientRect()
-  const headerBottom = [...document.querySelectorAll<HTMLElement>('.app-sidebar, .household-context-bar')]
+  const headerBottom = [...document.querySelectorAll<HTMLElement>('.app-sidebar, .app-context-header, .household-context-bar')]
     .filter(isPageElementVisible)
     .reduce((bottom, header) => {
       const position = getComputedStyle(header).position

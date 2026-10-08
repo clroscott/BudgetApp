@@ -318,7 +318,7 @@ export function AccountManagementPage() {
         <div className="page-title-row" data-tutorial-id="accounts-page-title">
           <div>
             <p className="eyebrow">Household</p>
-            <h1>Accounts</h1>
+            <h1>Financial accounts</h1>
             <p>Manage shared accounts and your personal accounts in {currentHousehold.name}.</p>
             <p>Account scope controls account privacy. “Include in budgets” on a transaction
               controls which budgets count it, without sharing the whole account.</p>

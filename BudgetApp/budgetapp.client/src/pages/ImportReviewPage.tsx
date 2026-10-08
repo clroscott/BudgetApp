@@ -7,6 +7,7 @@ import {
 } from '../categorizationRules/categorizationRuleApi'
 import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { TransactionsSectionNav } from '../components/TransactionsSectionNav'
 import { ContextualHelp } from '../components/ContextualHelp'
 import { helpWarnings } from '../help/helpTopics'
 import { useHouseholds } from '../households/useHouseholds'
@@ -1021,6 +1022,7 @@ export function ImportReviewPage() {
       </header>
 
       <section className="management-content import-review-content">
+        <TransactionsSectionNav />
         <div className="page-title-row">
           <div>
             <p className="eyebrow">Import staging</p>

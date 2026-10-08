@@ -4,36 +4,11 @@ import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
-import { navigationPages } from '../routing/pageRegistry'
+import { groupForPath, mainNavigationGroups } from '../routing/navigationGroups'
 import { useRouter } from '../routing/useRouter'
 import { skipNavigationEvent } from '../routing/pageFocus'
 import { AppIcon } from './AppIcon'
 import { BrandLockup } from './Brand'
-
-const primaryNavigation = navigationPages('primary')
-const settingsNavigation = navigationPages('settings')
-
-function NavigationLinks({
-  items,
-  currentPath,
-}: {
-  items: ReturnType<typeof navigationPages>
-  currentPath: string
-}) {
-  return items.map(item => (
-    <AppLink
-      className={currentPath === item.path ? 'active' : undefined}
-      aria-current={currentPath === item.path ? 'page' : undefined}
-      data-tutorial-id={`nav-${item.id}`}
-      key={item.path}
-      to={item.path}
-      title={item.label}
-    >
-      <AppIcon className="sidebar-navigation-icon" name={item.icon!} />
-      <span className="sidebar-label">{item.label}</span>
-    </AppLink>
-  ))
-}
 
 export function AppShell({ children, showHouseholdNavigation = true }: { children: ReactNode, showHouseholdNavigation?: boolean }) {
   const { logout, user } = useAuth()
@@ -44,16 +19,25 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
   } = useHouseholds()
   const { confirmNavigation, navigate, path } = useRouter()
   const [isNavigationOpen, setIsNavigationOpen] = useState(false)
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+  const profileRef = useRef<HTMLDetailsElement>(null)
   const menuRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     const menu = menuRef.current
     const reveal = () => setIsNavigationOpen(true)
+    const revealSection = (event: Event) => {
+      const targetId = (event as CustomEvent<{ targetId?: string }>).detail?.targetId
+      const group = mainNavigationGroups.find(item => item.children.some(page => `nav-${page.id}` === targetId))
+      if (group) setExpandedGroups(current => current[group.id] ? current : { ...current, [group.id]: true })
+    }
     const skip = () => setIsNavigationOpen(false)
     menu?.addEventListener(revealTutorialNavigationEvent, reveal)
     window.addEventListener(skipNavigationEvent, skip)
+    window.addEventListener(revealTutorialNavigationEvent, revealSection)
     return () => {
       menu?.removeEventListener(revealTutorialNavigationEvent, reveal)
       window.removeEventListener(skipNavigationEvent, skip)
+      window.removeEventListener(revealTutorialNavigationEvent, revealSection)
     }
   }, [])
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
@@ -68,6 +52,17 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
   })
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [signOutError, setSignOutError] = useState<string | null>(null)
+  useEffect(() => {
+    setIsNavigationOpen(false)
+    if (profileRef.current) profileRef.current.open = false
+  }, [path])
+  useEffect(() => {
+    const closeOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !profileRef.current?.contains(event.target) && profileRef.current) profileRef.current.open = false
+    }
+    document.addEventListener('pointerdown', closeOutside)
+    return () => document.removeEventListener('pointerdown', closeOutside)
+  }, [])
 
   const handleLogout = async () => {
     if (!confirmNavigation()) return
@@ -129,41 +124,41 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
         </button>
 
         <nav id="app-main-navigation" className="sidebar-navigation" aria-label="Main navigation">
-          <NavigationLinks items={primaryNavigation} currentPath={path} />
-          <p>Settings</p>
-          <NavigationLinks items={settingsNavigation.filter(item => item.id !== 'application-administration' || user?.isApplicationAdministrator)} currentPath={path} />
+          {mainNavigationGroups.map(group => {
+            const active = groupForPath(path)?.id === group.id
+            const expanded = expandedGroups[group.id] ?? active
+            return <div className="sidebar-group" data-navigation-group={group.id} key={group.id}>
+              <div className="sidebar-group-heading">
+                <AppLink to={group.page.path} title={group.label} aria-label={group.label}
+                  className={active ? 'active' : undefined}
+                  aria-current={path === group.page.path ? 'page' : active ? 'location' : undefined}
+                  data-tutorial-id={`nav-${group.page.id}`}>
+                  <AppIcon className="sidebar-navigation-icon" name={group.page.icon!} />
+                  <span className="sidebar-label">{group.label}</span>
+                </AppLink>
+                {group.children.length > 0 && <button type="button" className="sidebar-group-toggle"
+                  aria-expanded={expanded} aria-controls={`navigation-${group.id}`}
+                  aria-label={`${expanded ? 'Collapse' : 'Expand'} ${group.label} navigation`}
+                  onClick={() => setExpandedGroups(current => ({ ...current, [group.id]: !expanded }))}>
+                  <span aria-hidden="true">{expanded ? '−' : '+'}</span>
+                </button>}
+              </div>
+              {group.children.length > 0 && <div id={`navigation-${group.id}`} className="sidebar-children" hidden={!expanded}>
+                {group.children.map(page => <AppLink to={page.path} key={page.id} title={page.label} aria-label={page.label}
+                  className={path === page.path ? 'active' : undefined} aria-current={path === page.path ? 'page' : undefined}
+                  data-tutorial-id={`nav-${page.id}`}>
+                  <AppIcon className="sidebar-navigation-icon" name={page.icon ?? 'household'} />
+                  <span className="sidebar-label">{page.label}</span>
+                </AppLink>)}
+              </div>}
+            </div>
+          })}
         </nav>
 
-        <div className="sidebar-footer">
-          {signOutError && <small className="sidebar-error">{signOutError}</small>}
-          <button
-            className="text-button"
-            type="button"
-            title="Sign out"
-            disabled={isSigningOut}
-            onClick={() => void handleLogout()}
-          >
-            <svg
-              className="sidebar-navigation-icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M10 4H4v16h6" />
-              <path d="M14 8l4 4-4 4" />
-              <path d="M8 12h10" />
-            </svg>
-            <span className="sidebar-label">
-              {isSigningOut ? 'Signing out...' : 'Sign out'}
-            </span>
-          </button>
-        </div>
+        <div className="sidebar-footer"><small className="sidebar-label">Track. Plan. Grow together.</small></div>
       </aside>
       <div className="app-shell-content">
+        <div className="app-context-header">
         <div className="household-context-bar" hidden={!showHouseholdNavigation || path.startsWith('/admin')}>
           <div className="household-context-current">
             <span className="household-context-label">Current household</span>
@@ -191,6 +186,26 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
           <AppLink className="household-context-manage" to="/household">
             Manage household
           </AppLink>
+        </div>
+        {user && <details className="profile-menu" ref={profileRef}
+          onKeyDown={event => {
+            if (event.key === 'Escape' && profileRef.current?.open) {
+              event.stopPropagation(); profileRef.current.open = false
+              profileRef.current.querySelector('summary')?.focus()
+            }
+          }}>
+          <summary><AppIcon name="user" /><span>{user.displayName}</span><span className="visually-hidden"> — Profile menu</span></summary>
+          <div className="profile-menu-content">
+            <p>Your personal account</p>
+            <AppLink to="/settings/account" aria-current={path === '/settings/account' ? 'page' : undefined}>Account settings</AppLink>
+            <AppLink to="/help">Help</AppLink>
+            {user.isApplicationAdministrator && <AppLink to="/admin" aria-current={path === '/admin' ? 'page' : path.startsWith('/admin/') ? 'location' : undefined}>Application administration</AppLink>}
+            {signOutError && <p className="sidebar-error" role="alert">{signOutError}</p>}
+            <button className="text-button" type="button" disabled={isSigningOut} onClick={() => void handleLogout()}>
+              {isSigningOut ? 'Signing out…' : 'Sign out'}
+            </button>
+          </div>
+        </details>}
         </div>
         {children}
       </div>

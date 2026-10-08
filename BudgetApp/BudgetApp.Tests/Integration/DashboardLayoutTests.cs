@@ -18,7 +18,7 @@ public sealed class DashboardLayoutTests(BudgetAppWebApplicationFactory factory)
         Assert.NotNull(defaults);
         Assert.True(defaults.IsDefault);
         Assert.Equal(3, defaults.PreferredColumnCount);
-        Assert.Equal("monthly-budget", defaults.VisiblePanelKeys[0]);
+        Assert.Equal(["financial-overview", "needs-attention", "quick-actions"], defaults.VisiblePanelKeys);
 
         var save = await SendWithAntiforgery(
             client,
@@ -66,7 +66,7 @@ public sealed class DashboardLayoutTests(BudgetAppWebApplicationFactory factory)
         Assert.NotNull(restored);
         Assert.True(restored.IsDefault);
         Assert.Equal(3, restored.PreferredColumnCount);
-        Assert.Contains("household", restored.VisiblePanelKeys);
+        Assert.Equal(["financial-overview", "needs-attention", "quick-actions"], restored.VisiblePanelKeys);
     }
 
     [Fact]

@@ -1,39 +1,15 @@
-import { AppLink } from '../routing/AppLink'
+import { sectionPages } from '../routing/navigationGroups'
+import { SectionNavigation } from './SectionNavigation'
 
 type BudgetingPage =
   | 'monthly'
   | 'annual-targets'
   | 'annual-overview'
   | 'recurring-expenses'
-
-const links: ReadonlyArray<{
-  id: BudgetingPage
-  label: string
-  to: string
-}> = [
-  { id: 'monthly', label: 'Monthly Budget', to: '/budgeting' },
-  { id: 'annual-targets', label: 'Annual Targets', to: '/budgeting/annual-targets' },
-  { id: 'annual-overview', label: 'Annual Overview', to: '/budgeting/annual-overview' },
-  {
-    id: 'recurring-expenses',
-    label: 'Recurring Expenses',
-    to: '/budgeting/recurring-expenses',
-  },
-]
+  | 'categories'
 
 export function BudgetingSectionNav({ current }: { current: BudgetingPage }) {
-  return (
-    <nav className="budgeting-section-nav" aria-label="Budgeting pages">
-      {links.map(link => (
-        <AppLink
-          className={link.id === current ? 'active' : undefined}
-          aria-current={link.id === current ? 'page' : undefined}
-          key={link.id}
-          to={link.to}
-        >
-          {link.label}
-        </AppLink>
-      ))}
-    </nav>
-  )
+  const id = current === 'monthly' ? 'monthly-budget' : current
+  const currentPath = sectionPages('budgeting').find(page => page.id === id)?.path ?? ''
+  return <SectionNavigation section="budgeting" currentPath={currentPath} label="Budgeting pages" />
 }
