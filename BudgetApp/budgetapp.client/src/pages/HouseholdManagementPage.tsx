@@ -155,9 +155,10 @@ export function HouseholdManagementPage() {
   return (
     <main className="management-page">
       <div className="management-content">
+        <HouseholdSectionNav current="members" />
         <header className="page-title-row">
           <div>
-            <span className="eyebrow">Household</span>
+            <p className="eyebrow">Household</p>
             <h1>{currentHousehold.name}</h1>
             <p>Review members and manage invitations to your shared budget.</p>
           </div>
@@ -166,7 +167,6 @@ export function HouseholdManagementPage() {
           </AppLink>
         </header>
 
-        <HouseholdSectionNav current="members" />
         <ErrorSummary errors={errors} />
         {notice && <div className="success-summary" role="status">{notice}</div>}
         {exitCompleted && <button className="secondary-button" type="button" disabled={isSaving}

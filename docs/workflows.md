@@ -15,21 +15,34 @@ Each workflow uses the same structure:
 
 ## Application Areas
 
-The provisional authenticated navigation is:
+The current authenticated navigation groups existing routes as follows (see
+[UI cleanup](ui-cleanup.md)). Forecast/report expansions discussed later in this
+document remain future workflows, not extra current sidebar destinations.
 
 - Dashboard
 - Transactions
-- Import
+  - Import transactions
+  - Review imports
+  - Categorization rules
+  - CSV profiles
 - Budgeting
-  - Monthly Budget
-  - Recurring Expenses
-  - Forecast
-- Reports
-- Accounts
+  - Monthly budget
+  - Annual targets
+  - Annual overview
+  - Recurring expenses
+  - Categories
+- Financial accounts
 - Household
-- Settings
+  - Members and invitations
+  - Household settings
+  - Change history
+- Help
+  - Tutorials
 
-Categories, categorization rules, merchant aliases, and import profiles are secondary management areas. They should be available contextually from the workflows that use them rather than being hidden exclusively in Settings.
+Personal Account settings and Sign out are in the profile menu. Application
+administration is separate and visible only to authorized application operators.
+Secondary management pages are available from their contextual section menus;
+merchant aliases remain a future management concept.
 
 ## 1. Register and Create a Household
 

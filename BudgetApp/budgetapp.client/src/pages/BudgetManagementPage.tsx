@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { BrandLockup } from '../components/Brand'
 import { AmountCalculator } from '../components/AmountCalculator'
@@ -125,6 +125,29 @@ export function BudgetManagementPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const loadState = usePageLoad(`${currentHousehold?.id}/${year}/${month}/${scope}`)
   const { run, markReady, invalidate } = loadState
+  const pageRef = useRef<HTMLElement>(null)
+  const actionsRef = useRef<HTMLElement>(null)
+  const hasBudgetActions = Boolean(loadState.hasData && budget?.id && budget.categories.length > 0)
+
+  // Fixed actions must not cover the last rows. Measure wrapping, unsaved text
+  // and the asynchronously portaled Back to top button, not a guessed height.
+  useLayoutEffect(() => {
+    const page = pageRef.current
+    const actions = actionsRef.current
+    if (!hasBudgetActions || !page || !actions) return
+    const reserveSpace = () => page.style.setProperty(
+      '--budget-actions-height', `${Math.ceil(actions.getBoundingClientRect().height)}px`,
+    )
+    reserveSpace()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reserveSpace)
+    observer?.observe(actions)
+    window.addEventListener('resize', reserveSpace)
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', reserveSpace)
+      page.style.removeProperty('--budget-actions-height')
+    }
+  }, [hasBudgetActions])
 
   const currentSnapshot = useMemo(() => snapshot(amounts), [amounts])
   const isDirty = Boolean(budget?.id) && currentSnapshot !== savedSnapshot
@@ -354,7 +377,7 @@ export function BudgetManagementPage() {
   )
 
   return (
-    <main className="management-page budget-page">
+    <main className="management-page budget-page" ref={pageRef}>
       <header className="app-header">
         <BrandLockup />
         <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
@@ -362,13 +385,13 @@ export function BudgetManagementPage() {
 
       <div className="budget-page-layout">
       <section className="management-content budget-content">
+        <BudgetingSectionNav current="monthly" />
         <div className="page-title-row" data-tutorial-id="monthly-budget-page-title">
           <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time.</p>
             <p>Actuals follow “Include in budgets” on each transaction. Shared expenses can count
               in both scopes; your budget amounts remain separate.</p></div>
           {loadState.hasData && budget?.status && <span className={`budget-status budget-status-${budget.status.toLowerCase()}`}>{budget.status}</span>}
         </div>
-        <BudgetingSectionNav current="monthly" />
 
         <section className="budget-period-panel" aria-label="Budget period">
           <button className="secondary-button" type="button" disabled={isSaving} onClick={() => changePeriod(year, month - 1)}>Previous</button>
@@ -432,9 +455,10 @@ export function BudgetManagementPage() {
             <ContextualHelp topic="destructive-actions" />
           </aside>}
       </section>
-        {loadState.hasData && budget?.id && budget.categories.length > 0 && <section
+        {hasBudgetActions && budget && <section
           className="budget-save-bar"
           aria-label="Budget actions"
+          ref={actionsRef}
         >
           <div>
             <span>Monthly budget</span>

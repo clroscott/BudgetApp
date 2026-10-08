@@ -88,10 +88,10 @@ describe('full app shell focus and household boundaries', () => {
   it('applies meaningful titles and focus via the real AppRoutes boundary', async () => {
     render(<App />)
     await screen.findByLabelText('Current household')
-    fireEvent.click(screen.getByRole('link', { name: 'Accounts' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Financial accounts' }))
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Accounts' })))
     expect(document.title).toBe('Accounts | MC Budget')
     expect(document.querySelector('.page-announcement')!.textContent).toBe('Accounts page loaded.')
-    expect(screen.getByRole('link', { name: 'Accounts' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('link', { name: 'Financial accounts' }).getAttribute('aria-current')).toBe('page')
   })
 })

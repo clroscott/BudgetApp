@@ -1,5 +1,7 @@
 import {
   useEffect,
+  useLayoutEffect,
+  useCallback,
   useMemo,
   useRef,
   useState,
@@ -9,6 +11,12 @@ import { flushSync } from 'react-dom'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { PageLoadFeedback } from '../components/PageLoadFeedback'
+import { DashboardLivePanel } from '../components/DashboardLivePanel'
+import { usePageLoad } from './usePageLoad'
+import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
+import { dashboardBudgetLink, dashboardPeriod, readDashboardSnapshot, type DashboardSnapshot } from '../dashboard/dashboardSnapshot'
+import type { BudgetScope } from '../budgets/budgetApi'
 import { LoginVerificationReminder } from '../components/LoginVerificationReminder'
 import { AppIcon } from '../components/AppIcon'
 import {
@@ -19,6 +27,7 @@ import {
 } from '../dashboard/dashboardLayoutApi'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
+import { focusPageElement } from '../routing/pageFocus'
 import {
   dashboardPanels,
   defaultDashboardPanelKeys,
@@ -46,37 +55,60 @@ export function DashboardPage() {
   const [draftColumnCount, setDraftColumnCount] = useState(3)
   const [draggedPanelKey, setDraggedPanelKey] = useState<string | null>(null)
   const [isCustomizing, setIsCustomizing] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const [period, setPeriod] = useState(() => dashboardPeriod(currentHousehold?.timeZoneId ?? 'UTC'))
+  const [scope, setScope] = useState<BudgetScope>('Household')
+  const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
+  const layoutLoad = usePageLoad(`${user?.id}/${currentHousehold?.id}/layout`)
+  const summaryLoad = usePageLoad(`${user?.id}/${currentHousehold?.id}/${period}/${scope}`)
+  const { run: runLayout, markReady: layoutReady } = layoutLoad
+  const { run: runSummary } = summaryLoad
+  const isDirty = isCustomizing && Boolean(layout) && (draftColumnCount !== layout!.preferredColumnCount ||
+    JSON.stringify(draftPanelKeys) !== JSON.stringify(layout!.visiblePanelKeys))
+  const confirmDiscard = useUnsavedChangesGuard(isDirty, 'Discard your unsaved dashboard layout changes?')
+  const activeContext = useRef('')
+  activeContext.current = `${user?.id}/${currentHousehold?.id}`
   const panelElements = useRef(new Map<string, HTMLElement>())
+  const requestedPanelFocus = useRef<string | null>(null)
+  const addCardsHeading = useRef<HTMLHeadingElement>(null)
+  const customizeButton = useRef<HTMLButtonElement>(null)
+  const returnToCustomize = useRef(false)
+  useLayoutEffect(() => {
+    if (!isCustomizing && returnToCustomize.current) {
+      returnToCustomize.current = false
+      customizeButton.current?.focus()
+    }
+  }, [isCustomizing])
+  useLayoutEffect(() => {
+    const key = requestedPanelFocus.current
+    if (key === null) return
+    requestedPanelFocus.current = null
+    const heading = panelElements.current.get(key)?.querySelector<HTMLElement>('h2') ?? addCardsHeading.current
+    if (heading) return focusPageElement(heading)
+  }, [draftPanelKeys])
   const lastDragReorder = useRef<{
     x: number
     y: number
     occurredAt: number
   } | null>(null)
 
-  useEffect(() => {
+  const loadLayout = useCallback(async () => {
     if (!currentHousehold) return
-    let cancelled = false
-    setIsLoading(true)
-    setErrors([])
-    void getDashboardLayout(currentHousehold.id)
-      .then(result => {
-        if (cancelled) return
-        const normalized = withClientDefaults(result)
-        setLayout(normalized)
-        setDraftPanelKeys(normalized.visiblePanelKeys)
-        setDraftColumnCount(normalized.preferredColumnCount)
-      })
-      .catch(error => {
-        if (!cancelled) setErrors(getErrorMessages(error))
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [currentHousehold])
+    await runLayout(() => getDashboardLayout(currentHousehold.id), result => {
+      const normalized = withClientDefaults(result)
+      setLayout(normalized)
+      setDraftPanelKeys(normalized.visiblePanelKeys)
+      setDraftColumnCount(normalized.preferredColumnCount)
+    })
+  }, [currentHousehold, runLayout])
+  const loadSummary = useCallback(async () => {
+    if (!currentHousehold) return
+    await runSummary(() => readDashboardSnapshot(currentHousehold.id, period, scope), setSnapshot)
+  }, [currentHousehold, period, scope, runSummary])
+  useEffect(() => { void loadLayout() }, [loadLayout])
+  useEffect(() => { void loadSummary() }, [loadSummary])
+  useEffect(() => () => { activeContext.current = '' }, [])
 
   const hiddenPanels = useMemo(
     () => dashboardPanels.filter(panel => !draftPanelKeys.includes(panel.key)),
@@ -95,15 +127,32 @@ export function DashboardPage() {
   }
 
   const cancelCustomizing = () => {
+    if (!confirmDiscard()) return
     if (layout) {
       setDraftPanelKeys(layout.visiblePanelKeys)
       setDraftColumnCount(layout.preferredColumnCount)
     }
     setDraggedPanelKey(null)
+    returnToCustomize.current = true
     setIsCustomizing(false)
   }
 
+  const addPanel = (key: string) => {
+    if (isSaving) return
+    requestedPanelFocus.current = key
+    setDraftPanelKeys(current => [...current, key])
+  }
+
+  const removePanel = (key: string) => {
+    if (isSaving) return
+    const index = draftPanelKeys.indexOf(key)
+    requestedPanelFocus.current = draftPanelKeys[index + 1] ?? draftPanelKeys[index - 1] ?? ''
+    setDraftPanelKeys(current => current.filter(item => item !== key))
+  }
+
   const save = async () => {
+    if (isSaving || !layoutLoad.isFresh) return
+    const context = activeContext.current
     setIsSaving(true)
     setErrors([])
     try {
@@ -111,31 +160,39 @@ export function DashboardPage() {
         preferredColumnCount: draftColumnCount,
         visiblePanelKeys: draftPanelKeys,
       })
+      if (activeContext.current !== context) return
+      layoutReady()
       setLayout(saved)
       setDraftPanelKeys(saved.visiblePanelKeys)
       setDraftColumnCount(saved.preferredColumnCount)
+      returnToCustomize.current = true
       setIsCustomizing(false)
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (activeContext.current === context) setErrors(getErrorMessages(error))
     } finally {
-      setIsSaving(false)
+      if (activeContext.current === context) setIsSaving(false)
     }
   }
 
   const reset = async () => {
+    if (isSaving || !layoutLoad.isFresh || !confirmDiscard()) return
+    const context = activeContext.current
     setIsSaving(true)
     setErrors([])
     try {
       const defaults = withClientDefaults(
         await resetDashboardLayout(currentHousehold.id))
+      if (activeContext.current !== context) return
+      layoutReady()
       setLayout(defaults)
       setDraftPanelKeys(defaults.visiblePanelKeys)
       setDraftColumnCount(defaults.preferredColumnCount)
+      returnToCustomize.current = true
       setIsCustomizing(false)
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (activeContext.current === context) setErrors(getErrorMessages(error))
     } finally {
-      setIsSaving(false)
+      if (activeContext.current === context) setIsSaving(false)
     }
   }
 
@@ -170,7 +227,7 @@ export function DashboardPage() {
   }
 
   const movePanel = (movingKey: string, targetKey: string) => {
-    if (movingKey === targetKey) return
+    if (isSaving || movingKey === targetKey) return
     animatePanelLayoutChange(() => {
       setDraftPanelKeys(current => {
         const movingIndex = current.indexOf(movingKey)
@@ -202,7 +259,7 @@ export function DashboardPage() {
     targetKey: string,
   ) => {
     event.preventDefault()
-    if (!draggedPanelKey || draggedPanelKey === targetKey) return
+    if (isSaving || !draggedPanelKey || draggedPanelKey === targetKey) return
 
     const bounds = event.currentTarget.getBoundingClientRect()
     const horizontalInset = Math.min(48, bounds.width * 0.2)
@@ -244,13 +301,14 @@ export function DashboardPage() {
             <p className="eyebrow">Dashboard</p>
             <h1>Hello, {user.displayName}</h1>
             <p className="dashboard-intro">
-              Keep your most useful BudgetApp shortcuts within easy reach.
+              Your financial overview, things to do, and useful shortcuts in one place.
             </p>
           </div>
-          {!isLoading && !isCustomizing && (
+          {layoutLoad.isFresh && !isCustomizing && (
             <button
               className="secondary-button"
               type="button"
+              ref={customizeButton}
               onClick={beginCustomizing}
             >
               Customize dashboard
@@ -259,6 +317,23 @@ export function DashboardPage() {
         </div>
 
         <ErrorSummary errors={errors} />
+        <div className="dashboard-context-controls" aria-label="Financial summary context">
+          <label>Summary month<input type="month" min="0001-01" max="9998-12" value={period}
+            onChange={event => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value) && Number(event.target.value.slice(0, 4)) >= 1 && Number(event.target.value.slice(0, 4)) <= 9998) setPeriod(event.target.value) }} /></label>
+          <label>Budget scope<select value={scope} onChange={event => setScope(event.target.value as BudgetScope)}><option>Household</option><option>Personal</option></select></label>
+          <p>Summaries follow this month and scope. Imports and recent transactions are labeled separately.</p>
+        </div>
+        <PageLoadFeedback subject="dashboard summary" status={summaryLoad.status} errors={summaryLoad.errors}
+          onReload={() => void loadSummary()} disabled={summaryLoad.isPending} />
+        {summaryLoad.hasData && snapshot && snapshot.recent.totalCount === 0 && !snapshot.budget.id && currentHousehold.role !== 'Viewer' &&
+          <section className="dashboard-getting-started" aria-label="Getting started checklist">
+            <div><p className="eyebrow">Getting started</p><h2>Build your starting point</h2><p>Use these steps at your own pace. Nothing is created until you choose to save it.</p></div>
+            <ol>
+              <li>{snapshot.accounts.some(account => account.isActive) ? '✓ ' : ''}<AppLink to="/accounts">Add a financial account</AppLink></li>
+              <li><AppLink to="/import">Import transactions</AppLink>, then <AppLink to="/imports/review">review and approve them</AppLink></li>
+              <li><AppLink to={dashboardBudgetLink(period, scope)}>Plan your monthly budget</AppLink></li>
+            </ol>
+          </section>}
         <LoginVerificationReminder enabled={user.loginVerificationEnabled} />
 
         {!tutorialsLoading && (() => {
@@ -300,7 +375,7 @@ export function DashboardPage() {
           <section className="dashboard-customizer" aria-label="Dashboard settings">
             <div>
               <h2>Customize dashboard</h2>
-              <p>Drag shortcuts into order, remove them, or add hidden shortcuts.</p>
+              <p>Reorder cards by dragging or using Earlier/Later. Add or remove summaries and shortcuts.</p>
             </div>
             <fieldset>
               <legend>Desktop columns</legend>
@@ -309,6 +384,7 @@ export function DashboardPage() {
                   className={draftColumnCount === count ? 'selected' : undefined}
                   key={count}
                   type="button"
+                  disabled={isSaving}
                   aria-pressed={draftColumnCount === count}
                   onClick={() => changeColumnCount(count)}
                 >
@@ -345,12 +421,12 @@ export function DashboardPage() {
           </section>
         )}
 
-        {isLoading ? (
-          <p className="empty-state">Loading your dashboard...</p>
-        ) : visibleKeys.length === 0 ? (
+        {layoutLoad.status !== 'ready' && <PageLoadFeedback subject="dashboard layout" status={layoutLoad.status} errors={layoutLoad.errors}
+          onReload={() => void loadLayout()} disabled={isCustomizing || isSaving || layoutLoad.isPending} />}
+        {layoutLoad.hasData && (visibleKeys.length === 0 ? (
           <section className="dashboard-empty">
             <h2>Your dashboard is empty</h2>
-            <p>Add shortcuts below to build a dashboard that works for you.</p>
+            <p>Use Customize dashboard to add summaries or shortcuts.</p>
           </section>
         ) : (
           <div
@@ -368,7 +444,7 @@ export function DashboardPage() {
               return (
                 <article
                   className={`summary-card dashboard-panel${draggedPanelKey === key ? ' dragging' : ''}`}
-                  draggable={isCustomizing}
+                  draggable={isCustomizing && !isSaving}
                   key={key}
                   ref={element => {
                     if (element) panelElements.current.set(key, element)
@@ -394,7 +470,7 @@ export function DashboardPage() {
                         <button
                           className="text-button"
                           type="button"
-                          disabled={index === 0}
+                          disabled={isSaving || index === 0}
                           aria-label={`Move ${panel.label} earlier`}
                           onClick={() => movePanel(
                             key,
@@ -406,7 +482,7 @@ export function DashboardPage() {
                         <button
                           className="text-button"
                           type="button"
-                          disabled={index === draftPanelKeys.length - 1}
+                          disabled={isSaving || index === draftPanelKeys.length - 1}
                           aria-label={`Move ${panel.label} later`}
                           onClick={() => movePanel(
                             key,
@@ -418,9 +494,8 @@ export function DashboardPage() {
                         <button
                           className="text-button danger-text"
                           type="button"
-                          onClick={() => setDraftPanelKeys(
-                            current => current.filter(item => item !== key),
-                          )}
+                          disabled={isSaving}
+                          onClick={() => removePanel(key)}
                         >
                           Remove
                         </button>
@@ -431,24 +506,26 @@ export function DashboardPage() {
                     <span className="dashboard-panel-icon">
                       <AppIcon name={panel.icon} />
                     </span>
-                    <span>{panel.label}</span>
+                    {panel.live ? <h2>{panel.label}</h2> : <span>{panel.label}</span>}
                   </div>
-                  <strong>{title}</strong>
-                  <small>{description}</small>
+                  {panel.live ? <DashboardLivePanel panelKey={key} period={period} scope={scope}
+                    snapshot={summaryLoad.hasData ? snapshot : null} canManage={currentHousehold.role !== 'Viewer'} loading={summaryLoad.isPending} /> : <>
+                  <h2>{title}</h2>
+                  <p className="field-help">{description}</p>
                   {panel.links.map(link => (
                     <AppLink key={link.to} to={link.to}>{link.label}</AppLink>
-                  ))}
+                  ))}</>}
                 </article>
               )
             })}
           </div>
-        )}
+        ))}
 
         {isCustomizing && (
           <section className="dashboard-add-panels">
-            <h2>Add shortcuts</h2>
+            <h2 ref={addCardsHeading}>Add cards</h2>
             {hiddenPanels.length === 0 ? (
-              <p>Every available shortcut is already on your dashboard.</p>
+              <p>Every available card is already on your dashboard.</p>
             ) : (
               <div>
                 {hiddenPanels.map(panel => (
@@ -456,7 +533,8 @@ export function DashboardPage() {
                     className="secondary-button"
                     type="button"
                     key={panel.key}
-                    onClick={() => setDraftPanelKeys(current => [...current, panel.key])}
+                    disabled={isSaving}
+                    onClick={() => addPanel(panel.key)}
                   >
                     + {panel.label}
                   </button>

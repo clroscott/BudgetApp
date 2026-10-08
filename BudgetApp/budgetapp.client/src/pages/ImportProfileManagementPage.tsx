@@ -3,6 +3,7 @@ import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
 import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { TransactionsSectionNav } from '../components/TransactionsSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
 import {
   createImportProfile,
@@ -307,8 +308,9 @@ export function ImportProfileManagementPage() {
         <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
       </header>
       <section className="management-content import-profile-content">
+        <TransactionsSectionNav />
         <div className="page-title-row"><div>
-          <p className="eyebrow">Import settings</p>
+          <p className="eyebrow">Transactions</p>
           <h1>CSV import profiles</h1>
           <p>Save a bank or custom CSV structure once, then reuse it automatically.</p>
         </div></div>

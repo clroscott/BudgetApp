@@ -320,7 +320,8 @@ export function YearlyPlanManagementPage() {
       <BrandLockup />
       <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
     </header>
-    <main className="page-content">
+    <main className="page-content management-content">
+      <BudgetingSectionNav current="annual-targets" />
       <div className="page-title-row">
         <div>
           <p className="eyebrow">Budgeting</p>
@@ -331,7 +332,6 @@ export function YearlyPlanManagementPage() {
           </p>
         </div>
       </div>
-      <BudgetingSectionNav current="annual-targets" />
 
       <ErrorSummary errors={errors} />
       <PageLoadFeedback subject="annual targets" status={loadState.status} errors={loadState.errors}

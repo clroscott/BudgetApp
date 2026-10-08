@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { useAuth } from '../auth/useAuth'
 import { AppShell } from '../components/AppShell'
+import { HelpSectionNav } from '../components/HelpSectionNav'
 import { BrandLockup } from '../components/Brand'
 import { helpTopics, helpTopicUrl, requestedHelpTopic, type HelpTopicId } from '../help/helpTopics'
 import { useHouseholds } from '../households/useHouseholds'
@@ -45,6 +46,7 @@ export function HelpPage() {
     <main className="management-page help-page">
       <header className="app-header"><BrandLockup /><AppLink className="header-link" to={returnTo}>{returnLabel}</AppLink></header>
       <section className="management-content narrow-management-content">
+        {showNavigation && <HelpSectionNav />}
         <div className="page-title-row"><div>
           <p className="eyebrow">Help · Read only</p>
           <h1 ref={heading}>{selected?.title ?? 'Help'}</h1>

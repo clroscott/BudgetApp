@@ -7,6 +7,7 @@ import { budgetInclusionLabel } from '../transactions/budgetInclusion'
 import { BudgetInclusionEditor } from '../components/BudgetInclusionEditor'
 import { useRouter } from '../routing/useRouter'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { TransactionsSectionNav } from '../components/TransactionsSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
 import { ContextualHelp } from '../components/ContextualHelp'
 import { SavedTransactionFilters } from '../components/SavedTransactionFilters'
@@ -367,6 +368,7 @@ export function TransactionManagementPage() {
       </header>
 
       <section className="management-content transaction-content">
+        <TransactionsSectionNav />
         <div className="page-title-row">
           <div>
             <p className="eyebrow">Household activity</p>

@@ -1,5 +1,6 @@
 import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { HelpSectionNav } from '../components/HelpSectionNav'
 import { AppLink } from '../routing/AppLink'
 import { tutorialDefinitions } from '../tutorials/tutorialDefinitions'
 import type { TutorialKind } from '../tutorials/tutorialDefinitions'
@@ -142,6 +143,7 @@ export function TutorialHubPage() {
         </AppLink>
       </header>
       <section className="management-content tutorial-hub-content">
+        <HelpSectionNav />
         <div className="page-title-row">
           <div>
             <p className="eyebrow">Help and learning</p>

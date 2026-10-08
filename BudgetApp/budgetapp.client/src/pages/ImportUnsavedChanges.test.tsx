@@ -206,9 +206,10 @@ describe('staged import edit protection', () => {
   it('failed bulk saving retains corrections and protection; successful saving clears it', async () => {
     show(<ImportReviewPage />)
     const input = await screen.findByLabelText('Description') as HTMLInputElement
+    await waitFor(() => expect(input.disabled).toBe(false))
     fireEvent.change(input, { target: { value: 'Unsaved correction' } })
     vi.mocked(bulkUpdateImportDrafts).mockRejectedValueOnce(new Error('Sample correction failure'))
-    fireEvent.click(screen.getByRole('button', { name: 'Save all corrections (1)' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Save all corrections (1)' }))
     await screen.findByText('Sample correction failure')
     expect(input.value).toBe('Unsaved correction')
     fireEvent.click(screen.getByText('Leave page'))
@@ -250,8 +251,9 @@ describe('staged import edit protection', () => {
   it('does not silently refresh away a dirty row', async () => {
     show(<ImportReviewPage />)
     const input = await screen.findByLabelText('Description') as HTMLInputElement
+    await waitFor(() => expect(input.disabled).toBe(false))
     fireEvent.change(input, { target: { value: 'Unsaved correction' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Refresh' }))
     expect(input.value).toBe('Unsaved correction')
     expect(window.confirm).toHaveBeenCalledTimes(1)
   })

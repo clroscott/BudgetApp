@@ -3,6 +3,7 @@ import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
 import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { TransactionsSectionNav } from '../components/TransactionsSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
 import { ContextualHelp } from '../components/ContextualHelp'
 import { uploadCsvImport, type CsvImportResult } from '../imports/importApi'
@@ -206,6 +207,7 @@ export function CsvImportPage() {
       </header>
 
       <section className="management-content import-content">
+        <TransactionsSectionNav />
         <div className="page-title-row" data-tutorial-id="csv-import-page-title">
           <div>
             <p className="eyebrow">Transactions</p>

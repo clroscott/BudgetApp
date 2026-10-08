@@ -27,6 +27,8 @@ export function BackToTopButton() {
     const observer = new MutationObserver(() => setButtonHost(findVisibleHost()))
     observer.observe(document.body, {
       attributes: true,
+      // Budget actions may mount only after their asynchronous data arrives.
+      childList: true,
       subtree: true,
       attributeFilter: ['hidden'],
     })

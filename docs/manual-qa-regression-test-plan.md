@@ -1007,6 +1007,84 @@ semantic tests do not replace live screen-reader or zoom sign-off.
 - [ ] No passwords, tokens, full uploaded files, or unnecessary sensitive values
       appear in activity details.
 
+### UI cleanup and mixed dashboard (#200)
+
+Use the [navigation and dashboard guide](ui-cleanup.md) for the exact summary
+meanings. Run with fictional Development/Scratch data, including another member,
+a Viewer, a personal account, two households and multiple currencies.
+
+- [ ] Six main destinations are visible: Dashboard, Transactions, Budgeting,
+      Financial accounts, Household and Help. Expand each group and reach every
+      related page; its page section menu exposes the same destinations.
+- [ ] Current child pages expose exact current-page state, while their main group
+      identifies the section. Account settings/sign-out are in the profile menu;
+      application administration appears only for authorized application operators.
+- [ ] Open the profile menu using Enter/Space, Tab through its links, then Escape:
+      it closes and returns focus. Account settings still work without a household.
+- [ ] Desktop sidebar collapse preserves its per-user preference. At 390px,
+      800px and 880px, Menu/section toggles and scrolling reach every destination.
+      Accepted navigation closes the narrow menu; canceled dirty navigation keeps
+      both the current page and edits. Check long household/display names.
+- [ ] Replay Getting started with collapsed navigation: Financial accounts,
+      Budgeting and the hidden Import transactions link are revealed and usable.
+      Tutorial steps still advance, and no financial/configuration write occurs.
+- [ ] Page headings, section menus, primary actions, forms and feedback have
+      consistent spacing. No repeated logo/Return to dashboard bar in the full
+      shell; standalone/public workflows retain useful return navigation.
+- [ ] At wide desktop and narrow widths, switch through Transactions, Import,
+      Review imports, Rules and CSV profiles: content edges, tab-row position and
+      heading position do not jump. Repeat for Budgeting, Household and Help tabs.
+      Different descriptions, help, loading and error states do not displace tabs.
+- [ ] Dashboard, Financial accounts, Account settings, Household settings, Help,
+      Tutorials and all other app pages share the same outer content lane. Narrow
+      forms/cards remain left-aligned inside it. Context header and budget save
+      bars align with that lane, including with the sidebar collapsed.
+- [ ] Open Monthly budget directly and wait for its data, then scroll down:
+      Back to top appears inside the action bar, never underneath Save budget.
+      Reach the final category rows and removal guidance without the bar covering
+      them. Repeat with wrapped actions at 390px/800px and 200% zoom, collapsed
+      sidebar, unsaved changes, and a viewer/read-only budget. Back to top works;
+      leaving the page restores the ordinary floating button on other pages.
+- [ ] From a long/scrolled page, select another page via the sidebar or section tabs: the next page starts
+      at the shared top with its tabs visible and its heading focused. Short and
+      tall pages do not shift sideways when their scrollbar requirements differ.
+- [ ] New/default dashboard shows Financial overview, Needs attention and Quick
+      actions. An existing custom layout keeps its old cards, order and columns.
+      Reset to default adopts the three-card layout only when deliberately chosen.
+- [ ] Add/remove/reorder cards with both drag and Earlier/Later, change columns,
+      save and reload. Add optional Recent transactions. Layouts remain private
+      to the current user/household; another member's choices do not change.
+- [ ] Dirty layout edits warn on page navigation, refresh, sign-out and household
+      switching. Cancel keeps edits. Failed saving preserves the draft; successful
+      saving clears protection. Summary month/scope changes do not erase layout edits.
+- [ ] Compare Budgeted/Actual/Remaining with the same monthly budget. Include
+      parent/child lines, budgeted zero, negative remaining and uncategorized
+      spending. No double-counting, hidden currency conversion or bank-balance claim.
+- [ ] Switch Household/Personal scope and summary month. The card labels and
+      financial values follow the selection. Transactions counted in both scopes
+      are not duplicated or summed across two budgets.
+- [ ] Follow View spending/Uncategorized spending: the transaction filters keep
+      the exact month boundaries, selected budget inclusion and currency. Include
+      leap February and a household time-zone month boundary.
+- [ ] Imports awaiting review matches all visible ReadyForReview imports, including
+      imports outside the selected month. Completed imports do not count. Other
+      members' inaccessible personal imports/transactions never appear.
+- [ ] Recent transactions shows at most five visible records with their own
+      currencies, not a combined monthly total. Quick actions only navigate;
+      viewing/refreshing the dashboard does not create budgets or transactions.
+- [ ] After successful empty reads, setup guidance links to accounts, import/review
+      and monthly planning. An existing account is indicated. No saved budget is
+      not displayed as a saved zero budget. Viewers get no edit/setup prompts.
+- [ ] Delay/fail the initial summary and layout reads separately: loading stops on
+      failure and Retry loading appears, with no false zero/empty/setup claims.
+      Retry repeats reads only. Quick navigation remains usable where appropriate.
+- [ ] Fail a summary refresh: retained values are clearly stale. Revoke access:
+      retained financial values disappear. Change month/scope/household while a
+      request is delayed: old context vanishes and late responses are ignored.
+- [ ] Test keyboard, screen-reader announcements/labels and actual 200% browser
+      zoom. Headings and amounts remain meaningful; cards, profile menu, section
+      controls and focus rings are reachable without horizontal page overflow.
+
 ## Persistence, errors, and recovery
 
 ### Page-load feedback — Annual overview, Annual targets, Monthly budget, Household
