@@ -18,17 +18,22 @@ public sealed class ImportReviewService(
     TimeProvider timeProvider,
     AuditWriter? auditWriter = null)
 {
-    public async Task<IReadOnlyList<ImportListItem>> ListAsync(
+    public const int ImportListPageSize = 50;
+
+    public async Task<ImportListResult> ListAsync(
         Guid householdId,
         Guid userId,
+        ImportListFilter filter,
+        int page,
         CancellationToken cancellationToken)
     {
+        if (!Enum.IsDefined(filter)) throw new ArgumentException("Choose a supported import filter.", nameof(filter));
+        if (page < 1) throw new ArgumentException("Import page must be at least 1.", nameof(page));
         var role = await authorizationService.RequireViewAsync(
             householdId, userId, cancellationToken);
-        return (await importRepository.ListVisibleAsync(
-                householdId, userId, cancellationToken))
-            .OrderByDescending(record => record.UploadedAtUtc)
-            .Take(50)
+        var result = await importRepository.ListVisibleAsync(
+            householdId, userId, filter, page, ImportListPageSize, cancellationToken);
+        var items = result.Items
             .Select(record => new ImportListItem(
                 record.Id,
                 record.OriginalFileName,
@@ -43,6 +48,14 @@ public sealed class ImportReviewService(
                 record.UploadedAtUtc,
                 CanEdit(record.IsPersonalAccount, record.AccountOwnerUserId, role, userId)))
             .ToList();
+        return new ImportListResult(items, result.Page, ImportListPageSize, result.TotalCount,
+            (int)Math.Ceiling((double)result.TotalCount / ImportListPageSize), result.TotalVisibleCount);
+    }
+
+    public async Task<ImportSummary> GetSummaryAsync(Guid householdId, Guid userId, CancellationToken cancellationToken)
+    {
+        await authorizationService.RequireViewAsync(householdId, userId, cancellationToken);
+        return await importRepository.GetSummaryAsync(householdId, userId, cancellationToken);
     }
 
     public async Task<ImportReviewDetail> GetAsync(

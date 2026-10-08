@@ -1,12 +1,12 @@
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getBudget, type BudgetPageData, type BudgetScope } from '../budgets/budgetApi'
-import { getImports, type ImportListItem } from '../imports/importApi'
+import { getImportSummary, type ImportSummary } from '../imports/importApi'
 import { getTransactions, type TransactionListResult, type TransactionQuery } from '../transactions/transactionApi'
 
 export interface DashboardSnapshot {
   budget: BudgetPageData
   accounts: AccountItem[]
-  imports: ImportListItem[]
+  importSummary: ImportSummary
   recent: TransactionListResult
   uncategorized: TransactionListResult
 }
@@ -54,10 +54,10 @@ export function budgetSnapshotTotals(budget: BudgetPageData) {
 
 export async function readDashboardSnapshot(householdId: string, period: string, scope: BudgetScope): Promise<DashboardSnapshot> {
   const [year, month] = period.split('-').map(Number)
-  const [budget, accounts, imports, recent] = await Promise.all([
-    getBudget(householdId, year, month, scope), getAccounts(householdId), getImports(householdId),
+  const [budget, accounts, importSummary, recent] = await Promise.all([
+    getBudget(householdId, year, month, scope), getAccounts(householdId), getImportSummary(householdId),
     getTransactions(householdId, { page: 1 }),
   ])
   const uncategorized = await getTransactions(householdId, { ...dashboardQuery(period, scope, budget.currency), uncategorizedOnly: true })
-  return { budget, accounts, imports, recent, uncategorized }
+  return { budget, accounts, importSummary, recent, uncategorized }
 }

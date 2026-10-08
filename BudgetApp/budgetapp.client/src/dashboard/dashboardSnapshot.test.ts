@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAccounts } from '../accounts/accountApi'
 import { getBudget } from '../budgets/budgetApi'
-import { getImports } from '../imports/importApi'
+import { getImportSummary } from '../imports/importApi'
 import { getTransactions } from '../transactions/transactionApi'
 import { budgetFixture } from '../test/fixtures'
 import { budgetSnapshotTotals, dashboardBudgetLink, dashboardPeriod, dashboardQuery, dashboardTransactionsLink, readDashboardSnapshot } from './dashboardSnapshot'
@@ -9,12 +9,12 @@ import { defaultDashboardPanelKeys, dashboardPanels } from '../routing/pageRegis
 
 vi.mock('../accounts/accountApi', () => ({ getAccounts: vi.fn() }))
 vi.mock('../budgets/budgetApi', () => ({ getBudget: vi.fn() }))
-vi.mock('../imports/importApi', () => ({ getImports: vi.fn() }))
+vi.mock('../imports/importApi', () => ({ getImportSummary: vi.fn() }))
 vi.mock('../transactions/transactionApi', () => ({ getTransactions: vi.fn() }))
 beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(getAccounts).mockResolvedValue([])
-  vi.mocked(getImports).mockResolvedValue([])
+  vi.mocked(getImportSummary).mockResolvedValue({ totalCount: 0, unfinishedCount: 0, readyForReviewCount: 0 })
   vi.mocked(getTransactions).mockResolvedValue({ items: [], totalCount: 0, page: 1, pageSize: 50, totalPages: 0, hasMore: false, totalsByCurrency: {} })
 })
 describe('dashboard financial context', () => {
@@ -52,7 +52,7 @@ describe('dashboard financial context', () => {
     const result = await readDashboardSnapshot('household-a', '2026-01', 'Personal')
     expect(getBudget).toHaveBeenCalledExactlyOnceWith('household-a', 2026, 1, 'Personal')
     expect(getAccounts).toHaveBeenCalledExactlyOnceWith('household-a')
-    expect(getImports).toHaveBeenCalledExactlyOnceWith('household-a')
+    expect(getImportSummary).toHaveBeenCalledExactlyOnceWith('household-a')
     expect(getTransactions).toHaveBeenNthCalledWith(1, 'household-a', { page: 1 })
     expect(getTransactions).toHaveBeenNthCalledWith(2, 'household-a', { ...dashboardQuery('2026-01', 'Personal', 'USD'), uncategorizedOnly: true })
     expect(result.budget.currency).toBe('USD')

@@ -76,5 +76,15 @@ public sealed class BudgetAppDbContext(DbContextOptions<BudgetAppDbContext> opti
             .IsRequired();
 
         builder.ApplyConfigurationsFromAssembly(typeof(BudgetAppDbContext).Assembly);
+
+        // SQLite is the isolated test provider and cannot order DateTimeOffset.
+        // Normalize only this sortable test column to UTC DateTime; SQL Server's
+        // datetimeoffset mapping and Production schema remain unchanged.
+        if (Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite")
+        {
+            builder.Entity<ImportFile>().Property(file => file.UploadedAtUtc)
+                .HasConversion(value => value.UtcDateTime,
+                    value => new DateTimeOffset(DateTime.SpecifyKind(value, DateTimeKind.Utc)));
+        }
     }
 }

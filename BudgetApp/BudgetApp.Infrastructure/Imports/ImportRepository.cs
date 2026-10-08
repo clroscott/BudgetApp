@@ -10,32 +10,73 @@ namespace BudgetApp.Infrastructure.Imports;
 internal sealed class ImportRepository(BudgetAppDbContext dbContext)
     : IImportRepository
 {
-    public async Task<IReadOnlyList<ImportListRecord>> ListVisibleAsync(
+    public async Task<ImportListQueryResult> ListVisibleAsync(
         Guid householdId,
         Guid userId,
+        ImportListFilter filter,
+        int page,
+        int pageSize,
         CancellationToken cancellationToken)
     {
-        return await (
+        var summary = await GetSummaryAsync(householdId, userId, cancellationToken);
+        var total = filter switch
+        {
+            ImportListFilter.Unfinished => summary.UnfinishedCount,
+            ImportListFilter.Completed => summary.TotalCount - summary.UnfinishedCount,
+            ImportListFilter.ReadyForReview => summary.ReadyForReviewCount,
+            _ => summary.TotalCount
+        };
+        var lastPage = Math.Max(1, (int)Math.Ceiling((double)total / pageSize));
+        var actualPage = Math.Min(page, lastPage);
+        var query = VisibleImports(householdId, userId);
+        query = filter switch
+        {
+            ImportListFilter.Unfinished => query.Where(item => item.File.Status != ImportFileStatus.Completed),
+            ImportListFilter.Completed => query.Where(item => item.File.Status == ImportFileStatus.Completed),
+            ImportListFilter.ReadyForReview => query.Where(item => item.File.Status == ImportFileStatus.ReadyForReview),
+            _ => query
+        };
+        var items = await query.OrderByDescending(item => item.File.UploadedAtUtc)
+            .ThenByDescending(item => item.File.Id)
+            .Skip((actualPage - 1) * pageSize).Take(pageSize)
+            .Select(item => new ImportListRecord(
+                item.File.Id,
+                item.File.OriginalFileName,
+                item.Account.Name,
+                item.File.Status.ToString(),
+                item.File.TotalRowCount,
+                item.File.ValidRowCount,
+                item.File.InvalidRowCount,
+                item.File.ApprovedRowCount,
+                item.File.ExcludedRowCount,
+                item.File.DuplicateRowCount,
+                item.File.UploadedAtUtc,
+                item.Account.Scope == AccountScope.Personal,
+                item.Account.OwnerUserId))
+            .ToListAsync(cancellationToken);
+        return new ImportListQueryResult(items, actualPage, total, summary.TotalCount);
+    }
+
+    public async Task<ImportSummary> GetSummaryAsync(Guid householdId, Guid userId, CancellationToken cancellationToken) =>
+        await VisibleImports(householdId, userId).GroupBy(_ => 1)
+            .Select(group => new ImportSummary(group.Count(),
+                group.Count(item => item.File.Status != ImportFileStatus.Completed),
+                group.Count(item => item.File.Status == ImportFileStatus.ReadyForReview)))
+            .SingleOrDefaultAsync(cancellationToken) ?? new ImportSummary(0, 0, 0);
+
+    private IQueryable<VisibleImport> VisibleImports(Guid householdId, Guid userId) =>
+        (
             from importFile in dbContext.ImportFiles.AsNoTracking()
             join account in dbContext.Accounts.AsNoTracking()
                 on importFile.AccountId equals account.Id
             where importFile.HouseholdId == householdId &&
                   (account.Scope == AccountScope.Household || account.OwnerUserId == userId)
-            select new ImportListRecord(
-                importFile.Id,
-                importFile.OriginalFileName,
-                account.Name,
-                importFile.Status.ToString(),
-                importFile.TotalRowCount,
-                importFile.ValidRowCount,
-                importFile.InvalidRowCount,
-                importFile.ApprovedRowCount,
-                importFile.ExcludedRowCount,
-                importFile.DuplicateRowCount,
-                importFile.UploadedAtUtc,
-                account.Scope == AccountScope.Personal,
-                account.OwnerUserId))
-            .ToListAsync(cancellationToken);
+            select new VisibleImport { File = importFile, Account = account });
+
+    private sealed class VisibleImport
+    {
+        public required ImportFile File { get; init; }
+        public required Account Account { get; init; }
     }
 
     public async Task<ImportAccessRecord?> GetAccessAsync(

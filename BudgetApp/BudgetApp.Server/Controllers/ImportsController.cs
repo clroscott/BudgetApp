@@ -18,16 +18,32 @@ public sealed class ImportsController(
     ILogger<ImportsController> logger) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<ImportListItem>>> List(
+    public async Task<ActionResult<ImportListResult>> List(
         Guid householdId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [FromQuery] ImportListFilter filter = ImportListFilter.Unfinished,
+        [FromQuery, Range(1, int.MaxValue)] int page = 1)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
         try
         {
             return Ok(await importReviewService.ListAsync(
-                householdId, userId, cancellationToken));
+                householdId, userId, filter, page, cancellationToken));
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            return MapException(exception);
+        }
+    }
+
+    [HttpGet("summary")]
+    public async Task<ActionResult<ImportSummary>> Summary(Guid householdId, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        try
+        {
+            return Ok(await importReviewService.GetSummaryAsync(householdId, userId, cancellationToken));
         }
         catch (Exception exception) when (IsExpected(exception))
         {

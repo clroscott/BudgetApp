@@ -36,14 +36,14 @@ export function DashboardLivePanel({ panelKey, snapshot, period, scope, canManag
     </>
   }
   if (panelKey === 'needs-attention') {
-    const pending = snapshot.imports.filter(item => item.status === 'ReadyForReview')
+    const pending = snapshot.importSummary.readyForReviewCount
     return <>
       <ul className="dashboard-attention-list">
-        <li><strong>{pending.length}</strong><AppLink to="/imports/review">Imports awaiting review</AppLink><small>All visible imports, across months and scopes.</small></li>
+        <li><strong>{pending}</strong><AppLink to="/imports/review?filter=ready">Imports awaiting review</AppLink><small>All visible imports, across months and scopes.</small></li>
         <li><strong>{snapshot.uncategorized.totalCount}</strong><AppLink to={dashboardTransactionsLink(period, scope, budget.currency, true)}>Uncategorized spending</AppLink><small>{scope} · {period} · {budget.currency}</small></li>
       </ul>
-      {pending.length === 0 && snapshot.uncategorized.totalCount === 0 && <p>No items in these checks need attention.</p>}
-      {!canManage && <p className="field-help">Your household role is view-only. A member with editing access can resolve these items.</p>}
+      {pending === 0 && snapshot.uncategorized.totalCount === 0 && <p>No items in these checks need attention.</p>}
+      {!canManage && <p className="field-help">Shared-account imports need a member with editing access. You can still review imports from your own personal accounts.</p>}
     </>
   }
   if (panelKey === 'recent-transactions') return <>

@@ -881,6 +881,73 @@ the real local Production household.
       status, and audit all roll back. Retry succeeds once. Do not provoke failures
       or disconnect the real Production database to test this case.
 
+### Import-file discovery and exact dashboard counts (#209)
+
+- [ ] Review imports defaults to **Unfinished**. Use **Awaiting review**,
+      **Completed**, and **All**: each filter operates across the full visible
+      history, not just the latest 50 imports. Failed/processing imports are
+      discoverable but cannot be approved or edited as ready rows.
+- [ ] **Choose an uploaded file** groups **File status** and **Uploaded file**.
+      **Review transactions in [filename]** identifies the open file; **Show
+      transactions** filters only rows inside it. The file list and selected-file
+      refresh controls stay with their respective sections.
+- [ ] Changing **File status** opens the first matching file, or an explicit empty
+      message such as **No completed files**. It does not keep an unrelated file
+      open. Confirming the unsaved-change prompt discards corrections; canceling
+      keeps the filter, selected file, corrections, and URL unchanged. A failed
+      filter request shows retry guidance, not a claim that no matching files exist.
+- [ ] With more than 50 matching files in disposable data, use **Next files**
+      and **Previous files**. Each page contains at most 50 files; these controls
+      are distinct from **Next rows** / **Previous rows** within one import.
+      File paging is hidden when there is only one page, with a matching-file count
+      still shown. Transaction-row paging is unaffected.
+- [ ] Keep an older unfinished file alongside more than 50 newer completed files:
+      it remains discoverable. Repeat with equal upload timestamps; page boundaries
+      stay stable when records have not changed.
+- [ ] Open an authorized older import by its saved review URL, even outside the
+      selected list page/filter. The URL and open import are retained; its selector
+      still shows its filename/account/status without technical paging notes. Invalid/inaccessible
+      links show recovery guidance, never another user's private data.
+- [ ] Edit a row, then cancel list paging, filter/selection changes, selected-import
+      refresh, route navigation, and household switching. The selected import,
+      correction, and URL remain intact. List-only refresh does not discard edits.
+- [ ] Complete an import while viewing Unfinished: the completed file stays open
+      read-only, the list count refreshes, and it is available under Completed.
+      Discard an eligible staged file: the list refreshes and falls back to a valid
+      page if its former last page is now empty.
+- [ ] Dashboard **Imports awaiting review** matches every visible ReadyForReview
+      import across months/accounts; failed/processing/completed files do not inflate
+      that number. Its link opens the Awaiting review filter. Complete an import,
+      return to/refresh the dashboard, and verify the count decreases by one.
+- [ ] Household Viewers see shared files read-only but can review their own personal
+      account imports. Another member's private imports are absent from list,
+      counts, and direct lookup; other households remain isolated.
+- [ ] In isolated automated checks, distinguish failed list/detail/category reads
+      from successful zero results; retries work, stale data is explained, and late
+      responses cannot replace the newer filter/import. Do not break Production
+      connections to test this case.
+- [ ] In isolated automated checks, let a row/bulk correction save succeed but
+      fail its subsequent detail read. Corrections remain visible, write controls
+      stay disabled, and guidance distinguishes a saved change from a failed refresh.
+      Retrying loads the saved values without repeating the write.
+- [ ] Keyboard-test filters, file selector, both pager types and retry controls.
+      Review rows are compact and column-aligned: date, amount, description,
+      categories, Personal/Household budget choices, status, and review actions.
+      Visible vertical dividers align with each header and separate the same columns
+      in every row, with clear spacing between Household and the review status.
+      Alternating white and lightly tinted rows make adjacent transactions easy to
+      distinguish without obscuring controls, warnings, or keyboard focus.
+      Budget labels, validation/duplicate badges, and actions (including **Save and
+      approve** on edited rows) stay inside their own columns at narrow widths and
+      200% zoom; longer content wraps rather than overlapping a neighboring column.
+      **Details** expands row save/reset, rule creation, removal, and privacy
+      explanations without discarding edits. Invalid/duplicate warnings remain
+      visible while Details is closed; read-only rows never expose write actions.
+      At narrow widths and 200% zoom, focus and horizontally scroll the review
+      region to reach every column; the rest of the page must not overflow.
+      Check narrow widths and 200% zoom for wrapping, visible focus and readable
+      labels. No broad visual redesign or sticky warning fix is included here (#201).
+
 ## Transactions and export
 
 - [ ] Transactions load for all visible accounts.

@@ -93,7 +93,9 @@ internal sealed class ImportReviewFixture : IImportRepository, IHouseholdAuthori
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyList<ImportListRecord>> ListVisibleAsync(Guid householdId, Guid userId, CancellationToken ct) => throw new NotSupportedException();
+    public Task<ImportListQueryResult> ListVisibleAsync(Guid householdId, Guid userId, ImportListFilter filter,
+        int page, int pageSize, CancellationToken ct) => throw new NotSupportedException();
+    public Task<ImportSummary> GetSummaryAsync(Guid householdId, Guid userId, CancellationToken ct) => throw new NotSupportedException();
     public Task<bool> ExistsByAccountAndHashAsync(Guid accountId, string hash, CancellationToken ct) => throw new NotSupportedException();
     public Task AddAsync(ImportFile file, IReadOnlyCollection<ImportTransactionDraft> drafts, CancellationToken ct) => throw new NotSupportedException();
     public void Remove(ImportFile file) => throw new NotSupportedException();
