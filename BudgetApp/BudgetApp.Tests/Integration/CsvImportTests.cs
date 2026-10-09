@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using BudgetApp.Domain.Accounts;
+using BudgetApp.Domain.Households;
 using BudgetApp.Domain.Imports;
 using BudgetApp.Domain.Transactions;
 using BudgetApp.Infrastructure.Data;
@@ -13,6 +15,77 @@ namespace BudgetApp.Tests.Integration;
 public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
     : IClassFixture<BudgetAppWebApplicationFactory>
 {
+    [Theory]
+    [InlineData("transactions.xlsx")]
+    [InlineData("transactions.xls")]
+    [InlineData("transactions.xlsm")]
+    public async Task FormatNeutralFoundation_DoesNotEnableWorkbookUploadOrInspection(string fileName)
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        await Register(client);
+        var household = await CreateHousehold(client);
+        var account = await CreateAccount(client, household);
+        var token = await GetAntiforgeryToken(client);
+        const string data = "Date,Description,Amount\n2026-07-20,Synthetic purchase,10\n";
+        var upload = await Upload(client, household, account, data, token, fileName: fileName);
+        Assert.Equal(HttpStatusCode.BadRequest, upload.StatusCode);
+        Assert.Contains("Only .csv files are supported.", await upload.Content.ReadAsStringAsync());
+        using var body = new MultipartFormDataContent();
+        body.Add(new StringContent(account.ToString()), "accountId");
+        body.Add(new ByteArrayContent(Encoding.UTF8.GetBytes(data)), "file", fileName);
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"/api/households/{household}/import-profiles/inspect") { Content = body };
+        request.Headers.Add("X-XSRF-TOKEN", token);
+        var inspection = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.BadRequest, inspection.StatusCode);
+        Assert.Contains("Only .csv files are supported.", await inspection.Content.ReadAsStringAsync());
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        Assert.False(await db.ImportFiles.AnyAsync(f => f.HouseholdId == household));
+        Assert.False(await db.Transactions.AnyAsync(t => t.HouseholdId == household));
+    }
+
+    [Fact]
+    public async Task Upload_PreservesViewerPersonalOwnerAndArchivedAccountPermissions()
+    {
+        using var owner = factory.CreateAuthenticatedTestClient();
+        var ownerId = await Register(owner);
+        var householdId = await CreateHousehold(owner);
+        var sharedId = await CreateAccount(owner, householdId);
+        using var viewer = factory.CreateAuthenticatedTestClient();
+        var viewerId = await Register(viewer);
+        Guid viewerAccountId; Guid ownerAccountId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+            var household = await db.Households.SingleAsync(h => h.Id == householdId);
+            var now = DateTimeOffset.UtcNow;
+            db.HouseholdMembers.Add(household.AddInvitedMember(viewerId, HouseholdRole.Viewer, ownerId, now));
+            var own = Account.CreatePersonal(householdId, viewerId, "Viewer private", AccountType.Chequing, "CAD", null, null, now);
+            var other = Account.CreatePersonal(householdId, ownerId, "Owner private", AccountType.Chequing, "CAD", null, null, now);
+            db.Accounts.AddRange(own, other); await db.SaveChangesAsync();
+            viewerAccountId = own.Id; ownerAccountId = other.Id;
+        }
+        var viewerToken = await GetAntiforgeryToken(viewer);
+        var ownerToken = await GetAntiforgeryToken(owner);
+        // Permission failures must precede parsing, not be masked by malformed content.
+        Assert.Equal(HttpStatusCode.Forbidden, (await Upload(viewer, householdId, sharedId, "not CSV", viewerToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Upload(viewer, householdId, ownerAccountId, "not CSV", viewerToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Upload(owner, householdId, viewerAccountId, "not CSV", ownerToken)).StatusCode);
+        const string csv = "Date,Description,Amount\n2026-07-20,Personal purchase,10\n";
+        Assert.Equal(HttpStatusCode.Created, (await Upload(viewer, householdId, viewerAccountId, csv, viewerToken)).StatusCode);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+            (await db.Accounts.SingleAsync(a => a.Id == viewerAccountId)).Archive(DateTimeOffset.UtcNow);
+            await db.SaveChangesAsync();
+        }
+        Assert.Equal(HttpStatusCode.BadRequest, (await Upload(viewer, householdId, viewerAccountId, csv, viewerToken)).StatusCode);
+        using var finalScope = factory.Services.CreateScope();
+        var finalDb = finalScope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        Assert.Equal(1, await finalDb.ImportFiles.CountAsync(f => f.HouseholdId == householdId));
+        Assert.False(await finalDb.Transactions.AnyAsync(t => t.HouseholdId == householdId));
+    }
+
     [Fact]
     public async Task Upload_AppliesFirstMatchingRuleWithoutOverwritingCsvCategory()
     {
@@ -714,7 +787,8 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         string csv,
         string token,
         bool allowDuplicateFile = false,
-        Guid? profileId = null)
+        Guid? profileId = null,
+        string fileName = "transactions.csv")
     {
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(accountId.ToString()), "accountId");
@@ -725,7 +799,7 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
             content.Add(new StringContent(profileId.Value.ToString()), "profileId");
         var fileContent = new ByteArrayContent(Encoding.UTF8.GetBytes(csv));
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
-        content.Add(fileContent, "file", "transactions.csv");
+        content.Add(fileContent, "file", fileName);
 
         var request = new HttpRequestMessage(
             HttpMethod.Post,

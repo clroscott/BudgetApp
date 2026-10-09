@@ -9,7 +9,7 @@ namespace BudgetApp.Application.Imports;
 public sealed class ImportProfileService(
     IImportProfileRepository repository,
     IAccountRepository accountRepository,
-    ICsvImportReader csvReader,
+    ITransactionImportReader importReader,
     HouseholdAuthorizationService authorizationService,
     TimeProvider timeProvider,
     AuditWriter? auditWriter = null)
@@ -153,6 +153,7 @@ public sealed class ImportProfileService(
         Guid householdId,
         Guid userId,
         Guid accountId,
+        string originalFileName,
         Stream content,
         CancellationToken cancellationToken)
     {
@@ -160,7 +161,7 @@ public sealed class ImportProfileService(
         _ = await accountRepository.GetForUpdateAsync(
             householdId, accountId, cancellationToken)
             ?? throw new AccountNotFoundException();
-        var inspection = await csvReader.InspectAsync(content, cancellationToken);
+        var inspection = await importReader.InspectAsync(content, originalFileName, cancellationToken);
         var match = await repository.FindMatchAsync(
             householdId,
             ImportProfile.BuildHeaderSignature(inspection.Headers),
@@ -189,7 +190,7 @@ public sealed class ImportProfileService(
         return ($"{(safeName.Length == 0 ? "import-profile" : safeName)}.csv", content);
     }
 
-    public async Task<CsvProfileDefinition?> ResolveAsync(
+    public async Task<ImportProfileDefinition?> ResolveAsync(
         Guid householdId,
         Guid profileId,
         CancellationToken cancellationToken)
@@ -203,7 +204,7 @@ public sealed class ImportProfileService(
         return ToDefinition(profile);
     }
 
-    public async Task<CsvProfileDefinition?> DetectAsync(
+    public async Task<ImportProfileDefinition?> DetectAsync(
         Guid householdId,
         Guid accountId,
         IReadOnlyList<string> headers,
@@ -250,14 +251,14 @@ public sealed class ImportProfileService(
             profile.CreditColumn, profile.CategoryColumn, profile.SubcategoryColumn,
             profile.AmountConvention.ToString(), profile.DefaultAccountId, profile.IsActive);
 
-    private static ImportProfileModel ToModel(CsvProfileDefinition profile) =>
+    private static ImportProfileModel ToModel(ImportProfileDefinition profile) =>
         new(
             profile.Id ?? Guid.Empty, profile.Name, profile.Headers,
             profile.DateColumn, profile.DescriptionColumn, profile.AmountColumn,
             profile.DebitColumn, profile.CreditColumn, profile.CategoryColumn,
             profile.SubcategoryColumn, profile.AmountConvention.ToString(), null, true);
 
-    private static CsvProfileDefinition ToDefinition(ImportProfile profile) =>
+    private static ImportProfileDefinition ToDefinition(ImportProfile profile) =>
         new(
             profile.Id, profile.Name, profile.GetHeaders(), profile.DateColumn,
             profile.DescriptionColumn, profile.AmountColumn, profile.DebitColumn,

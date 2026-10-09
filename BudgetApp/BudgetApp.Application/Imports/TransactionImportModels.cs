@@ -1,6 +1,6 @@
 namespace BudgetApp.Application.Imports;
 
-public sealed record CsvImportRow(
+public sealed record TransactionImportRow(
     int SourceRowNumber,
     string RawData,
     DateOnly? TransactionDate,
@@ -10,12 +10,12 @@ public sealed record CsvImportRow(
     string? SubcategoryName,
     string? ValidationMessage);
 
-public sealed record CsvImportReadResult(
+public sealed record TransactionImportReadResult(
     long FileSizeBytes,
     string Sha256Hash,
-    IReadOnlyList<CsvImportRow> Rows);
+    IReadOnlyList<TransactionImportRow> Rows);
 
-public sealed record CsvImportResult(
+public sealed record TransactionImportResult(
     Guid ImportFileId,
     string OriginalFileName,
     string AccountName,

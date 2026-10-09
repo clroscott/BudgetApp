@@ -13,7 +13,7 @@ namespace BudgetApp.Server.Controllers;
 [ApiController]
 [Route("api/households/{householdId:guid}/imports")]
 public sealed class ImportsController(
-    CsvImportService csvImportService,
+    TransactionImportService importService,
     ImportReviewService importReviewService,
     ILogger<ImportsController> logger) : ControllerBase
 {
@@ -72,8 +72,8 @@ public sealed class ImportsController(
 
     [HttpPost]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(CsvImportLimits.MaxRequestSizeBytes)]
-    public async Task<ActionResult<CsvImportResult>> Upload(
+    [RequestSizeLimit(TransactionImportLimits.MaxRequestSizeBytes)]
+    public async Task<ActionResult<TransactionImportResult>> Upload(
         Guid householdId,
         [FromForm] Guid accountId,
         [FromForm] IFormFile? file,
@@ -91,10 +91,10 @@ public sealed class ImportsController(
             return BadRequestProblem("Select a CSV file to import.");
         }
 
-        if (file.Length > CsvImportLimits.MaxFileSizeBytes)
+        if (file.Length > TransactionImportLimits.MaxFileSizeBytes)
         {
             return BadRequestProblem(
-                $"CSV files cannot exceed {CsvImportLimits.MaxFileSizeBytes / 1024 / 1024} MB.");
+                $"CSV files cannot exceed {TransactionImportLimits.MaxFileSizeBytes / 1024 / 1024} MB.");
         }
 
         var safeFileName = Path.GetFileName(file.FileName.Replace('\\', '/'));
@@ -102,7 +102,7 @@ public sealed class ImportsController(
         try
         {
             await using var content = file.OpenReadStream();
-            var result = await csvImportService.UploadAsync(
+            var result = await importService.UploadAsync(
                 householdId,
                 userId,
                 accountId,
@@ -399,8 +399,8 @@ public sealed class ImportsController(
             ImportNotFoundException or
             ImportDraftNotFoundException or
             CategoryNotFoundException or
-            DuplicateCsvImportException or
-            CsvImportRejectedException or
+            DuplicateImportFileException or
+            TransactionImportRejectedException or
             ArgumentException or
             InvalidOperationException;
 
@@ -418,7 +418,7 @@ public sealed class ImportsController(
                 (StatusCodes.Status404NotFound, "Import row not found"),
             CategoryNotFoundException =>
                 (StatusCodes.Status400BadRequest, "Category not found"),
-            DuplicateCsvImportException =>
+            DuplicateImportFileException =>
                 (StatusCodes.Status409Conflict, "Possible duplicate file"),
             _ => (StatusCodes.Status400BadRequest, "CSV import was rejected")
         };

@@ -864,6 +864,38 @@ initial findings and pending live tasks.
       data.
 - [ ] Completed imports remain understandable as historical records.
 
+### Format-neutral import foundation (#22, Part 1)
+
+This part is a backend refactor only. CSV labels/routes/templates remain in place;
+Excel support and worksheet selection are deliberately not enabled yet. Use
+fictional Development/Scratch data; no migration is required. Restart the server
+after updating because the internal service/reader types have changed.
+
+- [ ] Import a standard CSV: source values, row numbers, raw details, category
+      suggestions and Personal/Household inclusion match the existing behavior.
+      The upload creates drafts only; approval/completion remain required.
+- [ ] Inspect an unfamiliar CSV layout, save a profile, and reuse it. Header
+      matching, amount-sign conventions, category/subcategory mappings and the
+      profile's CSV template remain unchanged.
+- [ ] Repeat a file, then repeat with explicit confirmation. The same-file hash
+      and transaction duplicate acknowledgement rules remain in force.
+- [ ] Check malformed headers/rows, invalid dates/amounts, quotes/commas, leading
+      zero text, refunds, four-decimal amounts, the 10 MB file limit and 10,000
+      row limit. Failure preserves the selected upload; no official transactions
+      or partial import are created by a failed read.
+- [ ] Attempt `.xlsx`, `.xls` and `.xlsm` uploads/inspection through the API:
+      they still reject unsupported file types, even if renamed CSV text was
+      supplied. The inspection path now validates the extension as upload does.
+- [ ] A household Viewer cannot upload into a shared account, can upload into
+      their own active personal account, and cannot use another member's private
+      account. Archived accounts reject new imports. Other households/private
+      imports remain invisible; unsaved upload/review guards remain intact.
+
+Automated coverage exercises the neutral dispatcher, CSV parser, limits, input
+ownership/cancellation, unsupported formats and staging/approval integration.
+Live checklist items above remain manual sign-off, not inferred from test passes.
+See [the two-part implementation notes](excel-import-foundation.md).
+
 ### Duplicate lookup and completion regression (#208)
 
 Use disposable Development/Scratch data; never import large synthetic files into

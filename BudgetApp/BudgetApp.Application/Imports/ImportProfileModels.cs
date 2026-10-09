@@ -30,7 +30,7 @@ public sealed record SaveImportProfileInput(
     string AmountConvention,
     Guid? DefaultAccountId);
 
-public sealed record CsvProfileDefinition(
+public sealed record ImportProfileDefinition(
     Guid? Id,
     string Name,
     IReadOnlyList<string> Headers,
@@ -43,12 +43,12 @@ public sealed record CsvProfileDefinition(
     string? SubcategoryColumn,
     ImportAmountConvention AmountConvention);
 
-public sealed record CsvStructureInspection(
+public sealed record TransactionImportInspection(
     long FileSizeBytes,
     string Sha256Hash,
     IReadOnlyList<string> Headers,
     IReadOnlyList<IReadOnlyList<string>> PreviewRows,
-    CsvProfileDefinition SuggestedProfile);
+    ImportProfileDefinition SuggestedProfile);
 
 public sealed record ImportProfileInspectionModel(
     IReadOnlyList<string> Headers,

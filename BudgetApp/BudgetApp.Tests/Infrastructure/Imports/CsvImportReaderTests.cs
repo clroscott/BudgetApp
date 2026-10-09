@@ -78,7 +78,7 @@ public sealed class CsvImportReaderTests
     {
         const string csv = "When,What,Value\n2026-07-20,Groceries,-10\n";
 
-        var exception = await Assert.ThrowsAsync<CsvImportRejectedException>(() =>
+        var exception = await Assert.ThrowsAsync<TransactionImportRejectedException>(() =>
             Read(csv));
 
         Assert.Contains("layout is not recognized", exception.Message);
@@ -97,7 +97,7 @@ public sealed class CsvImportReaderTests
         Assert.Equal(["When", "Vendor", "Value", "Group"], inspection.Headers);
         Assert.Null(inspection.SuggestedProfile.AmountColumn);
 
-        var profile = new CsvProfileDefinition(
+        var profile = new ImportProfileDefinition(
             Guid.NewGuid(),
             "Custom bank",
             inspection.Headers,
@@ -129,7 +129,7 @@ public sealed class CsvImportReaderTests
         Assert.Equal(first.Sha256Hash, second.Sha256Hash);
     }
 
-    private Task<CsvImportReadResult> Read(string csv) =>
+    private Task<TransactionImportReadResult> Read(string csv) =>
         reader.ReadAsync(
             new MemoryStream(Encoding.UTF8.GetBytes(csv)),
             CancellationToken.None);
