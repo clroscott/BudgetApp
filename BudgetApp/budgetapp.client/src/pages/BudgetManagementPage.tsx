@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
-import { BrandLockup } from '../components/Brand'
+import { PageFrame } from '../components/PageFrame'
 import { AmountCalculator } from '../components/AmountCalculator'
 import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import { ContextualHelp } from '../components/ContextualHelp'
@@ -376,15 +376,30 @@ export function BudgetManagementPage() {
     </span>
   )
 
-  return (
-    <main className="management-page budget-page" ref={pageRef}>
-      <header className="app-header">
-        <BrandLockup />
-        <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
-      </header>
+  const actions = hasBudgetActions && budget && <section
+    className="budget-save-bar"
+    aria-label="Budget actions"
+    ref={actionsRef}
+  >
+    <div>
+      <span>Monthly budget</span>
+      <strong>{formattedTotal}</strong>
+      <small>Actual {formatAmount(actualTotal)} · Remaining {formatAmount(total - actualTotal)}</small>
+      {isDirty && <small>Unsaved changes</small>}
+    </div>
+    <div className="budget-save-actions">
+      <span className="budget-back-to-top-host" data-back-to-top-host />
+      {budget?.status === 'Draft' && canManage && <button className="danger-button" type="button" disabled={isSaving} onClick={() => void handleDeleteDraft()}>Delete draft</button>}
+      {budget?.status === 'Draft' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before activating.' : undefined} onClick={() => void handleStatus('activate')}>Activate</button>}
+      {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before returning to Draft.' : undefined} onClick={() => void handleStatus('return-to-draft')}>Return to draft</button>}
+      {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before closing.' : undefined} onClick={() => void handleStatus('close')}>Close budget</button>}
+      {budget?.status === 'Closed' && canManage && <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleStatus('reopen')}>Reopen budget</button>}
+      {canEdit && <button className="primary-button" type="button" disabled={isSaving || !isDirty} onClick={() => void handleSave()}>{isSaving ? 'Saving...' : 'Save budget'}</button>}
+    </div>
+  </section>
 
-      <div className="budget-page-layout">
-      <section className="management-content budget-content">
+  return (
+    <PageFrame className="budget-page" contentClassName="budget-content" ref={pageRef} footer={actions}>
         <BudgetingSectionNav current="monthly" />
         <div className="page-title-row" data-tutorial-id="monthly-budget-page-title">
           <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time.</p>
@@ -454,29 +469,6 @@ export function BudgetManagementPage() {
             <p className="action-consequence">{budget.status === 'Draft' ? helpWarnings.deleteDraft : helpWarnings.returnToDraft}</p>
             <ContextualHelp topic="destructive-actions" />
           </aside>}
-      </section>
-        {hasBudgetActions && budget && <section
-          className="budget-save-bar"
-          aria-label="Budget actions"
-          ref={actionsRef}
-        >
-          <div>
-            <span>Monthly budget</span>
-            <strong>{formattedTotal}</strong>
-            <small>Actual {formatAmount(actualTotal)} · Remaining {formatAmount(total - actualTotal)}</small>
-            {isDirty && <small>Unsaved changes</small>}
-          </div>
-          <div className="budget-save-actions">
-            <span className="budget-back-to-top-host" data-back-to-top-host />
-            {budget?.status === 'Draft' && canManage && <button className="danger-button" type="button" disabled={isSaving} onClick={() => void handleDeleteDraft()}>Delete draft</button>}
-            {budget?.status === 'Draft' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before activating.' : undefined} onClick={() => void handleStatus('activate')}>Activate</button>}
-            {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before returning to Draft.' : undefined} onClick={() => void handleStatus('return-to-draft')}>Return to draft</button>}
-            {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before closing.' : undefined} onClick={() => void handleStatus('close')}>Close budget</button>}
-            {budget?.status === 'Closed' && canManage && <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleStatus('reopen')}>Reopen budget</button>}
-            {canEdit && <button className="primary-button" type="button" disabled={isSaving || !isDirty} onClick={() => void handleSave()}>{isSaving ? 'Saving...' : 'Save budget'}</button>}
-          </div>
-        </section>}
-      </div>
-    </main>
+    </PageFrame>
   )
 }

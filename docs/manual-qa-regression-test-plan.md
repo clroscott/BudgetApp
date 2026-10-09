@@ -677,6 +677,10 @@ are manual sign-off cases, not claims established by automated DOM tests. See
       once and returns focus. Invalid arithmetic stays open with an announced
       error. Repeat near the bottom of a long page and at 200% zoom/narrow width;
       Close/keypad/result controls can be reached by keyboard and scrolling.
+- [ ] Scroll Annual targets with saved and unsaved values. Back to top appears
+      inside the annual save bar, beside or wrapped above Save annual targets;
+      neither button overlaps or clips at normal/narrow widths or 200% zoom.
+      Back to top scrolls without saving, clearing edits or bypassing the guard.
 - [ ] In monthly and annual budgets, calculate without applying, then open a
       different row's calculator by mouse and keyboard. Only the new calculator
       remains open and its Calculation field receives focus. The old row's amount
@@ -926,11 +930,24 @@ the read-only rendered harness in `tools/LayoutQa`.
 - [ ] Start a Learn-only tutorial with collapsed/narrow navigation; stable targets
       still reveal and focus correctly. Retry/Back/Exit/Escape remain usable and
       blocked unrelated controls are not keyboard reachable. No financial writes.
-- [ ] Check a long monthly budget (compatibility bridge): footer clearance still
+- [ ] Switch between Monthly budget, Annual targets, Annual overview, Recurring
+      expenses and Categories. Common columns, section tabs and headings remain
+      aligned. At intermediate widths with the desktop sidebar expanded/collapsed,
+      month/year/scope controls and annual-target rows wrap without overflowing
+      the page. Annual tables retain their own labeled horizontal scrolling.
+- [ ] Check a long monthly budget: footer clearance still
       follows its measured height, Back to top stays within actions, and calculators
-      are not covered. Escape closes the calculator and returns focus. The existing
-      short-desktop/zoom budget period-control overflow remains a budgeting-slice
-      follow-up; it must not worsen while migrating other features.
+      are not covered. Escape closes the calculator and returns focus. Opening
+      another calculator or clicking outside dismisses without applying an amount.
+      Repeat near the final row with unsaved text and at actual 200% zoom.
+- [ ] Preserve an unsaved monthly amount, annual target/plan-period edit, category
+      rename/new subcategory and recurring-expense edit when navigation or household
+      switching is canceled. Failed saves retain edits, and successful saves retain
+      the existing scope, fiscal-default, allocation and permission rules.
+- [ ] Test an empty budget separately from an initial failed load, then a refresh
+      failure with retained data. Retry stays visible and stale data cannot be edited.
+      Verify Viewer restrictions and personal-account/expense permissions remain
+      unchanged; the layout migration grants no additional access.
 - [ ] Open Account settings with no household. Main content and profile controls
       remain accessible with no phantom sidebar or empty household context strip.
       Check representative dashboard, annual and settings/help pages for unchanged

@@ -19,6 +19,13 @@ otherwise Playwright uses its already-installed Chromium.
 node .\tools\LayoutQa\verify-layout.mjs before
 # Make the focused layout change, then:
 node .\tools\LayoutQa\verify-layout.mjs after
+
+# Keep each later slice's before/after evidence separate:
+node .\tools\LayoutQa\verify-layout.mjs before budgeting
+node .\tools\LayoutQa\verify-layout.mjs after budgeting
+
+# Focused calculator switching/dismissal/Use-result checks (fictional form state):
+node .\tools\LayoutQa\verify-layout.mjs interactions budgeting
 ```
 
 The `before` run must precede the source change. Both runs must use the same
@@ -32,10 +39,15 @@ Output lives under ignored `artifacts/layout-qa/before` and `after`:
 - `pixel-comparisons.json` (after): exact changed-channel counts for initial
   screenshots. Review differences; rendering/anti-aliasing varies across machines.
 
-The first #218 slice covers seven pages × five layouts, plus keyboard, profile,
-sticky-header and budget action/calculator checks. The existing short-desktop
-budget overflow is recorded and must not worsen. Other pages must not gain a
-document-level horizontal scrollbar; import tables keep their own scrolling area.
+The original first-slice evidence covers seven pages × five layouts. The current
+harness covers sixteen page/state variants × five layouts (80 cases), including
+the five budgeting destinations, loaded/empty/failed/delayed data, Viewer targets
+and multiple-household selection. It waits for data-ready UI, not only a heading.
+It also checks keyboard, profile, sticky-header and budget action/calculator behavior.
+All pages must avoid document-level horizontal overflow; wide review/annual tables
+retain their own scrolling area. The monthly/annual internal responsive grids can
+change flow height; common column/title/tab/form geometry must otherwise match.
+Different image sizes and pixel counts are recorded for visual review, not ignored.
 
 The 960×540/2× case is a **200%-equivalent CSS viewport**, not an actual zoom or
 screen-reader test. Complete the permanent manual checklist before merge. Future

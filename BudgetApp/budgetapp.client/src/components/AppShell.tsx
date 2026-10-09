@@ -32,7 +32,10 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
     // height rather than assuming a breakpoint-specific fixed header size.
     const measure = () => {
       const height = Math.ceil(sidebar.getBoundingClientRect().height)
-      shell.style.setProperty('--shell-navigation-height', `${height}px`)
+      const value = `${height}px`
+      if (shell.style.getPropertyValue('--shell-navigation-height') !== value) {
+        shell.style.setProperty('--shell-navigation-height', value)
+      }
     }
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
     observer?.observe(sidebar)
@@ -43,7 +46,7 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
       window.removeEventListener('resize', measure)
       shell.style.removeProperty('--shell-navigation-height')
     }
-  }, [showHouseholdNavigation, isNavigationOpen])
+  }, [showHouseholdNavigation, isNavigationOpen, expandedGroups])
   useEffect(() => {
     const menu = menuRef.current
     const reveal = () => setIsNavigationOpen(true)

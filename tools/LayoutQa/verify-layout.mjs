@@ -16,14 +16,17 @@ const sharp = clientRequire('sharp')
 const playwrightPath = process.env.BUDGETAPP_QA_PLAYWRIGHT_PATH
 const { chromium } = playwrightPath ? await import(pathToFileURL(playwrightPath).href) : await import('playwright')
 const mode = process.argv[2] ?? 'after'
-assert.ok(['before', 'after'].includes(mode), 'Use before or after')
-const output = resolve(root, 'artifacts/layout-qa', mode)
+assert.ok(['before', 'after', 'interactions'].includes(mode), 'Use before, after or interactions')
+const slice = process.argv[3] ?? ''
+assert.ok(/^[a-z0-9-]*$/.test(slice), 'Use a lowercase slice name')
+const evidence = resolve(root, 'artifacts/layout-qa', slice)
+const output = resolve(evidence, mode)
 await mkdir(output, { recursive: true })
+const before = mode === 'after' ? JSON.parse(await readFile(resolve(evidence, 'before/measurements.json'), 'utf8')) : []
 const server = await createServer({ root: client, configFile: false, plugins: [react()], server: { host: '127.0.0.1', port: 4178, strictPort: true } })
 let browser
 const errors = []
 const results = []
-const before = mode === 'after' ? JSON.parse(await readFile(resolve(root, 'artifacts/layout-qa/before/measurements.json'), 'utf8')) : []
 const layouts = [
   { name: 'desktop', width: 1440, height: 1000 },
   { name: 'collapsed', width: 1440, height: 1000, collapsed: true },
@@ -33,15 +36,25 @@ const layouts = [
   // screen-reader announcements must also be checked manually.
   { name: 'zoom-equivalent', width: 960, height: 540, scale: 2 },
 ]
-const routes = [
-  { name: 'transactions', path: '/transactions', heading: 'Transactions' },
-  { name: 'upload', path: '/import', heading: 'Import transactions' },
-  { name: 'review', path: `/imports/review?importId=${importId}`, heading: 'Review imported rows' },
-  { name: 'rules', path: '/settings/categorization-rules', heading: 'Categorization rules' },
-  { name: 'profiles', path: '/settings/import-profiles', heading: 'Import profiles' },
-  { name: 'budget', path: '/budgeting?year=2026&month=10', heading: 'Monthly budget' },
-  { name: 'account-no-household', path: '/settings/account', heading: 'Account settings', noHousehold: true },
+const allRoutes = [
+  { name: 'transactions', path: '/transactions', heading: 'Transactions', ready: '.transaction-row' },
+  { name: 'upload', path: '/import', heading: 'Import transactions', ready: '.import-form select option[value="layout-account"]', attached: true },
+  { name: 'review', path: `/imports/review?importId=${importId}`, heading: 'Review imported rows', ready: '.import-draft-card' },
+  { name: 'rules', path: '/settings/categorization-rules', heading: 'Categorization rules', ready: '.rule-row' },
+  { name: 'profiles', path: '/settings/import-profiles', heading: 'Import profiles', ready: '.account-card' },
+  { name: 'budget', path: '/budgeting?year=2026&month=10', heading: 'Monthly budget', ready: '.budget-save-bar', flowChange: true },
+  { name: 'annual-targets', path: '/budgeting/annual-targets', heading: 'Annual targets', ready: '.yearly-target-row', flowChange: true },
+  { name: 'annual-overview', path: '/budgeting/annual-overview?year=2026', heading: 'Annual overview', ready: '.annual-category-row' },
+  { name: 'recurring', path: '/budgeting/recurring-expenses', heading: 'Recurring expenses', ready: '.recurring-card', flowChange: true },
+  { name: 'categories', path: '/settings/categories', heading: 'Categories', ready: '.category-row', flowChange: true },
+  { name: 'budget-empty', path: '/budgeting?year=2026&month=10', heading: 'Monthly budget', emptyBudget: true, ready: '.budget-empty-state', flowChange: true },
+  { name: 'budget-failed', path: '/budgeting?year=2026&month=10', heading: 'Monthly budget', failure: /\/budgets\/2026\/10$/, ready: '.page-load-feedback', flowChange: true },
+  { name: 'annual-targets-viewer', path: '/budgeting/annual-targets', heading: 'Annual targets', viewer: true, ready: '.yearly-target-row', flowChange: true },
+  { name: 'annual-overview-delayed', path: '/budgeting/annual-overview?year=2026', heading: 'Annual overview', delay: 200, ready: '.annual-category-row' },
+  { name: 'budget-multiple-households', path: '/budgeting?year=2026&month=10', heading: 'Monthly budget', multipleHouseholds: true, ready: '.budget-save-bar', flowChange: true },
+  { name: 'account-no-household', path: '/settings/account', heading: 'Account settings', noHousehold: true, ready: '.account-settings-details' },
 ]
+const routes = mode === 'interactions' ? allRoutes.filter(route => ['budget', 'annual-targets'].includes(route.name)) : allRoutes
 try {
   await server.listen()
   browser = await chromium.launch({ headless: true, ...(process.env.BUDGETAPP_QA_BROWSER_PATH ? { executablePath: process.env.BUDGETAPP_QA_BROWSER_PATH } : {}) })
@@ -66,6 +79,8 @@ try {
           return intercepted.abort()
         }
         try {
+          if (route.failure?.test(url.pathname)) return intercepted.fulfill({ status: 503, json: { message: 'Synthetic unavailable data for layout QA' } })
+          if (route.delay) await new Promise(resolve => setTimeout(resolve, route.delay))
           return intercepted.fulfill({ json: responseFor(url.pathname, route) })
         } catch (error) {
           errors.push(error.message)
@@ -74,8 +89,13 @@ try {
       })
       await page.goto(`http://127.0.0.1:4178${route.path}`)
       await page.getByRole('heading', { name: route.heading, exact: true }).waitFor()
-      if (route.name === 'review') await page.locator('.import-draft-card').first().waitFor()
-      if (route.name === 'budget') await page.getByRole('region', { name: 'Budget actions' }).waitFor()
+      await page.locator(route.ready).first().waitFor({ state: route.attached ? 'attached' : 'visible' })
+      if (route.viewer) assert.ok(await page.getByRole('button', { name: 'Save annual targets', exact: true }).isDisabled())
+      if (route.failure) {
+        assert.ok(await page.getByRole('button', { name: 'Retry loading', exact: true }).isVisible())
+        assert.equal(await page.locator('.budget-empty-state, .budget-save-bar').count(), 0)
+      }
+      if (route.multipleHouseholds) assert.equal(await page.locator('.household-context-bar select option').count(), 2)
       await page.evaluate(() => document.fonts.ready)
       await page.screenshot({ path: resolve(output, `${layout.name}-${route.name}.png`), fullPage: true })
       const measurements = await page.evaluate(() => {
@@ -95,12 +115,8 @@ try {
       const key = `${layout.name}-${route.name}`
       results.push({ key, ...measurements })
       if (mode === 'after') {
-        // The unmigrated budget period controls already overflow at this short
-        // desktop/zoom viewport. Record that follow-up, but never worsen it.
-        const previousWidth = before.find(item => item.key === key)?.scrollWidth ?? measurements.viewport
-        const allowedWidth = route.name === 'budget' ? Math.max(measurements.viewport, previousWidth) : measurements.viewport
-        assert.ok(measurements.scrollWidth <= allowedWidth, `${key}: document must not gain sideways overflow`)
-        if (!['budget', 'account-no-household'].includes(route.name)) assert.equal(measurements.hiddenHeaders, 0, `${key}: no retired page header`)
+        assert.ok(measurements.scrollWidth <= measurements.viewport, `${key}: document must not overflow sideways`)
+        assert.equal(measurements.hiddenHeaders, 0, `${key}: no retired page header`)
       }
       const profile = page.locator('.profile-menu')
       await profile.locator('summary').click()
@@ -116,9 +132,31 @@ try {
         assert.equal(await page.getByRole('button', { name: 'Menu', exact: true }).getAttribute('aria-expanded'), 'false')
         assert.ok(await page.getByRole('heading', { name: route.heading, exact: true }).evaluate(element => element === document.activeElement))
       }
-      if (route.name === 'review' || route.name === 'budget') {
+      if (['review', 'budget', 'annual-targets', 'annual-targets-viewer'].includes(route.name)) {
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
         await page.getByRole('button', { name: 'Back to top' }).waitFor()
+        if (route.name.startsWith('annual-targets')) {
+          const actions = page.getByRole('region', { name: 'Annual target actions' })
+          const back = actions.getByRole('button', { name: 'Back to top' })
+          await back.waitFor()
+          const save = actions.getByRole('button', { name: 'Save annual targets', exact: true })
+          const bounds = await Promise.all([actions.boundingBox(), back.boundingBox(), save.boundingBox()])
+          const [bar, top, submit] = bounds
+          for (const button of [top, submit]) {
+            assert.ok(button.x >= bar.x && button.x + button.width <= bar.x + bar.width + 1, `${key}: annual action outside bar`)
+            assert.ok(button.y >= bar.y && button.y + button.height <= bar.y + bar.height + 1, `${key}: annual action clipped`)
+          }
+          const overlaps = top.x < submit.x + submit.width && top.x + top.width > submit.x && top.y < submit.y + submit.height && top.y + top.height > submit.y
+          assert.equal(overlaps, false, `${key}: annual actions overlap`)
+          assert.equal(await back.evaluate(element => getComputedStyle(element).position), 'static')
+          await back.click()
+          await page.waitForFunction(() => window.scrollY === 0)
+          await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+          await back.waitFor()
+          // A wrapped action row can grow after Back to top is portaled in.
+          // Reach the updated document bottom before checking the final controls.
+          await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+        }
         await page.screenshot({ path: resolve(output, `${key}-scrolled.png`) })
         if (mode === 'after' && layout.width <= 880) {
           const overlaps = await page.evaluate(() => {
@@ -137,6 +175,34 @@ try {
           assert.ok(await trigger.evaluate(element => element === document.activeElement))
         }
       }
+      if (mode === 'interactions') {
+        const triggers = page.getByRole('button', { name: /Open calculator for/ })
+        const first = triggers.first(), last = triggers.last()
+        // Calculator results only change local fixture-backed form state. No
+        // Save/Create/Allocate control is activated; all API writes stay blocked.
+        const amountInputs = page.locator(route.name === 'budget' ? '.budget-amount-row input[type="number"]' : '.yearly-target-row input[type="number"]')
+        const unchanged = await amountInputs.first().inputValue()
+        await first.click()
+        await page.getByLabel('Calculation', { exact: true }).fill('24 / 2')
+        await page.keyboard.press('Enter')
+        assert.equal(await page.getByRole('status').filter({ hasText: 'Result:' }).textContent(), 'Result: 12')
+        await last.click()
+        assert.equal(await page.getByRole('dialog').count(), 1)
+        assert.equal(await first.getAttribute('aria-expanded'), 'false')
+        assert.equal(await amountInputs.first().inputValue(), unchanged)
+        await page.getByRole('heading', { name: route.heading, exact: true }).click()
+        assert.equal(await page.getByRole('dialog').count(), 0)
+        await last.click()
+        await page.getByRole('button', { name: 'Close calculator', exact: true }).click({ timeout: 5000 })
+        assert.ok(await last.evaluate(element => element === document.activeElement))
+        await last.click()
+        await page.getByLabel('Calculation', { exact: true }).fill('24 / 2')
+        await page.keyboard.press('Enter')
+        await page.getByRole('button', { name: 'Use result', exact: true }).click({ timeout: 5000 })
+        assert.equal(await amountInputs.last().inputValue(), '12')
+        assert.equal(await page.getByRole('dialog').count(), 0)
+        assert.ok(await last.evaluate(element => element === document.activeElement))
+      }
       await context.close()
     }
   }
@@ -145,15 +211,22 @@ try {
   if (mode === 'after') {
     for (const result of results) {
       const old = before.find(item => item.key === result.key)
+      assert.ok(old, `${result.key}: missing baseline`)
+      const route = routes.find(route => result.key.endsWith(`-${route.name}`))
       for (const field of ['content', 'heading', 'nav', 'form']) {
-        assert.deepEqual(result[field], old[field], `${result.key}: ${field} geometry changed`)
+        if (field === 'content' && route.flowChange) {
+          for (const axis of ['x', 'y', 'width']) assert.equal(result[field][axis], old[field][axis], `${result.key}: content ${axis} changed`)
+        } else assert.deepEqual(result[field], old[field], `${result.key}: ${field} geometry changed`)
       }
     }
     const pixels = []
     for (const result of results) {
-      const old = await sharp(resolve(root, 'artifacts/layout-qa/before', `${result.key}.png`)).raw().toBuffer({ resolveWithObject: true })
+      const old = await sharp(resolve(evidence, 'before', `${result.key}.png`)).raw().toBuffer({ resolveWithObject: true })
       const current = await sharp(resolve(output, `${result.key}.png`)).raw().toBuffer({ resolveWithObject: true })
-      assert.deepEqual(current.info, old.info, `${result.key}: rendered image dimensions changed`)
+      if (JSON.stringify(current.info) !== JSON.stringify(old.info)) {
+        pixels.push({ key: result.key, dimensionsChanged: true, before: old.info, after: current.info })
+        continue
+      }
       let changedChannels = 0
       for (let index = 0; index < current.data.length; index++) if (current.data[index] !== old.data[index]) changedChannels++
       pixels.push({ key: result.key, changedChannels, totalChannels: current.data.length })

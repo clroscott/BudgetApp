@@ -78,31 +78,13 @@
   max-width: 38rem;
 }
 
-/* Compatibility bridge: budget/settings/help groups migrate in later slices.
+/* Compatibility bridge: dashboard/settings/help/operator groups migrate later.
    Do not add new feature-page widths or hidden headers to this bridge. */
 
 .app-shell .narrow-management-content > :is(.account-settings-stack, .household-settings-form, .household-form, .help-topic-list, .help-article) {
   width: 100%;
   max-width: 44rem;
   margin-inline: 0;
-}
-
-.app-shell .annual-overview-content {
-  row-gap: 0;
-}
-
-.app-shell .annual-overview-content > :is(.panel, .annual-summary-grid, .contextual-help-row, .budget-actual-warning) {
-  margin-bottom: 1rem;
-}
-
-.app-shell .yearly-save-bar {
-  max-width: none;
-  margin-inline: 0;
-}
-
-.app-shell .budget-save-bar {
-  left: var(--page-sidebar-width);
-  width: min(calc(100% - var(--page-sidebar-width) - var(--page-content-gutter) - var(--page-content-gutter)), var(--page-content-max));
 }
 
 .app-shell:not(.standalone-account-shell) .app-header {
