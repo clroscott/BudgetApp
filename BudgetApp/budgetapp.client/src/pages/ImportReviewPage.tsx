@@ -84,6 +84,7 @@ function generatedRuleName(
 }
 
 interface DraftRowProps {
+  sourceWorksheetName?: string | null
   householdId: string
   importFileId: string
   draft: ImportDraftItem
@@ -114,6 +115,7 @@ type DraftRowFilter =
 type RuleApplicationMode = 'fill' | 'reapply'
 
 function DraftRow({
+  sourceWorksheetName,
   householdId,
   importFileId,
   draft,
@@ -366,7 +368,7 @@ function DraftRow({
 
   return (
     <article className={`import-draft-card import-decision-${draft.reviewDecision.toLowerCase()}`}
-      aria-label={`CSV row ${draft.sourceRowNumber}`}>
+      aria-label={`${sourceWorksheetName ? 'Excel' : 'CSV'} row ${draft.sourceRowNumber}`}>
       <form className="import-draft-form" onSubmit={(event) => void save(event)}>
         <div className="import-draft-line">
         <div className="import-draft-fields">
@@ -469,9 +471,9 @@ function DraftRow({
         </div>
         {draft.validationMessage && <p className="row-validation-message" role="alert">{draft.validationMessage}</p>}
         {areDetailsOpen && <div className="import-row-details" id={detailsId}>
-          <p className="field-help">CSV row {draft.sourceRowNumber} · Validation: {draft.validationStatus}.</p>
+          <p className="field-help">{sourceWorksheetName ? `Worksheet ${sourceWorksheetName} · Excel` : 'CSV'} row {draft.sourceRowNumber} · Validation: {draft.validationStatus}.</p>
           <p className="field-help">The full amount counts in each selected budget, with only one transaction.
-            Household inclusion shares the expense, not your private account or CSV file.</p>
+            Household inclusion shares the expense, not your private account or uploaded file.</p>
           {draft.canChangePersonalInclusion === false && <p className="field-help">Another reviewer has chosen their
             Personal budget for this row. You can add it to yours after the import is completed.</p>}
           {editable && <div className="import-row-detail-actions">
@@ -892,7 +894,7 @@ export function ImportReviewPage() {
       if (parsedAmount !== null && !Number.isFinite(parsedAmount)) {
         const row = detail.drafts.find(draft => draft.id === draftId)
         setErrors([
-          `CSV row ${row?.sourceRowNumber ?? ''} has an invalid amount.`.trim(),
+          `${detail?.sourceWorksheetName ? 'Excel' : 'CSV'} row ${row?.sourceRowNumber ?? ''} has an invalid amount.`.trim(),
         ])
         return
       }
@@ -981,7 +983,7 @@ export function ImportReviewPage() {
 
   const handleRemoveDraft = async (draftId: string, sourceRowNumber: number) => {
     if (!detail || !window.confirm(
-      `Remove CSV row ${sourceRowNumber} from this staged import? This cannot be undone.`,
+      `Remove ${detail?.sourceWorksheetName ? 'Excel' : 'CSV'} row ${sourceRowNumber} from this staged import? This cannot be undone.`,
     )) return
 
     setErrors([])
@@ -1034,7 +1036,7 @@ export function ImportReviewPage() {
             <h1>Review imported rows</h1>
             <p>Nothing becomes an official transaction until you review every row and complete the import.</p>
           </div>
-          <AppLink to="/import">Upload another CSV</AppLink>
+          <AppLink to="/import">Upload another file</AppLink>
         </div>
 
         <ContextualHelp topic="import-approval" />
@@ -1084,14 +1086,14 @@ export function ImportReviewPage() {
                   setDraftPage(1)
                 }}>
                 {selectedNotListed && <option value={selectedImportId}>
-                  {detailLoad.hasData && detail ? `${detail.originalFileName} — ${detail.accountName} (${detail.status})` : 'Selected file'}
+                  {detailLoad.hasData && detail ? `${detail.originalFileName}${detail.sourceWorksheetName ? ` · ${detail.sourceWorksheetName}` : ''} — ${detail.accountName} (${detail.status})` : 'Selected file'}
                 </option>}
                 {filteredImports.length === 0 && !selectedImportId && <option value="">
                   {listLoad.isPending ? 'Loading imports…' : listLoad.hasData ? noMatchingFilesLabel : 'Import list unavailable'}
                 </option>}
                 {filteredImports.map(item => (
                   <option key={item.id} value={item.id}>
-                    {item.originalFileName} — {item.accountName} ({item.status})
+                    {item.originalFileName}{item.sourceWorksheetName ? ` · ${item.sourceWorksheetName}` : ''} — {item.accountName} ({item.status})
                   </option>
                 ))}
               </select>
@@ -1117,13 +1119,13 @@ export function ImportReviewPage() {
         {!selectedImportId && listLoad.hasData && importList?.totalVisibleCount === 0 ? (
           <div className="empty-state">
             <h2>No imports yet</h2>
-            <p>Upload a CSV to create staged rows for review.</p>
-            <AppLink to="/import">Import a CSV</AppLink>
+            <p>Upload a CSV or Excel workbook to create staged rows for review.</p>
+            <AppLink to="/import">Import transactions</AppLink>
           </div>
         ) : !selectedImportId && listLoad.hasData && importList?.totalCount === 0 ? (
           <div className="empty-state">
             <h2>{noMatchingFilesLabel}</h2>
-            <p>Choose another file status or upload a new CSV.</p>
+            <p>Choose another file status or upload a new file.</p>
           </div>
         ) : detailLoad.hasData && detail && (
           <>
@@ -1132,6 +1134,7 @@ export function ImportReviewPage() {
                 <div>
                   <p className="eyebrow">{detail.status}</p>
                   <h2>Review transactions in {detail.originalFileName}</h2>
+                  {detail.sourceWorksheetName && <p>Worksheet: <strong>{detail.sourceWorksheetName}</strong>. Row numbers refer to the original Excel worksheet.</p>}
                   <p>{detail.accountName} · {detail.currency}</p>
                 </div>
                 {detailLoad.isFresh && <button className="text-button" type="button"
@@ -1357,6 +1360,7 @@ export function ImportReviewPage() {
               <div className="import-draft-list">
                 {visibleDrafts.map(draft => (
                   <DraftRow
+                    sourceWorksheetName={detail.sourceWorksheetName}
                     key={`${draft.id}-${draft.reviewDecision}-${draft.validationStatus}-${draft.duplicateStatus}`}
                     householdId={currentHousehold.id}
                     importFileId={detail.id}

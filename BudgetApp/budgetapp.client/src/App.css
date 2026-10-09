@@ -4968,6 +4968,11 @@ a {
 .admin-account-status dd { margin: 0; overflow-wrap: anywhere; }
 @media (max-width: 55rem) { .admin-support-layout { grid-template-columns: minmax(0, 1fr); } }
 .admin-users-filter { display: flex; flex-wrap: wrap; align-items: end; gap: 0.75rem; margin-block: 1rem; }
+.import-preview-table { width: 100%; border-collapse: collapse; text-align: left; }
+.import-preview-table caption { text-align: left; padding-block: 0.6rem; color: var(--muted); }
+.import-preview-table th, .import-preview-table td { border: 1px solid var(--border); padding: 0.6rem; min-width: 7rem; max-width: 22rem; overflow-wrap: anywhere; }
+.import-preview-table thead { background: var(--surface-soft); }
+.import-mapping-panel .table-scroll-region { max-width: 100%; overflow-x: auto; }
 .admin-users-filter > div { flex: 1 1 20rem; display: grid; gap: 0.4rem; min-width: 0; }
 .admin-users-list { list-style: none; padding: 0; display: grid; gap: 0.8rem; }
 .admin-users-list .account-settings-card { margin: 0; overflow-wrap: anywhere; }

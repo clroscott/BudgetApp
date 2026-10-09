@@ -53,6 +53,8 @@ public sealed class ImportFile
     public long FileSizeBytes { get; private set; }
 
     public string Sha256Hash { get; private set; } = string.Empty;
+    public string? SourceWorksheetId { get; private set; }
+    public string? SourceWorksheetName { get; private set; }
 
     public ImportFileStatus Status { get; private set; }
 
@@ -91,6 +93,17 @@ public sealed class ImportFile
             fileSizeBytes,
             sha256Hash,
             uploadedAtUtc);
+
+    public void SetWorksheetSource(string? id, string? name)
+    {
+        if (id is null && name is null) return;
+        if (string.IsNullOrWhiteSpace(id) || id.Length > 64 || string.IsNullOrWhiteSpace(name) || name.Length > 31)
+            throw new ArgumentException("The original worksheet ID and name are required and must be within supported limits.");
+        if (SourceWorksheetId is not null)
+            throw new InvalidOperationException("Import worksheet provenance cannot be changed.");
+        SourceWorksheetId = id;
+        SourceWorksheetName = name;
+    }
 
     public void StartProcessing(DateTimeOffset updatedAtUtc)
     {

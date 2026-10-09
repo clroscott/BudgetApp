@@ -18,6 +18,7 @@ import {
 } from '../imports/importProfileApi'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedForm } from '../routing/useUnsavedForm'
+import { ImportParsingFields } from '../imports/ImportParsingFields'
 
 type ImportColumnField =
   'ignore' | 'date' | 'description' | 'amount' | 'debit' | 'credit' |
@@ -34,8 +35,8 @@ const mappingDescriptions: Record<ImportColumnField, string> = {
   date: 'The date the transaction occurred or was posted.',
   description: 'The transaction label, payee, or merchant name.',
   amount: 'Use when one column contains both spending and money in. Signs distinguish them.',
-  debit: 'Use when the CSV has a separate column for purchases, withdrawals, or fees.',
-  credit: 'Use when the CSV has a separate column for deposits, refunds, or income.',
+  debit: 'Use when the file has a separate column for purchases, withdrawals, or fees.',
+  credit: 'Use when the file has a separate column for deposits, refunds, or income.',
   category: 'An optional category name to match against an existing BudgetApp category.',
   subcategory: 'An optional subcategory name to match under an existing category.',
 }
@@ -62,6 +63,8 @@ const emptyForm: SaveImportProfile = {
   subcategoryColumn: 'Subcategory',
   amountConvention: 'SpendingPositive',
   defaultAccountId: null,
+  dateFormat: null,
+  numberCulture: null,
 }
 
 export function ImportProfileManagementPage() {
@@ -82,7 +85,7 @@ export function ImportProfileManagementPage() {
   const inactiveProfiles = profiles.filter(profile => !profile.isActive)
   const formGuard = useUnsavedForm({
     form, columns: columns.map(({ header, field }) => ({ header, field })),
-  }, 'Discard your unsaved CSV profile changes?')
+  }, 'Discard your unsaved import profile changes?')
 
   const load = async () => {
     if (!currentHousehold) return
@@ -132,6 +135,8 @@ export function ImportProfileManagementPage() {
       subcategoryColumn: profile.subcategoryColumn,
       amountConvention: profile.amountConvention,
       defaultAccountId: profile.defaultAccountId,
+      dateFormat: profile.dateFormat ?? null,
+      numberCulture: profile.numberCulture ?? null,
     }
     const nextColumns: ImportProfileColumn[] = profile.headers.map(header => ({
       key: nextColumnKey++,
@@ -311,15 +316,15 @@ export function ImportProfileManagementPage() {
         <TransactionsSectionNav />
         <div className="page-title-row"><div>
           <p className="eyebrow">Transactions</p>
-          <h1>CSV import profiles</h1>
-          <p>Save a bank or custom CSV structure once, then reuse it automatically.</p>
+          <h1>Import profiles</h1>
+          <p>Save a bank or custom CSV/Excel structure once, then reuse it automatically.</p>
         </div></div>
         <ErrorSummary errors={errors} />
         {canEdit && <form className="management-form import-profile-form"
           onSubmit={event => event.preventDefault()}>
           <div className="account-form-heading"><div>
             <h2>{editingId ? 'Edit profile' : 'Create profile'}</h2>
-            <p>Name each CSV column and choose what BudgetApp should do with it.</p>
+            <p>Name each file column and choose what BudgetApp should do with it.</p>
           </div>{editingId && <button className="text-button" type="button"
             onClick={() => { if (formGuard.confirmDiscard()) reset() }}>Cancel</button>}</div>
           <div className="import-profile-details-grid">
@@ -336,9 +341,9 @@ export function ImportProfileManagementPage() {
           <div className="import-profile-column-builder">
             <div className="import-profile-column-heading">
               <div>
-                <h3>CSV columns</h3>
+                <h3>File columns</h3>
                 <p>
-                  CSV header is the exact title in the file. Maps to tells BudgetApp
+                  Column header is the exact title in the file. Maps to tells BudgetApp
                   what that column means.
                 </p>
               </div>
@@ -351,7 +356,7 @@ export function ImportProfileManagementPage() {
               <p>
                 Choose <b>Single amount</b> when the bank uses one Amount column for
                 everything. Choose <b>Debit</b> and/or <b>Credit</b> only when spending
-                and money in are separate CSV columns. You do not use both layouts.
+                and money in are separate file columns. You do not use both layouts.
               </p>
               <p>
                 Category columns are optional. Their text is matched to categories
@@ -363,9 +368,9 @@ export function ImportProfileManagementPage() {
                 <div className="import-profile-column-row" key={column.key}>
                   <span className="import-profile-column-number">{index + 1}</span>
                   <label>
-                    <span>CSV header</span>
+                    <span>Column header</span>
                     <input value={column.header} maxLength={100}
-                      placeholder="Column name from the CSV"
+                      placeholder="Column name from the file"
                       onChange={event => updateColumnHeader(column.key, event.target.value)} />
                   </label>
                   <label>
@@ -410,6 +415,10 @@ export function ImportProfileManagementPage() {
               </select>
             </label>
           )}
+          <div className="import-profile-grid">
+            <ImportParsingFields dateFormat={form.dateFormat} numberCulture={form.numberCulture}
+              disabled={isBusy || !canEdit} onChange={setField} />
+          </div>
           <p className="field-help import-profile-requirements">
             Required mappings: transaction date, description, and either a single amount
             or at least one debit/credit column.
@@ -426,7 +435,7 @@ export function ImportProfileManagementPage() {
             <div className="account-section-heading">
               <div>
                 <h2>Active profiles</h2>
-                <p>Available for automatic matching and CSV imports.</p>
+                <p>Available for automatic matching and CSV/Excel imports.</p>
               </div>
               <span>{activeProfiles.length}</span>
             </div>

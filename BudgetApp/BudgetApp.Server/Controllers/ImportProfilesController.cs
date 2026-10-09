@@ -112,26 +112,27 @@ public sealed class ImportProfilesController(ImportProfileService service) : Con
 
     [HttpPost("inspect")]
     [Consumes("multipart/form-data")]
-    [RequestSizeLimit(CsvImportLimits.MaxRequestSizeBytes)]
+    [RequestSizeLimit(TransactionImportLimits.MaxRequestSizeBytes)]
     public async Task<ActionResult<ImportProfileInspectionModel>> Inspect(
         Guid householdId,
         [FromForm] Guid accountId,
         [FromForm] IFormFile? file,
+        [FromForm] string? worksheetId,
         CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
-        if (file is null) return BadRequest("Select a CSV file.");
-        if (file.Length > CsvImportLimits.MaxFileSizeBytes)
+        if (file is null) return BadRequest("Select a CSV or Excel (.xlsx) file.");
+        if (file.Length > TransactionImportLimits.MaxFileSizeBytes)
         {
             return BadRequest(
-                $"CSV files cannot exceed {CsvImportLimits.MaxFileSizeBytes / 1024 / 1024} MB.");
+                $"Import files cannot exceed {TransactionImportLimits.MaxFileSizeBytes / 1024 / 1024} MB.");
         }
 
         try
         {
             await using var content = file.OpenReadStream();
             return Ok(await service.InspectAsync(
-                householdId, userId, accountId, content, cancellationToken));
+                householdId, userId, accountId, file.FileName, content, cancellationToken, worksheetId));
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -168,7 +169,7 @@ public sealed class ImportProfilesController(ImportProfileService service) : Con
         exception is HouseholdAccessDeniedException or
             ImportProfileNotFoundException or
             BudgetApp.Application.Accounts.AccountNotFoundException or
-            CsvImportRejectedException or
+            TransactionImportRejectedException or
             ArgumentException or
             InvalidOperationException;
 

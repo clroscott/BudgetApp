@@ -75,6 +75,25 @@ const cases = [
 ]
 
 describe('editable page guard coverage', () => {
+  it('preserves saved regional profile formats in the editor and protects changes to them', async () => {
+    vi.mocked(getImportProfiles).mockResolvedValue([{
+      id: 'profile-a', name: 'Regional bank', headers: ['Date', 'Description', 'Amount'],
+      dateColumn: 'Date', descriptionColumn: 'Description', amountColumn: 'Amount', debitColumn: null, creditColumn: null,
+      categoryColumn: null, subcategoryColumn: null, amountConvention: 'SpendingPositive', defaultAccountId: null, isActive: true,
+      dateFormat: 'dd/MM/yyyy', numberCulture: 'de-DE',
+    }])
+    show(<ImportProfileManagementPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+    const date = screen.getByLabelText('Text date format') as HTMLSelectElement
+    const number = screen.getByLabelText('Text number format') as HTMLSelectElement
+    expect(date.value).toBe('dd/MM/yyyy')
+    expect(number.value).toBe('de-DE')
+    fireEvent.change(number, { target: { value: 'fr-CA' } })
+    fireEvent.click(screen.getByText('Leave page'))
+    expect(window.confirm).toHaveBeenCalledTimes(1)
+    expect(number.value).toBe('fr-CA')
+    expect(window.location.pathname).toBe('/settings-test')
+  })
   it.each(cases)('protects $name and becomes clean again when the value is restored', async ({ page, selector }) => {
     const { container } = show(page)
     const input = await waitFor(() => {

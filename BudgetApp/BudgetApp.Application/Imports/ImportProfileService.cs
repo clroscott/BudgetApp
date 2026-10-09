@@ -9,7 +9,7 @@ namespace BudgetApp.Application.Imports;
 public sealed class ImportProfileService(
     IImportProfileRepository repository,
     IAccountRepository accountRepository,
-    ICsvImportReader csvReader,
+    ITransactionImportReader importReader,
     HouseholdAuthorizationService authorizationService,
     TimeProvider timeProvider,
     AuditWriter? auditWriter = null)
@@ -44,7 +44,7 @@ public sealed class ImportProfileService(
             profile,
             userId,
             AuditActions.Created,
-            $"Created CSV import profile '{profile.Name}'.");
+            $"Created import profile '{profile.Name}'.");
         await repository.SaveChangesAsync(cancellationToken);
         return ToModel(profile);
     }
@@ -69,6 +69,7 @@ public sealed class ImportProfileService(
             input.CategoryColumn, input.SubcategoryColumn,
             ParseConvention(input.AmountConvention), input.DefaultAccountId,
             timeProvider.GetUtcNow());
+        profile.SetParsingOptions(input.DateFormat, input.NumberCulture);
         if (profile.DefaultAccountId.HasValue)
             await repository.ClearDefaultAccountAsync(
                 householdId, profile.DefaultAccountId.Value, profile.Id, cancellationToken);
@@ -76,7 +77,7 @@ public sealed class ImportProfileService(
             profile,
             userId,
             AuditActions.Updated,
-            $"Updated CSV import profile '{profile.Name}'.",
+            $"Updated import profile '{profile.Name}'.",
             new Dictionary<string, string?>
             {
                 ["Name"] = $"{previousName} → {profile.Name}",
@@ -103,7 +104,7 @@ public sealed class ImportProfileService(
             profile,
             userId,
             isActive ? AuditActions.Activated : AuditActions.Deactivated,
-            $"{(isActive ? "Activated" : "Deactivated")} CSV import profile " +
+            $"{(isActive ? "Activated" : "Deactivated")} import profile " +
             $"'{profile.Name}'.");
         await repository.SaveChangesAsync(cancellationToken);
     }
@@ -125,7 +126,7 @@ public sealed class ImportProfileService(
             profile,
             userId,
             AuditActions.Deleted,
-            $"Deleted CSV import profile '{profile.Name}'.");
+            $"Deleted import profile '{profile.Name}'.");
         repository.Remove(profile);
         await repository.SaveChangesAsync(cancellationToken);
     }
@@ -153,15 +154,17 @@ public sealed class ImportProfileService(
         Guid householdId,
         Guid userId,
         Guid accountId,
+        string originalFileName,
         Stream content,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? worksheetId = null)
     {
-        await authorizationService.RequireViewAsync(householdId, userId, cancellationToken);
-        _ = await accountRepository.GetForUpdateAsync(
+        var role = await authorizationService.RequireViewAsync(householdId, userId, cancellationToken);
+        var account = await accountRepository.GetForUpdateAsync(
             householdId, accountId, cancellationToken)
             ?? throw new AccountNotFoundException();
-        var inspection = await csvReader.InspectAsync(content, cancellationToken);
-        var match = await repository.FindMatchAsync(
+        TransactionImportService.RequireImportPermission(account, role, userId);
+        var inspection = await importReader.InspectAsync(content, originalFileName, cancellationToken, worksheetId);
+        var match = inspection.Headers.Count == 0 ? null : await repository.FindMatchAsync(
             householdId,
             ImportProfile.BuildHeaderSignature(inspection.Headers),
             accountId,
@@ -170,7 +173,8 @@ public sealed class ImportProfileService(
             inspection.Headers,
             inspection.PreviewRows,
             match is null ? null : ToModel(match),
-            ToModel(inspection.SuggestedProfile));
+            inspection.SuggestedProfile is null ? null : ToModel(inspection.SuggestedProfile),
+            inspection.Worksheets, inspection.SelectedWorksheetId, inspection.SelectedWorksheetName, inspection.PreviewRowNumbers);
     }
 
     public async Task<(string FileName, string Content)> GetTemplateAsync(
@@ -189,7 +193,7 @@ public sealed class ImportProfileService(
         return ($"{(safeName.Length == 0 ? "import-profile" : safeName)}.csv", content);
     }
 
-    public async Task<CsvProfileDefinition?> ResolveAsync(
+    public async Task<ImportProfileDefinition?> ResolveAsync(
         Guid householdId,
         Guid profileId,
         CancellationToken cancellationToken)
@@ -203,7 +207,7 @@ public sealed class ImportProfileService(
         return ToDefinition(profile);
     }
 
-    public async Task<CsvProfileDefinition?> DetectAsync(
+    public async Task<ImportProfileDefinition?> DetectAsync(
         Guid householdId,
         Guid accountId,
         IReadOnlyList<string> headers,
@@ -228,13 +232,17 @@ public sealed class ImportProfileService(
             throw new AccountNotFoundException();
     }
 
-    private ImportProfile CreateProfile(Guid householdId, SaveImportProfileInput input) =>
-        ImportProfile.Create(
+    private ImportProfile CreateProfile(Guid householdId, SaveImportProfileInput input)
+    {
+        var profile = ImportProfile.Create(
             householdId, input.Name, input.Headers, input.DateColumn,
             input.DescriptionColumn, input.AmountColumn, input.DebitColumn,
             input.CreditColumn, input.CategoryColumn, input.SubcategoryColumn,
             ParseConvention(input.AmountConvention), input.DefaultAccountId,
             timeProvider.GetUtcNow());
+        profile.SetParsingOptions(input.DateFormat, input.NumberCulture);
+        return profile;
+    }
 
     private static ImportAmountConvention ParseConvention(string value) =>
         Enum.TryParse<ImportAmountConvention>(value, true, out var parsed) &&
@@ -248,21 +256,21 @@ public sealed class ImportProfileService(
             profile.Id, profile.Name, profile.GetHeaders(), profile.DateColumn,
             profile.DescriptionColumn, profile.AmountColumn, profile.DebitColumn,
             profile.CreditColumn, profile.CategoryColumn, profile.SubcategoryColumn,
-            profile.AmountConvention.ToString(), profile.DefaultAccountId, profile.IsActive);
+            profile.AmountConvention.ToString(), profile.DefaultAccountId, profile.IsActive, profile.DateFormat, profile.NumberCulture);
 
-    private static ImportProfileModel ToModel(CsvProfileDefinition profile) =>
+    private static ImportProfileModel ToModel(ImportProfileDefinition profile) =>
         new(
             profile.Id ?? Guid.Empty, profile.Name, profile.Headers,
             profile.DateColumn, profile.DescriptionColumn, profile.AmountColumn,
             profile.DebitColumn, profile.CreditColumn, profile.CategoryColumn,
-            profile.SubcategoryColumn, profile.AmountConvention.ToString(), null, true);
+            profile.SubcategoryColumn, profile.AmountConvention.ToString(), null, true, profile.DateFormat, profile.NumberCulture);
 
-    private static CsvProfileDefinition ToDefinition(ImportProfile profile) =>
+    private static ImportProfileDefinition ToDefinition(ImportProfile profile) =>
         new(
             profile.Id, profile.Name, profile.GetHeaders(), profile.DateColumn,
             profile.DescriptionColumn, profile.AmountColumn, profile.DebitColumn,
             profile.CreditColumn, profile.CategoryColumn, profile.SubcategoryColumn,
-            profile.AmountConvention);
+            profile.AmountConvention, profile.DateFormat, profile.NumberCulture);
 
     private static string EscapeCsv(string value) =>
         value.Contains(',') || value.Contains('"') || value.Contains('\n')

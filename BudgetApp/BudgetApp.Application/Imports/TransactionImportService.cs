@@ -11,19 +11,19 @@ using BudgetApp.Domain.Imports;
 
 namespace BudgetApp.Application.Imports;
 
-public sealed class CsvImportService(
+public sealed class TransactionImportService(
     IAccountRepository accountRepository,
     ICategoryRepository categoryRepository,
     ICategorizationRuleRepository categorizationRuleRepository,
     IImportRepository importRepository,
-    ICsvImportReader csvImportReader,
+    ITransactionImportReader importReader,
     ImportProfileService importProfileService,
     ImportReviewService importReviewService,
     HouseholdAuthorizationService authorizationService,
     TimeProvider timeProvider,
     AuditWriter? auditWriter = null)
 {
-    public async Task<CsvImportResult> UploadAsync(
+    public async Task<TransactionImportResult> UploadAsync(
         Guid householdId,
         Guid userId,
         Guid accountId,
@@ -31,11 +31,11 @@ public sealed class CsvImportService(
         Stream content,
         bool allowDuplicateFile,
         Guid? profileId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? worksheetId = null)
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        var normalizedFileName = ValidateFileName(originalFileName);
+        var normalizedFileName = importReader.ValidateFileName(originalFileName);
         var role = await authorizationService.RequireViewAsync(
             householdId,
             userId,
@@ -52,15 +52,15 @@ public sealed class CsvImportService(
                 householdId, profileId.Value, cancellationToken)
             : null;
         var readResult = profile is null
-            ? await csvImportReader.ReadAsync(content, cancellationToken)
-            : await csvImportReader.ReadAsync(content, profile, cancellationToken);
+            ? await importReader.ReadAsync(content, normalizedFileName, cancellationToken, worksheetId)
+            : await importReader.ReadAsync(content, normalizedFileName, profile, cancellationToken, worksheetId);
         if (!allowDuplicateFile &&
             await importRepository.ExistsByAccountAndHashAsync(
                 account.Id,
                 readResult.Sha256Hash,
-                cancellationToken))
+                cancellationToken, readResult.SourceWorksheetId))
         {
-            throw new DuplicateCsvImportException();
+            throw new DuplicateImportFileException();
         }
 
         var now = timeProvider.GetUtcNow();
@@ -73,6 +73,7 @@ public sealed class CsvImportService(
             readResult.Sha256Hash,
             now);
         importFile.StartProcessing(now);
+        importFile.SetWorksheetSource(readResult.SourceWorksheetId, readResult.SourceWorksheetName);
 
         var categories = await categoryRepository.ListAsync(
             householdId,
@@ -128,6 +129,7 @@ public sealed class CsvImportService(
             new Dictionary<string, string?>
             {
                 ["File name"] = importFile.OriginalFileName,
+                ["Worksheet"] = importFile.SourceWorksheetName,
                 ["Account"] = account.Name,
                 ["Rows staged"] = importFile.TotalRowCount.ToString(),
                 ["Valid rows"] = importFile.ValidRowCount.ToString(),
@@ -136,7 +138,7 @@ public sealed class CsvImportService(
             }));
         await importRepository.SaveChangesAsync(cancellationToken);
 
-        return new CsvImportResult(
+        return new TransactionImportResult(
             importFile.Id,
             importFile.OriginalFileName,
             account.Name,
@@ -144,11 +146,11 @@ public sealed class CsvImportService(
             importFile.TotalRowCount,
             importFile.ValidRowCount,
             importFile.InvalidRowCount,
-            importFile.DuplicateRowCount);
+            importFile.DuplicateRowCount, importFile.SourceWorksheetName);
     }
 
     private static ImportTransactionDraft CreateDraft(
-        CsvImportRow row,
+        TransactionImportRow row,
         IReadOnlyList<CategoryRecord> categories,
         IReadOnlyList<CategorizationRule> categorizationRules,
         Guid accountId,
@@ -180,7 +182,7 @@ public sealed class CsvImportService(
     }
 
     private static CategoryRecord? FindRuleMatch(
-        CsvImportRow row,
+        TransactionImportRow row,
         IReadOnlyList<CategoryRecord> categories,
         IReadOnlyList<CategorizationRule> rules,
         Guid accountId)
@@ -196,7 +198,7 @@ public sealed class CsvImportService(
     }
 
     private static CategoryRecord? FindCategoryMatch(
-        CsvImportRow row,
+        TransactionImportRow row,
         IReadOnlyList<CategoryRecord> categories)
     {
         var active = categories.Where(category => category.IsActive).ToList();
@@ -232,33 +234,14 @@ public sealed class CsvImportService(
     private static string? NormalizeCategoryName(string? name) =>
         string.IsNullOrWhiteSpace(name) ? null : name.Trim().ToUpperInvariant();
 
-    private static string ValidateFileName(string originalFileName)
-    {
-        if (string.IsNullOrWhiteSpace(originalFileName))
-        {
-            throw new CsvImportRejectedException("Select a CSV file to import.");
-        }
-
-        var trimmedFileName = originalFileName.Trim();
-        if (!string.Equals(
-                Path.GetExtension(trimmedFileName),
-                ".csv",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new CsvImportRejectedException("Only .csv files are supported.");
-        }
-
-        return trimmedFileName;
-    }
-
-    private static void RequireImportPermission(
+    internal static void RequireImportPermission(
         Account account,
         HouseholdRole role,
         Guid userId)
     {
         if (!account.IsActive)
         {
-            throw new CsvImportRejectedException(
+            throw new TransactionImportRejectedException(
                 "Transactions cannot be imported into an archived account.");
         }
 

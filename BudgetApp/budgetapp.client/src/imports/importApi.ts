@@ -9,6 +9,7 @@ export interface CsvImportResult {
   validRows: number
   invalidRows: number
   duplicateRows: number
+  sourceWorksheetName?: string | null
 }
 
 export interface ImportListItem {
@@ -24,6 +25,7 @@ export interface ImportListItem {
   duplicateRows: number
   uploadedAtUtc: string
   canEdit: boolean
+  sourceWorksheetName?: string | null
 }
 
 export type ImportListFilter = 'inProgress' | 'completed' | 'all' | 'ready'
@@ -66,6 +68,7 @@ export interface ImportDraftItem {
 export interface ImportReviewDetail extends Omit<ImportListItem, 'uploadedAtUtc'> {
   currency: string
   drafts: ImportDraftItem[]
+  sourceWorksheetName?: string | null
 }
 
 export interface CompleteImportResult {
@@ -92,12 +95,14 @@ export function uploadCsvImport(
   file: File,
   allowDuplicateFile: boolean,
   profileId?: string,
+  worksheetId?: string,
 ): Promise<CsvImportResult> {
   const form = new FormData()
   form.append('accountId', accountId)
   form.append('file', file)
   form.append('allowDuplicateFile', String(allowDuplicateFile))
   if (profileId) form.append('profileId', profileId)
+  if (worksheetId) form.append('worksheetId', worksheetId)
 
   return apiPostForm<CsvImportResult>(
     `/api/households/${householdId}/imports`,

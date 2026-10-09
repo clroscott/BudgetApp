@@ -37,7 +37,8 @@ public interface IImportRepository
     Task<bool> ExistsByAccountAndHashAsync(
         Guid accountId,
         string sha256Hash,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? sourceWorksheetId = null);
 
     Task AddAsync(
         ImportFile importFile,
@@ -75,7 +76,8 @@ public sealed record ImportListRecord(
     int DuplicateRows,
     DateTimeOffset UploadedAtUtc,
     bool IsPersonalAccount,
-    Guid? AccountOwnerUserId);
+    Guid? AccountOwnerUserId,
+    string? SourceWorksheetName = null);
 
 public sealed record DuplicateCandidate(
     Guid TransactionId,

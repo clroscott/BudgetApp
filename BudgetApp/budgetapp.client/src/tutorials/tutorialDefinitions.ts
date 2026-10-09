@@ -28,7 +28,7 @@ export const tutorialDefinitions: TutorialDefinition[] = [
     kind: 'LearnOnly',
     title: 'Getting started',
     description:
-      'Tour the Dashboard, Accounts, Monthly Budget, and CSV Import areas.',
+      'Tour the Dashboard, Accounts, Monthly Budget, and Import areas.',
     estimatedMinutes: 3,
     steps: [
       {
@@ -72,7 +72,7 @@ export const tutorialDefinitions: TutorialDefinition[] = [
         advance: 'next',
       },
       {
-        title: 'Open CSV Import',
+        title: 'Open Import transactions',
         body:
           'Importing stages bank rows for review before they become official transactions.',
         route: '/budgeting',
@@ -82,7 +82,7 @@ export const tutorialDefinitions: TutorialDefinition[] = [
       {
         title: 'Imports start in review',
         body:
-          'Choose an account and CSV file here. Uploaded rows are staged for review and do not appear in Transactions or budget totals until you approve them and create the approved transactions.',
+          'Choose an account and CSV or Excel file here. Uploaded rows are staged for review and do not appear in Transactions or budget totals until you approve them and create the approved transactions.',
         route: '/import',
         targetId: 'csv-import-page-title',
         advance: 'next',

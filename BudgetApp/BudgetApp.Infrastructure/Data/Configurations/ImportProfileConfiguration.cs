@@ -11,6 +11,8 @@ internal sealed class ImportProfileConfiguration
     {
         builder.ToTable("ImportProfiles");
         builder.HasKey(profile => profile.Id);
+        builder.Property(profile => profile.DateFormat).HasMaxLength(32);
+        builder.Property(profile => profile.NumberCulture).HasMaxLength(32);
         builder.Property(profile => profile.Name)
             .HasMaxLength(ImportProfile.NameMaxLength).IsRequired();
         builder.Property(profile => profile.Headers)

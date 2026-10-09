@@ -32,7 +32,8 @@ public sealed record ImportListItem(
     int ExcludedRows,
     int DuplicateRows,
     DateTimeOffset UploadedAtUtc,
-    bool CanEdit);
+    bool CanEdit,
+    string? SourceWorksheetName = null);
 
 public sealed record ImportDraftItem(
     Guid Id,
@@ -68,7 +69,8 @@ public sealed record ImportReviewDetail(
     int ExcludedRows,
     int DuplicateRows,
     bool CanEdit,
-    IReadOnlyList<ImportDraftItem> Drafts);
+    IReadOnlyList<ImportDraftItem> Drafts,
+    string? SourceWorksheetName = null);
 
 public sealed record CompleteImportResult(
     Guid ImportFileId,

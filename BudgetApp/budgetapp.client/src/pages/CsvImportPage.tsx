@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
 import { BrandLockup } from '../components/Brand'
@@ -18,6 +18,7 @@ import {
 } from '../imports/importProfileApi'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
+import { ImportParsingFields } from '../imports/ImportParsingFields'
 
 const maxFileSizeBytes = 10 * 1024 * 1024
 const standardCsvHeaders = new Set([
@@ -42,6 +43,7 @@ function isStandardCsvStructure(headers: string[]) {
 
 export function CsvImportPage() {
   const { currentHousehold } = useHouseholds()
+  const householdId = currentHousehold?.id
   const [accounts, setAccounts] = useState<AccountItem[]>([])
   const [selectedAccountId, setSelectedAccountId] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -51,15 +53,34 @@ export function CsvImportPage() {
   const [mapping, setMapping] = useState<SaveImportProfile | null>(null)
   const [allowDuplicateFile, setAllowDuplicateFile] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [hasLoadedAccounts, setHasLoadedAccounts] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [result, setResult] = useState<CsvImportResult | null>(null)
+  const revision = useRef(0)
+  const pending = useRef(false)
+  const isExcel = selectedFile?.name.toLowerCase().endsWith('.xlsx') ?? false
   const confirmDiscard = useUnsavedChangesGuard(
-    Boolean(selectedFile) && !result, 'Leave your CSV upload or mapping before it has been imported?',
+    Boolean(selectedFile) && !result, 'Leave your transaction upload or mapping before it has been imported?',
   )
 
   useEffect(() => {
-    if (!currentHousehold) {
+    const contextRevision = revision
+    contextRevision.current++
+    pending.current = false
+    setIsUploading(false)
+    setSelectedFile(null)
+    setSelectedProfileId('')
+    setInspection(null)
+    setMapping(null)
+    setResult(null)
+    setAllowDuplicateFile(false)
+    setAccounts([])
+    setProfiles([])
+    setHasLoadedAccounts(false)
+    if (!householdId) {
+      setIsLoading(false)
       return
     }
 
@@ -67,8 +88,8 @@ export function CsvImportPage() {
     setIsLoading(true)
     setErrors([])
     void Promise.all([
-      getAccounts(currentHousehold.id),
-      getImportProfiles(currentHousehold.id),
+      getAccounts(householdId),
+      getImportProfiles(householdId),
     ])
       .then(([items, profileItems]) => {
         if (!isCurrent) {
@@ -77,6 +98,7 @@ export function CsvImportPage() {
 
         const activeAccounts = items.filter(account => account.isActive)
         setAccounts(activeAccounts)
+        setHasLoadedAccounts(true)
         setProfiles(profileItems)
         setSelectedAccountId(current =>
           activeAccounts.some(account => account.id === current)
@@ -96,8 +118,9 @@ export function CsvImportPage() {
 
     return () => {
       isCurrent = false
+      contextRevision.current++
     }
-  }, [currentHousehold])
+  }, [householdId, loadAttempt])
 
   const selectedAccount = useMemo(
     () => accounts.find(account => account.id === selectedAccountId) ?? null,
@@ -108,18 +131,60 @@ export function CsvImportPage() {
     return null
   }
 
+  const startRequest = () => {
+    if (pending.current) return null
+    pending.current = true
+    setIsUploading(true)
+    setErrors([])
+    return ++revision.current
+  }
+  const finishRequest = (request: number) => {
+    if (request !== revision.current) return
+    pending.current = false
+    setIsUploading(false)
+  }
+  const offerMapping = (inspected: ImportProfileInspection) => {
+    const suggested = inspected.suggestedProfile
+    setMapping(!selectedProfileId && !inspected.matchedProfile &&
+      !isStandardCsvStructure(inspected.headers) && suggested ? {
+        ...suggested, defaultAccountId: selectedAccountId,
+      } : null)
+  }
+  const upload = (profileId?: string, worksheetId?: string) => worksheetId
+    ? uploadCsvImport(currentHousehold.id, selectedAccountId, selectedFile!, allowDuplicateFile, profileId, worksheetId)
+    : profileId
+      ? uploadCsvImport(currentHousehold.id, selectedAccountId, selectedFile!, allowDuplicateFile, profileId)
+      : uploadCsvImport(currentHousehold.id, selectedAccountId, selectedFile!, allowDuplicateFile)
+
+  const selectWorksheet = async (worksheetId: string) => {
+    if (!selectedFile) return
+    if (mapping && !confirmDiscard()) return
+    const request = startRequest()
+    if (request === null) return
+    try {
+      const inspected = await inspectImportFile(currentHousehold.id, selectedAccountId, selectedFile, worksheetId)
+      if (request !== revision.current) return
+      setInspection(inspected)
+      offerMapping(inspected)
+      setResult(null)
+    } catch (error) {
+      if (request === revision.current) setErrors(getErrorMessages(error))
+    } finally { finishRequest(request) }
+  }
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (pending.current) return
     setErrors([])
     setResult(null)
 
     if (!selectedFile) {
-      setErrors(['Select a CSV file to import.'])
+      setErrors(['Select a CSV or Excel (.xlsx) file to import.'])
       return
     }
 
     if (selectedFile.size > maxFileSizeBytes) {
-      setErrors(['CSV files cannot exceed 10 MB.'])
+      setErrors(['Import files cannot exceed 10 MB.'])
       return
     }
 
@@ -128,71 +193,55 @@ export function CsvImportPage() {
       return
     }
 
-    setIsUploading(true)
+    const request = startRequest()
+    if (request === null) return
     try {
-      let profileId = selectedProfileId
-      if (!profileId) {
-        const inspected = await inspectImportFile(
-          currentHousehold.id, selectedAccountId, selectedFile)
-        if (!inspected.matchedProfile) {
-          if (isStandardCsvStructure(inspected.headers)) {
-            setInspection(null)
-            setMapping(null)
-            setResult(await uploadCsvImport(
-              currentHousehold.id,
-              selectedAccountId,
-              selectedFile,
-              allowDuplicateFile,
-            ))
-            return
-          }
-
-          setInspection(inspected)
-          setMapping({
-            name: inspected.suggestedProfile.name,
-            headers: inspected.headers,
-            dateColumn: inspected.suggestedProfile.dateColumn,
-            descriptionColumn: inspected.suggestedProfile.descriptionColumn,
-            amountColumn: inspected.suggestedProfile.amountColumn,
-            debitColumn: inspected.suggestedProfile.debitColumn,
-            creditColumn: inspected.suggestedProfile.creditColumn,
-            categoryColumn: inspected.suggestedProfile.categoryColumn,
-            subcategoryColumn: inspected.suggestedProfile.subcategoryColumn,
-            amountConvention: inspected.suggestedProfile.amountConvention,
-            defaultAccountId: selectedAccountId,
-          })
-          return
-        }
-        profileId = inspected.matchedProfile.id
-        setSelectedProfileId(profileId)
+      let inspected = inspection
+      if ((isExcel && !inspected) || (!isExcel && !selectedProfileId)) {
+        inspected = await inspectImportFile(currentHousehold.id, selectedAccountId, selectedFile)
+        if (request !== revision.current) return
+        setInspection(inspected)
+        offerMapping(inspected)
+        // Always show the worksheet/preview before staging an Excel workbook.
+        if (isExcel) return
       }
-      setResult(await uploadCsvImport(
-        currentHousehold.id, selectedAccountId, selectedFile,
-        allowDuplicateFile, profileId))
+      if (isExcel && !inspected?.selectedWorksheetId) {
+        setErrors(['Choose a worksheet before uploading for review.'])
+        return
+      }
+      const profileId = selectedProfileId || inspected?.matchedProfile?.id
+      if (!profileId && inspected && !isStandardCsvStructure(inspected.headers)) {
+        offerMapping(inspected)
+        return
+      }
+      const staged = await upload(profileId, isExcel ? inspected?.selectedWorksheetId ?? undefined : undefined)
+      if (request !== revision.current) return
+      setMapping(null)
+      setResult(staged)
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (request === revision.current) setErrors(getErrorMessages(error))
     } finally {
-      setIsUploading(false)
+      finishRequest(request)
     }
   }
 
   const saveMappingAndUpload = async () => {
     if (!mapping || !selectedFile) return
-    setIsUploading(true)
-    setErrors([])
+    if (isExcel && !inspection?.selectedWorksheetId) return
+    const request = startRequest()
+    if (request === null) return
     try {
       const profile = await createImportProfile(currentHousehold.id, mapping)
+      if (request !== revision.current) return
       setProfiles(current => [...current, profile])
       setSelectedProfileId(profile.id)
-      setInspection(null)
       setMapping(null)
-      setResult(await uploadCsvImport(
-        currentHousehold.id, selectedAccountId, selectedFile,
-        allowDuplicateFile, profile.id))
+      const staged = await upload(profile.id, isExcel ? inspection?.selectedWorksheetId ?? undefined : undefined)
+      if (request === revision.current) setResult(staged)
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (request === revision.current) setErrors(getErrorMessages(error))
     } finally {
-      setIsUploading(false)
+      finishRequest(request)
     }
   }
 
@@ -211,7 +260,7 @@ export function CsvImportPage() {
         <div className="page-title-row" data-tutorial-id="csv-import-page-title">
           <div>
             <p className="eyebrow">Transactions</p>
-            <h1>Import CSV</h1>
+            <h1>Import transactions</h1>
             <p>Upload bank transactions into a review area before they affect your budget.</p>
             <p>During review, choose “My personal budget”, “Household budget”, or both for each row.
               Upload each transaction only once.</p>
@@ -226,6 +275,12 @@ export function CsvImportPage() {
 
         {isLoading ? (
           <p className="empty-state">Loading accounts...</p>
+        ) : !hasLoadedAccounts ? (
+          <div className="empty-state">
+            <h2>Could not load accounts and import profiles</h2>
+            <p>Retry loading before selecting a file. No import was created.</p>
+            <button className="secondary-button" type="button" onClick={() => setLoadAttempt(value => value + 1)}>Retry loading</button>
+          </div>
         ) : accounts.length === 0 ? (
           <div className="empty-state">
             <h2>No active accounts</h2>
@@ -237,9 +292,11 @@ export function CsvImportPage() {
             <label>
               <span>Import into account</span>
               <select
+                disabled={isUploading}
                 value={selectedAccountId}
                 onChange={event => {
                   if (mapping && !confirmDiscard()) return
+                  revision.current++
                   setSelectedAccountId(event.target.value)
                   setInspection(null)
                   setMapping(null)
@@ -255,30 +312,34 @@ export function CsvImportPage() {
             </label>
 
             <label className="file-drop-field">
-              <span>CSV file</span>
+              <span>CSV or Excel file</span>
               <input
+                key={currentHousehold.id}
+                disabled={isUploading}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onClick={event => {
                   if (mapping && !confirmDiscard()) event.preventDefault()
                 }}
                 onChange={event => {
+                  revision.current++
                   setSelectedFile(event.target.files?.[0] ?? null)
                   setInspection(null)
                   setMapping(null)
                   setResult(null)
                 }}
               />
-              <small>Maximum 10 MB and 10,000 transaction rows.</small>
+              <small>CSV or modern Excel (.xlsx). Maximum 10 MB and 10,000 transaction rows per worksheet. No .xls, macros, or password-protected workbooks.</small>
             </label>
 
             <label>
-              <span>CSV profile</span>
-              <select value={selectedProfileId}
+              <span>Import profile</span>
+              <select value={selectedProfileId} disabled={isUploading}
                 onChange={event => {
                   if (mapping && !confirmDiscard()) return
+                  revision.current++
                   setSelectedProfileId(event.target.value)
-                  setInspection(null)
+                  if (!isExcel) setInspection(null)
                   setMapping(null)
                   setResult(null)
                 }}>
@@ -291,7 +352,7 @@ export function CsvImportPage() {
             </label>
 
             <div className="csv-format-note">
-              <h2>CSV structures</h2>
+              <h2>File structures</h2>
               <p>BudgetApp remembers each bank or custom structure after it is mapped once.</p>
               <p>Positive amounts are spending; negative amounts are income, refunds, or credits.</p>
               {selectedProfileId ? <a
@@ -309,6 +370,7 @@ export function CsvImportPage() {
             <label className="checkbox-row duplicate-file-confirmation">
               <input
                 type="checkbox"
+                disabled={isUploading}
                 checked={allowDuplicateFile}
                 onChange={event => setAllowDuplicateFile(event.target.checked)}
               />
@@ -318,22 +380,42 @@ export function CsvImportPage() {
             <button
               className="primary-button import-submit"
               type="submit"
-              disabled={isUploading || !selectedFile || !selectedAccount}
+              disabled={isUploading || !selectedFile || !selectedAccount || Boolean(isExcel && inspection && !inspection.selectedWorksheetId) || Boolean(mapping)}
             >
-              {isUploading ? 'Uploading and checking...' : 'Upload for review'}
+              {isUploading ? 'Reading and checking...' : isExcel && !inspection ? 'Preview workbook' : 'Upload for review'}
             </button>
           </form>
         )}
 
+        {isExcel && inspection && !result && (
+          <section className="management-form import-mapping-panel" aria-label="Excel worksheet preview">
+            <h2>Choose one worksheet</h2>
+            <p>Only this worksheet will be staged. Worksheets are never combined.</p>
+            <label><span>Worksheet</span>
+              <select value={inspection.selectedWorksheetId ?? ''} disabled={isUploading}
+                onChange={event => { if (event.target.value) void selectWorksheet(event.target.value) }}>
+                <option value="" disabled>Select a worksheet</option>
+                {inspection.worksheets?.map(sheet => <option key={sheet.id} value={sheet.id} disabled={Boolean(sheet.problem)}>
+                  {sheet.name}{sheet.isHidden ? ' (hidden)' : ''} — {sheet.problem ?? `${sheet.transactionRows} transaction rows`}
+                </option>)}
+              </select>
+            </label>
+            {inspection.selectedWorksheetName && <p>Selected worksheet: <strong>{inspection.selectedWorksheetName}</strong></p>}
+            {!selectedProfileId && inspection.matchedProfile && <p>Using saved profile: <strong>{inspection.matchedProfile.name}</strong>.</p>}
+            <p className="field-help">Formulas are never run. Only saved results are read, which may be outdated. Recalculate and save in Excel first; cells without usable saved results will need correction.</p>
+            {inspection.selectedWorksheetId && <ImportPreview inspection={inspection} />}
+          </section>
+        )}
+
         {inspection && mapping && (
           <section className="management-form import-mapping-panel">
-            <div><p className="eyebrow">New CSV structure</p>
+            <div><p className="eyebrow">New file structure</p>
               <h2>Map these columns once</h2>
               <p>Save this mapping and future files with the same headers will be detected automatically.</p>
             </div>
             <div className="import-profile-grid">
               <label className="import-mapping-profile-name">
-                <span>Profile name</span><input value={mapping.name}
+              <span>Profile name</span><input value={mapping.name} disabled={isUploading}
                 onChange={event => setMappingField('name', event.target.value)} /></label>
               {(['dateColumn', 'descriptionColumn', 'amountColumn', 'debitColumn',
                 'creditColumn', 'categoryColumn', 'subcategoryColumn'] as const).map(field => (
@@ -345,7 +427,7 @@ export function CsvImportPage() {
                   creditColumn: 'Credit / money in',
                   categoryColumn: 'Category',
                   subcategoryColumn: 'Subcategory',
-                }[field]}</span><select value={mapping[field] ?? ''}
+                }[field]}</span><select value={mapping[field] ?? ''} disabled={isUploading}
                   onChange={event => setMappingField(field, event.target.value || null)}>
                   <option value="">Not mapped</option>
                   {inspection.headers.map(header =>
@@ -354,18 +436,17 @@ export function CsvImportPage() {
               ))}
               <label><span>Source amount signs</span><select
                 value={mapping.amountConvention}
+                disabled={isUploading}
                 onChange={event => setMappingField('amountConvention', event.target.value)}>
                 <option value="SpendingPositive">Positive means spending</option>
                 <option value="MoneyInPositive">Positive means money in</option>
               </select></label>
+              <ImportParsingFields dateFormat={mapping.dateFormat} numberCulture={mapping.numberCulture}
+                disabled={isUploading} onChange={setMappingField} />
             </div>
-            <div className="csv-preview-table">
-              <div>{inspection.headers.map(header => <strong key={header}>{header}</strong>)}</div>
-              {inspection.previewRows.map((row, index) =>
-                <div key={index}>{row.map((value, column) =>
-                  <span key={`${index}-${column}`}>{value}</span>)}</div>)}
-            </div>
-            <button className="primary-button" type="button" disabled={isUploading}
+            {!isExcel && <ImportPreview inspection={inspection} />}
+            {currentHousehold.role === 'Viewer' && <p>Only a household Owner or Admin can save a shared import profile. Ask them to save this mapping, or choose an existing profile.</p>}
+            <button className="primary-button" type="button" disabled={isUploading || currentHousehold.role === 'Viewer'}
               onClick={() => void saveMappingAndUpload()}>
               {isUploading ? 'Saving and uploading...' : 'Save profile and upload'}
             </button>
@@ -378,6 +459,7 @@ export function CsvImportPage() {
               <p className="eyebrow">Ready for review</p>
               <h2>{result.originalFileName}</h2>
               <p>Staged for {result.accountName}. No official transactions were created.</p>
+              {result.sourceWorksheetName && <p>Worksheet: {result.sourceWorksheetName}</p>}
             </div>
             <div className="import-stat-grid">
               <span><strong>{result.totalRows}</strong>Total rows</span>
@@ -395,4 +477,17 @@ export function CsvImportPage() {
       </section>
     </main>
   )
+}
+
+function ImportPreview({ inspection }: { inspection: ImportProfileInspection }) {
+  return <div className="table-scroll-region" role="region" aria-label="Import preview" tabIndex={0}>
+    <table className="import-preview-table">
+      <caption>First five transaction rows (before applying profile formats)</caption>
+      <thead><tr><th scope="col">Source row</th>{inspection.headers.map(header => <th scope="col" key={header}>{header}</th>)}</tr></thead>
+      <tbody>{inspection.previewRows.map((row, index) => <tr key={index}>
+        <th scope="row">{inspection.previewRowNumbers?.[index] ?? index + 2}</th>
+        {row.map((value, column) => <td key={column}>{value}</td>)}
+      </tr>)}</tbody>
+    </table>
+  </div>
 }
