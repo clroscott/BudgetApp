@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
 import { getCategories, type CategoryItem, type CategoryType } from '../categories/categoryApi'
-import { BrandLockup } from '../components/Brand'
+import { PageFrame } from '../components/PageFrame'
 import { budgetInclusionLabel } from '../transactions/budgetInclusion'
 import { BudgetInclusionEditor } from '../components/BudgetInclusionEditor'
 import { useRouter } from '../routing/useRouter'
@@ -361,13 +361,7 @@ export function TransactionManagementPage() {
   )
 
   return (
-    <main className="management-page">
-      <header className="app-header">
-        <BrandLockup />
-        <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
-      </header>
-
-      <section className="management-content transaction-content">
+    <PageFrame contentClassName="transaction-content">
         <TransactionsSectionNav />
         <div className="page-title-row">
           <div>
@@ -794,7 +788,6 @@ export function TransactionManagementPage() {
             </button>
           </nav>
         )}
-      </section>
-    </main>
+    </PageFrame>
   )
 }

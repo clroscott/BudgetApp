@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
-import { BrandLockup } from '../components/Brand'
+import { PageFrame } from '../components/PageFrame'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { TransactionsSectionNav } from '../components/TransactionsSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
@@ -16,7 +16,6 @@ import {
   type ImportProfile,
   type SaveImportProfile,
 } from '../imports/importProfileApi'
-import { AppLink } from '../routing/AppLink'
 import { useUnsavedForm } from '../routing/useUnsavedForm'
 import { ImportParsingFields } from '../imports/ImportParsingFields'
 
@@ -307,12 +306,7 @@ export function ImportProfileManagementPage() {
   )
 
   return (
-    <main className="management-page">
-      <header className="app-header">
-        <BrandLockup />
-        <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
-      </header>
-      <section className="management-content import-profile-content">
+    <PageFrame contentClassName="import-profile-content">
         <TransactionsSectionNav />
         <div className="page-title-row"><div>
           <p className="eyebrow">Transactions</p>
@@ -462,7 +456,6 @@ export function ImportProfileManagementPage() {
             </div>
           </section>
         </div>
-      </section>
-    </main>
+    </PageFrame>
   )
 }

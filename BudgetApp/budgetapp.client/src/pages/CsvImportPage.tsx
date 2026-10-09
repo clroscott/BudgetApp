@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
-import { BrandLockup } from '../components/Brand'
+import { PageFrame } from '../components/PageFrame'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { TransactionsSectionNav } from '../components/TransactionsSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
@@ -249,13 +249,7 @@ export function CsvImportPage() {
     setMapping(current => current ? { ...current, [field]: value } : current)
 
   return (
-    <main className="management-page">
-      <header className="app-header">
-        <BrandLockup />
-        <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
-      </header>
-
-      <section className="management-content import-content">
+    <PageFrame contentClassName="import-content">
         <TransactionsSectionNav />
         <div className="page-title-row" data-tutorial-id="csv-import-page-title">
           <div>
@@ -474,8 +468,7 @@ export function CsvImportPage() {
             </AppLink>
           </section>
         )}
-      </section>
-    </main>
+    </PageFrame>
   )
 }
 

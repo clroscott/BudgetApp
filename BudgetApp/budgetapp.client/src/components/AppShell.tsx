@@ -22,6 +22,28 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
   const profileRef = useRef<HTMLDetailsElement>(null)
   const menuRef = useRef<HTMLButtonElement>(null)
+  const shellRef = useRef<HTMLDivElement>(null)
+  const sidebarRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const shell = shellRef.current
+    const sidebar = sidebarRef.current
+    if (!shell || !sidebar) return
+    // CSS uses this only in the narrow layout. Measure actual wrapped/open menu
+    // height rather than assuming a breakpoint-specific fixed header size.
+    const measure = () => {
+      const height = Math.ceil(sidebar.getBoundingClientRect().height)
+      shell.style.setProperty('--shell-navigation-height', `${height}px`)
+    }
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    observer?.observe(sidebar)
+    window.addEventListener('resize', measure)
+    measure()
+    return () => {
+      observer?.disconnect()
+      window.removeEventListener('resize', measure)
+      shell.style.removeProperty('--shell-navigation-height')
+    }
+  }, [showHouseholdNavigation, isNavigationOpen])
   useEffect(() => {
     const menu = menuRef.current
     const reveal = () => setIsNavigationOpen(true)
@@ -95,8 +117,8 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
   }
 
   return (
-    <div className={`app-shell${isSidebarCollapsed ? ' sidebar-collapsed' : ''}${!showHouseholdNavigation ? ' standalone-account-shell' : ''}`}>
-      <aside hidden={!showHouseholdNavigation} className={`app-sidebar${isNavigationOpen ? ' open' : ''}${isSidebarCollapsed ? ' collapsed' : ''}`}>
+    <div ref={shellRef} className={`app-shell${isSidebarCollapsed ? ' sidebar-collapsed' : ''}${!showHouseholdNavigation ? ' standalone-account-shell' : ''}`}>
+      <aside ref={sidebarRef} hidden={!showHouseholdNavigation} className={`app-sidebar${isNavigationOpen ? ' open' : ''}${isSidebarCollapsed ? ' collapsed' : ''}`}>
         <div className="sidebar-top">
           <AppLink className="sidebar-brand" to="/dashboard" title="Dashboard">
             <BrandLockup />

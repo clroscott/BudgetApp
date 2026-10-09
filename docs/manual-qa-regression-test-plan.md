@@ -677,6 +677,12 @@ are manual sign-off cases, not claims established by automated DOM tests. See
       once and returns focus. Invalid arithmetic stays open with an announced
       error. Repeat near the bottom of a long page and at 200% zoom/narrow width;
       Close/keypad/result controls can be reached by keyboard and scrolling.
+- [ ] In monthly and annual budgets, calculate without applying, then open a
+      different row's calculator by mouse and keyboard. Only the new calculator
+      remains open and its Calculation field receives focus. The old row's amount
+      is unchanged. Clicking/tapping outside or switching away from the browser
+      dismisses without applying or pulling focus back; calculator keypad/input
+      interactions remain open. Reopening starts from the row's current amount.
 
 ## Tutorial resilience regression (#177)
 
@@ -890,6 +896,45 @@ compatibility checks against the combined feature as well.
       their own active personal account, and cannot use another member's private
       account. Archived accounts reject new imports. Other households/private
       imports remain invisible; unsaved upload/review guards remain intact.
+
+### Shared layout ownership (#218, first slice)
+
+Use fictional Development/Scratch data. This slice needs no database migration.
+See [style ownership and remaining migrations](shared-layout-ownership.md) and
+the read-only rendered harness in `tools/LayoutQa`.
+
+- [ ] Navigate through Transactions, Import transactions, Review imports,
+      Categorization rules and Import profiles. At the same width/sidebar state,
+      tabs, headings and content share one left/right column without jumping.
+      Upload forms remain narrower but left-aligned; compact review rows, column
+      boundaries, Details and internal horizontal scrolling retain their appearance.
+- [ ] Repeat with an expanded and collapsed desktop sidebar, 880px, 800px, 760px,
+      narrow width and actual 200% browser zoom. Controls and focus rings remain
+      readable/reachable without document-wide overflow on the migrated pages.
+- [ ] Scroll with the narrow Menu closed and open. Household/profile context
+      remains below the actual Menu/navigation height, not hidden underneath it.
+      Wrapped household names, multiple-household selection and resized viewports
+      retain their correct offset. Profile-menu Escape returns focus to its summary.
+- [ ] Tab to Skip to main content. It closes transient narrow navigation and
+      focuses the page heading without skipping past section tabs. Navigate to a
+      different page and confirm title/focus/announcement; ordinary filters and
+      canceled navigation do not steal focus. Check with a screen reader.
+- [ ] Make an unsaved transaction correction, import correction, rule edit,
+      profile mapping or file selection. Canceled navigation/household switching
+      preserves it. Upload/approve/save behavior, budget inclusions, scope/privacy
+      and existing keyboard/screen-reader labels remain unchanged.
+- [ ] Start a Learn-only tutorial with collapsed/narrow navigation; stable targets
+      still reveal and focus correctly. Retry/Back/Exit/Escape remain usable and
+      blocked unrelated controls are not keyboard reachable. No financial writes.
+- [ ] Check a long monthly budget (compatibility bridge): footer clearance still
+      follows its measured height, Back to top stays within actions, and calculators
+      are not covered. Escape closes the calculator and returns focus. The existing
+      short-desktop/zoom budget period-control overflow remains a budgeting-slice
+      follow-up; it must not worsen while migrating other features.
+- [ ] Open Account settings with no household. Main content and profile controls
+      remain accessible with no phantom sidebar or empty household context strip.
+      Check representative dashboard, annual and settings/help pages for unchanged
+      common alignment before merging this shared-style change.
 
 ### Excel workbook import (#22, Part 2)
 

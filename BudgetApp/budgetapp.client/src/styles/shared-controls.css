@@ -1,0 +1,115 @@
+/* Shared navigation, feedback and focus controls. */
+
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible,
+[data-page-focus-target]:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.skip-to-content {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: var(--layer-skip-link);
+  max-width: calc(100vw - 2rem);
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--accent);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  color: var(--heading);
+  font-weight: 800;
+  transform: translateY(calc(-100% - 2rem));
+}
+
+.skip-to-content:focus {
+  transform: translateY(0);
+}
+
+.page-announcement,
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.page-load-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.5rem;
+}
+
+.page-load-feedback h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.page-load-feedback button {
+  margin-top: 0.5rem;
+}
+
+.back-to-top-button {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  z-index: var(--layer-back-to-top);
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--heading);
+  box-shadow: var(--small-shadow);
+}
+
+.back-to-top-button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.budgeting-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  width: fit-content;
+  max-width: 100%;
+  gap: 0.35rem;
+  margin: 0 0 1.5rem;
+  padding: 0.3rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.8rem;
+  background: var(--surface-soft);
+}
+
+.budgeting-section-nav a {
+  flex: 0 0 auto;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.55rem;
+  color: var(--muted-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+
+.budgeting-section-nav a:hover {
+  color: var(--accent);
+  background: var(--surface);
+}
+
+.budgeting-section-nav a.active {
+  color: white;
+  background: var(--accent);
+  box-shadow: var(--small-shadow);
+}
+
+@media (max-width: 40rem) {
+  .back-to-top-button {
+    right: 0.8rem;
+    bottom: 0.8rem;
+  }
+}

@@ -1,0 +1,140 @@
+/* Canonical page geometry. Features own their internal grids, not page gutters. */
+
+:root {
+  --page-content-max: 76rem;
+  --page-content-gutter: 1.5rem;
+  --page-content-padding: 2.25rem;
+  --layer-back-to-top: 10;
+  --layer-context-header: 15;
+  --layer-sidebar: 20;
+  --layer-budget-actions: 20;
+  --layer-calculator: 40;
+  --layer-tutorial: 10000;
+  --layer-skip-link: 11000;
+}
+
+.page-frame,
+.management-page,
+.dashboard-page {
+  min-height: 100svh;
+  background: var(--page-bg);
+}
+
+.page-frame-content,
+.management-content,
+.dashboard-content {
+  width: min(100% - 2rem, 70rem);
+  margin: 0 auto;
+  padding: var(--page-content-padding) 0;
+  box-sizing: border-box;
+}
+
+.dashboard-content {
+  width: min(100% - 2rem, 76rem);
+}
+
+.narrow-management-content {
+  width: min(100% - 2rem, 44rem);
+}
+
+.app-shell :is(.page-frame-content, .management-content, .dashboard-content) {
+  width: min(calc(100% - var(--page-content-gutter) - var(--page-content-gutter)), var(--page-content-max));
+  max-width: none;
+  margin-inline: auto;
+}
+
+.page-title-row,
+.dashboard-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-title-row > div,
+.dashboard-title-row > div {
+  min-width: 0;
+}
+
+.page-title-row h1,
+.dashboard-title-row h1 {
+  margin: 0.25rem 0 0.65rem;
+  line-height: 1.15;
+}
+
+.page-title-row p,
+.dashboard-intro {
+  line-height: 1.6;
+  margin-block: 0.35rem;
+}
+
+.page-title-row p:last-child,
+.dashboard-intro {
+  color: var(--muted-text);
+}
+
+.dashboard-intro {
+  max-width: 38rem;
+}
+
+/* Compatibility bridge: budget/settings/help groups migrate in later slices.
+   Do not add new feature-page widths or hidden headers to this bridge. */
+
+.app-shell .narrow-management-content > :is(.account-settings-stack, .household-settings-form, .household-form, .help-topic-list, .help-article) {
+  width: 100%;
+  max-width: 44rem;
+  margin-inline: 0;
+}
+
+.app-shell .annual-overview-content {
+  row-gap: 0;
+}
+
+.app-shell .annual-overview-content > :is(.panel, .annual-summary-grid, .contextual-help-row, .budget-actual-warning) {
+  margin-bottom: 1rem;
+}
+
+.app-shell .yearly-save-bar {
+  max-width: none;
+  margin-inline: 0;
+}
+
+.app-shell .budget-save-bar {
+  left: var(--page-sidebar-width);
+  width: min(calc(100% - var(--page-sidebar-width) - var(--page-content-gutter) - var(--page-content-gutter)), var(--page-content-max));
+}
+
+.app-shell:not(.standalone-account-shell) .app-header {
+  display: none;
+}
+
+.app-shell-content .app-header {
+  justify-content: flex-end;
+}
+
+.app-shell-content .app-header > .brand-lockup {
+  display: none;
+}
+
+@media (max-width: 40rem) {
+  .page-title-row,
+  .dashboard-title-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 38rem) {
+  :root {
+    --page-content-gutter: 1rem;
+    --page-content-padding: 1.5rem;
+  }
+
+  .page-title-row,
+  .dashboard-title-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+}
