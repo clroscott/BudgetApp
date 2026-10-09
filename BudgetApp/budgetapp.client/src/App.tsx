@@ -16,6 +16,7 @@ import { getSafeReturnPath } from './auth/returnPath'
 import { BackToTopButton } from './components/BackToTopButton'
 import { AppShell } from './components/AppShell'
 import { BrandMark } from './components/Brand'
+import { ProviderReadBoundary } from './components/ProviderReadBoundary'
 import { HouseholdProvider } from './households/HouseholdProvider'
 import { useHouseholds } from './households/useHouseholds'
 import { appPages } from './routing/pageRegistry'
@@ -67,14 +68,16 @@ function HouseholdRequiredRoute({ children }: { children: ReactNode }) {
     currentHousehold,
     initializationError,
     isLoading,
+    hasLoaded,
     refresh,
   } = useHouseholds()
 
-  if (isLoading) {
+  const hasKnownHousehold = hasLoaded ?? Boolean(currentHousehold)
+  if (isLoading && !hasKnownHousehold) {
     return <LoadingScreen message="Loading your household..." />
   }
 
-  if (initializationError) {
+  if (initializationError && !hasKnownHousehold) {
     return (
       <StatusError
         message={initializationError}
@@ -84,7 +87,8 @@ function HouseholdRequiredRoute({ children }: { children: ReactNode }) {
   }
 
   return currentHousehold
-    ? <AppShell><Fragment key={currentHousehold.id}>{children}</Fragment></AppShell>
+    ? <AppShell><ProviderReadBoundary subject="household memberships" pending={isLoading} error={initializationError}
+        onRetry={() => void refresh()}><Fragment key={currentHousehold.id}>{children}</Fragment></ProviderReadBoundary></AppShell>
     : <Redirect to="/household/setup" />
 }
 
@@ -93,14 +97,16 @@ function HouseholdSetupRoute({ children }: { children: ReactNode }) {
     currentHousehold,
     initializationError,
     isLoading,
+    hasLoaded,
     refresh,
   } = useHouseholds()
 
-  if (isLoading) {
+  const hasKnownHousehold = hasLoaded ?? Boolean(currentHousehold)
+  if (isLoading && !hasKnownHousehold) {
     return <LoadingScreen message="Checking household setup..." />
   }
 
-  if (initializationError) {
+  if (initializationError && !hasKnownHousehold) {
     return (
       <StatusError
         message={initializationError}
@@ -109,7 +115,8 @@ function HouseholdSetupRoute({ children }: { children: ReactNode }) {
     )
   }
 
-  return currentHousehold ? <Redirect to="/dashboard" /> : children
+  return currentHousehold ? <Redirect to="/dashboard" /> : <ProviderReadBoundary subject="household memberships"
+    pending={isLoading} error={initializationError} onRetry={() => void refresh()}>{children}</ProviderReadBoundary>
 }
 
 function LoadingScreen({ message }: { message: string }) {
@@ -137,16 +144,24 @@ function StatusError({ message, onRetry }: { message: string, onRetry: () => voi
 }
 
 function AppRoutes() {
-  const { path } = useRouter()
-  const { user, initializationError, isLoading, refresh } = useAuth()
+  const { initializationError, isLoading, hasLoaded, refresh } = useAuth()
+  const hasKnownSession = hasLoaded ?? (!isLoading && !initializationError)
 
-  if (isLoading) {
+  if (isLoading && !hasKnownSession) {
     return <LoadingScreen message="Checking your session…" />
   }
 
-  if (initializationError) {
+  if (initializationError && !hasKnownSession) {
     return <StatusError message={initializationError} onRetry={() => void refresh()} />
   }
+
+  return <ProviderReadBoundary subject="your session" pending={isLoading} error={initializationError}
+    onRetry={() => void refresh()}><RouteContent /></ProviderReadBoundary>
+}
+
+function RouteContent() {
+  const { path } = useRouter()
+  const { user } = useAuth()
 
   if (user && !user.emailConfirmed && !verificationAccessPaths.has(path)) {
     return <Redirect to={emailVerificationPath(path + window.location.search)} />

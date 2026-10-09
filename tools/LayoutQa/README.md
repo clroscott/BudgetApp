@@ -71,3 +71,19 @@ The 960×540/2× case is a **200%-equivalent CSS viewport**, not an actual zoom 
 screen-reader test. Complete the permanent manual checklist before merge. Future
 feature migrations should add their pages and representative states here, keep
 requests read-only, and capture fresh before evidence for that migration.
+
+## Read ownership and failure/retry checks (#214)
+
+```powershell
+node .\tools\LayoutQa\verify-read-ownership.mjs
+```
+
+This focused harness uses port `127.0.0.1:4179`, the same installed runtime/browser
+configuration, and fictional GET-only responses. It covers five scenarios at
+1440px and 390px: initial list failure, an empty list's refresh failure, rule-preview
+retry, and late detail/list responses after switching imports. Request controls
+are StrictMode-safe and wait for actual readiness, not guessed startup call counts.
+API writes and external requests are blocked. Screenshots/read counts go to
+ignored `artifacts/read-ownership-qa`. It closes its own server/browser on failure
+and emits fictional-only diagnostics. It is not a production latency benchmark
+or a substitute for the owner's manual acceptance sweep.

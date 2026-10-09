@@ -8,6 +8,7 @@ import { authFixture } from '../test/fixtures'
 import { ResendConfirmationPage } from '../pages/ResendConfirmationPage'
 import { RegisterPage } from '../pages/RegisterPage'
 import { RouterProvider } from '../routing/RouterProvider'
+import { deferred } from '../test/deferred'
 
 vi.mock('./authApi', async original => ({ ...await original<typeof import('./authApi')>(),
   getCurrentUser: vi.fn(), login: vi.fn(), logout: vi.fn(), register: vi.fn(), resendConfirmation: vi.fn(),
@@ -15,13 +16,15 @@ vi.mock('./authApi', async original => ({ ...await original<typeof import('./aut
 const verified = authFixture().user!
 const unverified = { ...verified, emailConfirmed: false }
 function SessionProbe() {
-  const { user, isLoading, updateUser, logout: signOut } = useAuth()
+  const { user, isLoading, initializationError, refresh, updateUser, logout: signOut } = useAuth()
   const [draft, setDraft] = useState('unsaved value')
   return <>
     <p>{isLoading ? 'Loading session' : user ? `${user.email}: ${user.emailConfirmed ? 'verified' : 'unverified'}` : 'Signed out'}</p>
     <input aria-label="Unrelated edit" value={draft} onChange={event => setDraft(event.target.value)} />
     <button onClick={() => updateUser(verified)}>Complete confirmation</button>
+    <button onClick={() => void refresh()}>Refresh test session</button>
     <button onClick={() => void signOut()}>Log out test session</button>
+    {initializationError && <p role="alert">{initializationError}</p>}
   </>
 }
 beforeEach(() => {
@@ -35,6 +38,40 @@ beforeEach(() => {
 })
 
 describe('verification session continuity', () => {
+  it('keeps the newest explicit refresh when responses arrive in reverse order', async () => {
+    render(<AuthProvider><SessionProbe /></AuthProvider>)
+    await screen.findByText(`${verified.email}: unverified`)
+    const first = deferred<typeof verified | null>(), second = deferred<typeof verified | null>()
+    vi.mocked(getCurrentUser).mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    fireEvent.click(screen.getByText('Refresh test session'))
+    fireEvent.click(screen.getByText('Refresh test session'))
+    await act(async () => second.resolve(verified))
+    expect(screen.getByText(`${verified.email}: verified`)).toBeTruthy()
+    await act(async () => first.resolve(unverified))
+    expect(screen.getByText(`${verified.email}: verified`)).toBeTruthy()
+    expect(screen.queryByText('Loading session')).toBeNull()
+  })
+  it('does not restore a signed-out session from an explicit pending refresh', async () => {
+    render(<AuthProvider><SessionProbe /></AuthProvider>)
+    await screen.findByText(`${verified.email}: unverified`)
+    const read = deferred<typeof verified | null>()
+    vi.mocked(getCurrentUser).mockReturnValueOnce(read.promise)
+    fireEvent.click(screen.getByText('Refresh test session'))
+    fireEvent.click(screen.getByText('Log out test session'))
+    await screen.findByText('Signed out')
+    await act(async () => read.resolve(verified))
+    expect(screen.getByText('Signed out')).toBeTruthy()
+  })
+  it('does not downgrade an explicit user update with an older session refresh', async () => {
+    render(<AuthProvider><SessionProbe /></AuthProvider>)
+    await screen.findByText(`${verified.email}: unverified`)
+    const read = deferred<typeof verified | null>()
+    vi.mocked(getCurrentUser).mockReturnValueOnce(read.promise)
+    fireEvent.click(screen.getByText('Refresh test session'))
+    fireEvent.click(screen.getByText('Complete confirmation'))
+    await act(async () => read.resolve(unverified))
+    expect(screen.getByText(`${verified.email}: verified`)).toBeTruthy()
+  })
   it('keeps a password-only verification challenge out of the authenticated user context', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(null)
     vi.mocked(login).mockResolvedValue({ requiresVerification: true, challenge: {

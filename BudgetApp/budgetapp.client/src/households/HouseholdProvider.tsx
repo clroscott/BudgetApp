@@ -7,6 +7,8 @@ import {
   type ReactNode,
 } from 'react'
 import { useAuth } from '../auth/useAuth'
+import { ApiError } from '../api/apiClient'
+import { useReadOwner } from '../api/useReadOwner'
 import { useRouter } from '../routing/useRouter'
 import {
   createHousehold as createHouseholdRequest,
@@ -28,11 +30,17 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   )
   const selectedHouseholdIdRef = useRef<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [loadedUserId, setLoadedUserId] = useState<string | null>(null)
+  const [loadedKey, setLoadedKey] = useState<string | null>(null)
+  const [dataKey, setDataKey] = useState<string | null>(null)
   const [initializationError, setInitializationError] = useState<string | null>(null)
+  const userId = user?.id
+  const emailConfirmed = Boolean(user?.emailConfirmed)
+  const contextKey = `${userId ?? 'signed-out'}/${emailConfirmed}`
+  const reads = useReadOwner(contextKey)
+  const selectionKey = useRef(contextKey)
 
-  const storageKey = user
-    ? `budgetapp.selected-household.${user.id}`
+  const storageKey = userId
+    ? `budgetapp.selected-household.${userId}`
     : null
 
   const persistSelection = useCallback((householdId: string | null) => {
@@ -56,14 +64,23 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   }, [persistSelection])
 
   const refresh = useCallback(async (preferredHouseholdId?: string) => {
-    if (!user?.emailConfirmed) {
+    const attempt = reads.begin()
+    if (!attempt) return
+    if (selectionKey.current !== contextKey) {
+      selectionKey.current = contextKey
+      selectedHouseholdIdRef.current = null
+      setSelectedHouseholdId(null)
+    }
+    if (!emailConfirmed) {
       setHouseholds([])
       // Clear only in-memory views, not the user's saved household choice or any server data.
       selectedHouseholdIdRef.current = null
       setSelectedHouseholdId(null)
       setInitializationError(null)
       setIsLoading(false)
-      setLoadedUserId(user?.id ?? null)
+      setLoadedKey(contextKey)
+      setDataKey(contextKey)
+      attempt.finish()
       return
     }
 
@@ -71,8 +88,10 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
     setInitializationError(null)
 
     try {
-      const memberships = await getHouseholds()
+      const memberships = await getHouseholds(attempt.signal)
+      if (!attempt.isCurrent()) return
       setHouseholds(memberships)
+      setDataKey(contextKey)
       if (
         preferredHouseholdId &&
         memberships.some(item => item.id === preferredHouseholdId)
@@ -101,14 +120,24 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
         : memberships[0]?.id ?? null
       updateSelection(nextId)
     } catch (error) {
+      if (!attempt.isCurrent()) return
+      if (error instanceof ApiError && [401, 403].includes(error.status)) {
+        setHouseholds([])
+        setDataKey(null)
+        selectedHouseholdIdRef.current = null
+        setSelectedHouseholdId(null)
+      }
       setInitializationError(
         error instanceof Error ? error.message : 'Unable to load your household.',
       )
     } finally {
-      setLoadedUserId(user.id)
-      setIsLoading(false)
+      if (attempt.isCurrent()) {
+        setLoadedKey(contextKey)
+        setIsLoading(false)
+      }
+      attempt.finish()
     }
-  }, [storageKey, updateSelection, user])
+  }, [contextKey, emailConfirmed, reads, storageKey, updateSelection])
 
   useEffect(() => {
     void refresh()
@@ -116,41 +145,54 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
 
   const createHousehold = useCallback(
     async (request: CreateHouseholdRequest) => {
+      const stillInContext = reads.captureContext()
       const household = await createHouseholdRequest(request)
+      if (!stillInContext()) return household
+      reads.invalidate()
       setHouseholds(current => [
         ...current.filter(item => item.id !== household.id),
         household,
       ].sort((left, right) => left.name.localeCompare(right.name)))
       updateSelection(household.id)
+      setDataKey(contextKey)
+      setLoadedKey(contextKey)
+      setIsLoading(false)
+      setInitializationError(null)
       return household
     },
-    [updateSelection],
+    [contextKey, reads, updateSelection],
   )
 
   const selectHousehold = useCallback((householdId: string) => {
-    if (!households.some(item => item.id === householdId)) {
+    if (!reads.isContextCurrent() || dataKey !== contextKey || !emailConfirmed || !households.some(item => item.id === householdId)) {
       return false
     }
     if (householdId === selectedHouseholdIdRef.current) return true
     if (!confirmNavigation()) return false
     updateSelection(householdId)
     return true
-  }, [confirmNavigation, households, updateSelection])
+  }, [confirmNavigation, contextKey, dataKey, emailConfirmed, households, reads, updateSelection])
 
   const updateHousehold = useCallback((household: HouseholdMembership) => {
+    if (!reads.isContextCurrent() || dataKey !== contextKey || !emailConfirmed) return
+    reads.invalidate()
+    setIsLoading(false)
     setHouseholds(current => current.map(item => item.id === household.id ? household : item)
       .sort((left, right) => left.name.localeCompare(right.name)))
-  }, [])
+  }, [contextKey, dataKey, emailConfirmed, reads])
 
-  const currentHousehold = households.find(
+  const visibleHouseholds = useMemo(() => emailConfirmed && dataKey === contextKey ? households : [],
+    [contextKey, dataKey, emailConfirmed, households])
+  const currentHousehold = visibleHouseholds.find(
     household => household.id === selectedHouseholdId,
-  ) ?? households[0] ?? null
+  ) ?? visibleHouseholds[0] ?? null
 
   const value = useMemo<HouseholdContextValue>(() => ({
-    households,
+    households: visibleHouseholds,
     currentHousehold,
-    isLoading: isLoading || Boolean(user?.emailConfirmed && loadedUserId !== user.id),
-    initializationError,
+    isLoading: emailConfirmed && (isLoading || loadedKey !== contextKey),
+    initializationError: loadedKey === contextKey ? initializationError : null,
+    hasLoaded: dataKey === contextKey,
     selectHousehold,
     updateHousehold,
     createHousehold,
@@ -158,14 +200,16 @@ export function HouseholdProvider({ children }: { children: ReactNode }) {
   }), [
     createHousehold,
     currentHousehold,
-    households,
+    visibleHouseholds,
     initializationError,
     isLoading,
-    loadedUserId,
+    contextKey,
+    dataKey,
+    emailConfirmed,
+    loadedKey,
     refresh,
     selectHousehold,
     updateHousehold,
-    user,
   ])
 
   return (

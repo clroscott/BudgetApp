@@ -596,10 +596,11 @@ export function ImportReviewPage() {
     useState<RuleApplicationMode | null>(null)
   const [rulePreview, setRulePreview] =
     useState<CategorizationRuleApplicationPreview | null>(null)
-  const [isLoadingRulePreview, setIsLoadingRulePreview] = useState(false)
   const [ruleApplicationMessage, setRuleApplicationMessage] = useState('')
   const [isSavingAll, setIsSavingAll] = useState(false)
+  const [isRefreshingSelected, setIsRefreshingSelected] = useState(false)
   const [bulkSaveMessage, setBulkSaveMessage] = useState('')
+  const [completionMessage, setCompletionMessage] = useState('')
   const [bulkBudgetPreset, setBulkBudgetPreset] = useState<BudgetInclusionPreset | ''>('')
   const [bulkBudgetScope, setBulkBudgetScope] = useState<'matching' | 'page'>('matching')
   const [bulkBudgetMessage, setBulkBudgetMessage] = useState('')
@@ -615,11 +616,15 @@ export function ImportReviewPage() {
   const listLoad = usePageLoad(`${currentHousehold?.id}/${importFilter}/${importPage}`)
   const detailLoad = usePageLoad(`${currentHousehold?.id}/${selectedImportId}`)
   const categoryLoad = usePageLoad(`${currentHousehold?.id}/import-categories`)
+  const rulePreviewLoad = usePageLoad(`${currentHousehold?.id}/${selectedImportId}/rule-preview`)
   const householdId = currentHousehold?.id
   const { run: runList } = listLoad
   const { run: runDetail } = detailLoad
   const { run: runCategories } = categoryLoad
-  const isLoading = categoryLoad.isPending || (Boolean(selectedImportId) && detailLoad.isPending)
+  const { run: runPreview, markReady: markPreviewReady } = rulePreviewLoad
+  const isLoadingRulePreview = rulePreviewLoad.isPending
+  const isSelectedContextCurrent = detailLoad.captureContext()
+  const isLoading = isRefreshingSelected || categoryLoad.isPending || (Boolean(selectedImportId) && detailLoad.isPending)
   const filteredImports = listLoad.hasData ? importList?.items ?? [] : []
   const selectedNotListed = selectedImportId && !filteredImports.some(item => item.id === selectedImportId)
   const noMatchingFilesLabel = {
@@ -649,7 +654,7 @@ export function ImportReviewPage() {
   }, [])
 
   const refreshList = useCallback(async (householdId: string) => {
-    await runList(() => getImports(householdId, importFilter, importPage), result => {
+    await runList(signal => getImports(householdId, importFilter, importPage, signal), result => {
       setImportList(result)
       setImportPage(result.page)
       setSelectedImportId(current => current || result.items[0]?.id || '')
@@ -658,31 +663,42 @@ export function ImportReviewPage() {
 
   const refreshDetail = async () => {
     if (!currentHousehold || !selectedImportId) return false
-    const refreshed = await runDetail(() => getImport(currentHousehold.id, selectedImportId), setDetail)
+    const stillSelected = detailLoad.captureContext()
+    const refreshed = await runDetail(signal => getImport(currentHousehold.id, selectedImportId, signal), setDetail)
+    if (!stillSelected()) return false
     await refreshList(currentHousehold.id)
-    return refreshed
+    return refreshed && stillSelected()
   }
 
   const handleRefreshSelected = async () => {
-    if (!confirmNavigation()) return
-    if (await refreshDetail()) {
-      setDirtyDraftUpdates(new Map())
-      setErrors([])
-    }
+    if (isRefreshingSelected || !confirmNavigation()) return
+    setIsRefreshingSelected(true)
+    try {
+      if (await refreshDetail()) {
+        setDirtyDraftUpdates(new Map())
+        setErrors([])
+        setCompletionMessage(current => current ? 'Import completed. Approved transactions were created.' : '')
+      }
+    } finally { if (isSelectedContextCurrent()) setIsRefreshingSelected(false) }
   }
 
+  const reloadRulePreview = useCallback(async () => {
+    if (!householdId || !selectedImportId) return null
+    let count: number | null = null
+    await runPreview(signal => getImportCategorizationRulePreview(householdId, selectedImportId, signal), preview => {
+      setRulePreview(preview)
+      count = preview.fillChangedRows
+    })
+    return count
+  }, [householdId, selectedImportId, runPreview])
+
   const handleRuleCreated = async () => {
-    if (!currentHousehold || !selectedImportId || !await refreshDetail()) return null
-    const preview = await getImportCategorizationRulePreview(
-      currentHousehold.id,
-      selectedImportId,
-    )
-    setRulePreview(preview)
-    return preview.fillChangedRows
+    if (!isSelectedContextCurrent() || !await refreshDetail()) return null
+    return reloadRulePreview()
   }
 
   const reloadCategories = useCallback(async () => {
-    if (householdId) await runCategories(() => getCategories(householdId), setCategories)
+    if (householdId) await runCategories(signal => getCategories(householdId, signal), setCategories)
   }, [householdId, runCategories])
 
   useEffect(() => { void reloadCategories() }, [reloadCategories])
@@ -700,6 +716,7 @@ export function ImportReviewPage() {
   }, [selectedImportId, importFilter, importPage, navigate])
 
   useEffect(() => {
+    setCompletionMessage('')
     if (!householdId || !selectedImportId) {
       setDetail(null)
       return
@@ -711,32 +728,28 @@ export function ImportReviewPage() {
     setBulkBudgetScope('matching')
     setBulkBudgetMessage('')
     setErrors([])
-    void runDetail(() => getImport(householdId, selectedImportId), setDetail)
+    setIsCompleting(false)
+    setIsDiscarding(false)
+    setIsSavingAll(false)
+    setIsRefreshingSelected(false)
+    setApplyingRuleMode(null)
+    setBulkDecision(null)
+    setRuleApplicationMessage('')
+    setBusyDraftIds(new Set())
+    void runDetail(signal => getImport(householdId, selectedImportId, signal), setDetail)
   }, [householdId, selectedImportId, runDetail])
 
   useEffect(() => {
     if (!currentHousehold || !detail?.canEdit ||
         detail.status !== 'ReadyForReview') {
       setRulePreview(null)
-      setIsLoadingRulePreview(false)
+      markPreviewReady()
       return
     }
 
-    let isCurrent = true
     setRulePreview(null)
-    setIsLoadingRulePreview(true)
-    void getImportCategorizationRulePreview(
-      currentHousehold.id,
-      detail.id,
-    ).then(preview => {
-      if (isCurrent) setRulePreview(preview)
-    }).catch(error => {
-      if (isCurrent) setErrors(getErrorMessages(error))
-    }).finally(() => {
-      if (isCurrent) setIsLoadingRulePreview(false)
-    })
-    return () => { isCurrent = false }
-  }, [currentHousehold, detail])
+    void reloadRulePreview()
+  }, [currentHousehold, detail, markPreviewReady, reloadRulePreview])
 
   const pendingRows = useMemo(() => detail
     ? detail.totalRows - detail.approvedRows - detail.excludedRows
@@ -837,16 +850,17 @@ export function ImportReviewPage() {
     setErrors([])
     try {
       await checkImportDuplicates(currentHousehold.id, detail.id)
+      if (!isSelectedContextCurrent()) return
       await refreshDetail()
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
     }
   }
 
   const handleApplyCategorizationRules = async (
     mode: RuleApplicationMode,
   ) => {
-    if (!detail || hasUnsavedRows) return false
+    if (!detail || hasUnsavedRows || !rulePreviewLoad.isFresh) return false
     if (mode === 'reapply' && !window.confirm(
       `Reapply rules to ${reapplyRulePotentialCount} matching staged ${
         reapplyRulePotentialCount === 1 ? 'row' : 'rows'
@@ -862,7 +876,9 @@ export function ImportReviewPage() {
         detail.id,
         mode === 'reapply',
       )
+      if (!isSelectedContextCurrent()) return false
       await refreshDetail()
+      if (!isSelectedContextCurrent()) return false
       setRuleApplicationMessage(result.matchedRows === 0
         ? mode === 'fill'
           ? 'No uncategorized or parent-category rows matched an active rule.'
@@ -876,10 +892,10 @@ export function ImportReviewPage() {
           } changed; ${result.unchangedRows} stayed the same.`)
       return true
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
       return false
     } finally {
-      setApplyingRuleMode(null)
+      if (isSelectedContextCurrent()) setApplyingRuleMode(null)
     }
   }
 
@@ -919,15 +935,17 @@ export function ImportReviewPage() {
         detail.id,
         updates,
       )
+      if (!isSelectedContextCurrent()) return
       const refreshed = await refreshDetail()
+      if (!isSelectedContextCurrent()) return
       if (refreshed) setDirtyDraftUpdates(new Map())
       setBulkSaveMessage(
         `${result.savedRows} ${result.savedRows === 1 ? 'correction was' : 'corrections were'} saved.${refreshed ? '' : ' Retry refreshing the selected import before making more changes.'}`,
       )
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
     } finally {
-      setIsSavingAll(false)
+      if (isSelectedContextCurrent()) setIsSavingAll(false)
     }
   }
 
@@ -935,13 +953,17 @@ export function ImportReviewPage() {
     if (!detail) return
     setIsCompleting(true)
     setErrors([])
+    setCompletionMessage('')
     try {
       await completeImport(currentHousehold.id, detail.id)
-      await refreshDetail()
+      if (!isSelectedContextCurrent()) return
+      const refreshed = await refreshDetail()
+      if (isSelectedContextCurrent()) setCompletionMessage('Import completed. Approved transactions were created.' +
+        (refreshed ? '' : ' Retry refreshing the selected import to see the updated result; do not create the transactions again.'))
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
     } finally {
-      setIsCompleting(false)
+      if (isSelectedContextCurrent()) setIsCompleting(false)
     }
   }
 
@@ -973,11 +995,12 @@ export function ImportReviewPage() {
         detail.id,
         decision,
       )
+      if (!isSelectedContextCurrent()) return
       await refreshDetail()
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
     } finally {
-      setBulkDecision(null)
+      if (isSelectedContextCurrent()) setBulkDecision(null)
     }
   }
 
@@ -989,6 +1012,7 @@ export function ImportReviewPage() {
     setErrors([])
     try {
       await removeImportDraft(currentHousehold.id, detail.id, draftId)
+      if (!isSelectedContextCurrent()) return
       setDirtyDraftUpdates(current => {
         const updated = new Map(current)
         updated.delete(draftId)
@@ -996,7 +1020,7 @@ export function ImportReviewPage() {
       })
       await refreshDetail()
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
     }
   }
 
@@ -1009,15 +1033,16 @@ export function ImportReviewPage() {
     setErrors([])
     try {
       await discardImport(currentHousehold.id, detail.id)
+      if (!isSelectedContextCurrent()) return
       setDetail(null)
       setDraftPage(1)
       setDirtyDraftUpdates(new Map())
       setSelectedImportId('')
       await refreshList(currentHousehold.id)
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
     } finally {
-      setIsDiscarding(false)
+      if (isSelectedContextCurrent()) setIsDiscarding(false)
     }
   }
 
@@ -1036,7 +1061,11 @@ export function ImportReviewPage() {
         <ContextualHelp topic="import-approval" />
         <p className="field-help">{helpWarnings.sharePersonalExpense}</p>
         <ErrorSummary errors={errors} />
+        {completionMessage && <p role="status">{completionMessage}</p>}
         {!categoryLoad.isFresh && <PageLoadFeedback {...categoryLoad} subject="categories" onReload={() => void reloadCategories()} />}
+        {detailLoad.hasData && detail?.canEdit && detail.status === 'ReadyForReview' && !rulePreviewLoad.isFresh &&
+          <PageLoadFeedback {...rulePreviewLoad} subject="categorization rule matches" disabled={mutationBusy}
+            onReload={() => void reloadRulePreview()} />}
 
         <section className="import-file-picker" aria-labelledby="import-file-heading">
           <div className="import-section-heading">
@@ -1083,7 +1112,7 @@ export function ImportReviewPage() {
                   {detailLoad.hasData && detail ? `${detail.originalFileName}${detail.sourceWorksheetName ? ` · ${detail.sourceWorksheetName}` : ''} — ${detail.accountName} (${detail.status})` : 'Selected file'}
                 </option>}
                 {filteredImports.length === 0 && !selectedImportId && <option value="">
-                  {listLoad.isPending ? 'Loading imports…' : listLoad.hasData ? noMatchingFilesLabel : 'Import list unavailable'}
+                  {listLoad.isPending ? 'Loading imports…' : listLoad.isFresh ? noMatchingFilesLabel : 'Import list unavailable'}
                 </option>}
                 {filteredImports.map(item => (
                   <option key={item.id} value={item.id}>
@@ -1103,20 +1132,20 @@ export function ImportReviewPage() {
             <button className="secondary-button" type="button" disabled={!listLoad.hasData || listLoad.isPending || importPage >= importList.totalPages || mutationBusy}
               onClick={() => { if (confirmNavigation()) setImportPage(current => current + 1) }}>Next files</button>
           </nav>}
-          {listLoad.hasData && importList && importList.totalPages <= 1 &&
+          {listLoad.isFresh && importList && importList.totalPages <= 1 &&
             <p className="field-help" role="status">{importList.totalCount} matching uploaded {importList.totalCount === 1 ? 'file' : 'files'}</p>}
         </section>
 
         {selectedImportId && !detailLoad.isFresh && <PageLoadFeedback {...detailLoad} subject="selected import"
           disabled={mutationBusy} onReload={() => void handleRefreshSelected()} />}
 
-        {!selectedImportId && listLoad.hasData && importList?.totalVisibleCount === 0 ? (
+        {!selectedImportId && listLoad.isFresh && importList?.totalVisibleCount === 0 ? (
           <div className="empty-state">
             <h2>No imports yet</h2>
             <p>Upload a CSV or Excel workbook to create staged rows for review.</p>
             <AppLink to="/import">Import transactions</AppLink>
           </div>
-        ) : !selectedImportId && listLoad.hasData && importList?.totalCount === 0 ? (
+        ) : !selectedImportId && listLoad.isFresh && importList?.totalCount === 0 ? (
           <div className="empty-state">
             <h2>{noMatchingFilesLabel}</h2>
             <p>Choose another file status or upload a new file.</p>
@@ -1132,7 +1161,7 @@ export function ImportReviewPage() {
                   <p>{detail.accountName} · {detail.currency}</p>
                 </div>
                 {detailLoad.isFresh && <button className="text-button" type="button"
-                  disabled={mutationBusy} onClick={() => void handleRefreshSelected()}>Refresh selected import</button>}
+                  disabled={mutationBusy || isRefreshingSelected} onClick={() => void handleRefreshSelected()}>Refresh selected import</button>}
               </div>
               <div className="import-stat-grid">
                 <span><strong>{detail.totalRows}</strong>Total</span>
@@ -1165,7 +1194,7 @@ export function ImportReviewPage() {
                       </button>
                       <button className="secondary-button" type="button"
                         disabled={
-                          isLoadingRulePreview ||
+                          !rulePreviewLoad.isFresh ||
                           !rulePreview ||
                           fillRulePotentialCount === 0 ||
                           hasUnsavedRows ||
@@ -1175,12 +1204,12 @@ export function ImportReviewPage() {
                         {applyingRuleMode === 'fill'
                           ? 'Filling categories...'
                           : `Fill uncategorized (${
-                            isLoadingRulePreview ? '...' : fillRulePotentialCount
+                            isLoadingRulePreview ? '...' : rulePreviewLoad.isFresh ? fillRulePotentialCount : 'unavailable'
                           })`}
                       </button>
                       <button className="secondary-button" type="button"
                         disabled={
-                          isLoadingRulePreview ||
+                          !rulePreviewLoad.isFresh ||
                           !rulePreview ||
                           reapplyRulePotentialCount === 0 ||
                           hasUnsavedRows ||
@@ -1190,7 +1219,7 @@ export function ImportReviewPage() {
                         {applyingRuleMode === 'reapply'
                           ? 'Reapplying rules...'
                           : `Reapply to all (${
-                            isLoadingRulePreview ? '...' : reapplyRulePotentialCount
+                            isLoadingRulePreview ? '...' : rulePreviewLoad.isFresh ? reapplyRulePotentialCount : 'unavailable'
                           })`}
                       </button>
                     </div>
@@ -1368,7 +1397,7 @@ export function ImportReviewPage() {
                     onFillRemaining={() => handleApplyCategorizationRules('fill')}
                     onDirtyChange={handleDirtyChange}
                     onRemove={handleRemoveDraft}
-                    onError={error => setErrors(getErrorMessages(error))}
+                    onError={error => { if (isSelectedContextCurrent()) setErrors(getErrorMessages(error)) }}
                     onBusyChange={handleBusyChange}
                   />
                 ))}
