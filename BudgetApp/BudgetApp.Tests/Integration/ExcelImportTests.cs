@@ -16,6 +16,26 @@ namespace BudgetApp.Tests.Integration;
 public sealed class ExcelImportTests(BudgetAppWebApplicationFactory factory) : IClassFixture<BudgetAppWebApplicationFactory>
 {
     [Fact]
+    public async Task DownloadedSample_DefaultContentType_PreviewsAndStagesWithoutOfficialTransactions()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        var (_, household, account) = await Setup(client);
+        var bytes = await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Imports", "testtemplate.xlsx"));
+        var previewResponse = await FileRequest(client, household, account, bytes, inspect: true, fileName: "testtemplate.xlsx");
+        Assert.Equal(HttpStatusCode.OK, previewResponse.StatusCode);
+        var preview = (await previewResponse.Content.ReadFromJsonAsync<ImportProfileInspectionModel>())!;
+        Assert.Equal("Transactions", preview.SelectedWorksheetName);
+        Assert.Equal([2, 3], preview.PreviewRowNumbers);
+        var upload = await FileRequest(client, household, account, bytes, preview.SelectedWorksheetId, fileName: "testtemplate.xlsx");
+        Assert.Equal(HttpStatusCode.Created, upload.StatusCode);
+        var staged = (await upload.Content.ReadFromJsonAsync<TransactionImportResult>())!;
+        Assert.Equal(2, staged.ValidRows); Assert.Equal(0, staged.InvalidRows);
+        using var scope = factory.Services.CreateScope(); var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        var rows = await db.ImportTransactionDrafts.Where(draft => draft.ImportFileId == staged.ImportFileId).OrderBy(draft => draft.SourceRowNumber).ToListAsync();
+        Assert.Equal([100.51m, 100.52m], rows.Select(row => row.Amount));
+        Assert.False(await db.Transactions.AnyAsync(transaction => transaction.HouseholdId == household));
+    }
+    [Fact]
     public async Task WorksheetSelection_StagesOnlyOneSheetAndDuplicateFileIdentityIncludesSheet()
     {
         using var client = factory.CreateAuthenticatedTestClient();

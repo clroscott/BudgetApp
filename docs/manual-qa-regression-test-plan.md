@@ -904,6 +904,12 @@ See [supported layouts and enforced limits](excel-import-foundation.md#enforced-
       original source row numbers are clear. Upload stages drafts only. Review shows
       the worksheet name; row corrections, categories/subcategories, budget choices,
       approval/exclusion and completion still work. Restart/refresh retains provenance.
+- [ ] Preview and stage the synthetic `BudgetApp/BudgetApp.Tests/Fixtures/Imports/testtemplate.xlsx`
+      sample without resaving it. Its workbook type is declared by an extension default,
+      not a part override. The Transactions sheet has two October 7, 2026 rows with
+      TestDescXL / TestDescXL2 and amounts 100.51 / 100.52. Both stage as valid drafts;
+      official transactions are not created until approval/completion. Macro declarations,
+      unsupported explicit overrides and duplicate declarations still fail safely.
 - [ ] Use two populated sheets plus blank/header-only sheets. Preview does not stage
       anything or silently merge sheets. Select each usable sheet deliberately and
       verify the preview and staged rows come only from that sheet. Blank or invalid

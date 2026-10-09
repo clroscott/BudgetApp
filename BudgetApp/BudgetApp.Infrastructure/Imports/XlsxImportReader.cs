@@ -164,8 +164,7 @@ public sealed class XlsxImportReader
             var office = Relationships("_rels/.rels", "").Values.Where(r => r.Type.EndsWith("/officeDocument", StringComparison.Ordinal)).ToList();
             if (office.Count != 1) throw Reject("The file is not a supported Excel workbook.");
             var path = office[0].Path;
-            if (!types.Elements().Any(e => (string?)e.Attribute("PartName") == "/" + path &&
-                (string?)e.Attribute("ContentType") == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"))
+            if (ResolveContentType(types, path) != "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")
                 throw Reject("Only macro-free .xlsx spreadsheet workbooks are supported.");
             var root = Root(path);
             ns = root.Name.Namespace;
@@ -191,6 +190,24 @@ public sealed class XlsxImportReader
             if (shared.Path is not null) LoadShared(shared.Path);
             var styles = relationships.Values.SingleOrDefault(r => r.Type.EndsWith("/styles", StringComparison.Ordinal));
             if (styles.Path is not null) LoadStyles(styles.Path);
+        }
+
+        private static string? ResolveContentType(XElement types, string path)
+        {
+            XNamespace contentTypesNs = "http://schemas.openxmlformats.org/package/2006/content-types";
+            if (types.Name != contentTypesNs + "Types") throw Reject("Unsupported Excel content-type metadata.");
+            // OPC permits either a part-specific Override or an extension Default.
+            // An explicit override wins, including an unsupported one: never fall
+            // back to a safe default to bypass a disallowed workbook declaration.
+            var overrides = types.Elements(contentTypesNs + "Override")
+                .Where(element => (string?)element.Attribute("PartName") == "/" + path).Take(2).ToList();
+            if (overrides.Count > 1) throw Reject("Duplicate workbook content-type overrides.");
+            if (overrides.Count == 1) return (string?)overrides[0].Attribute("ContentType");
+            var extension = Path.GetExtension(path).TrimStart('.');
+            var defaults = types.Elements(contentTypesNs + "Default")
+                .Where(element => string.Equals((string?)element.Attribute("Extension"), extension, StringComparison.OrdinalIgnoreCase)).Take(2).ToList();
+            if (defaults.Count > 1) throw Reject("Duplicate workbook content-type defaults.");
+            return defaults.Count == 1 ? (string?)defaults[0].Attribute("ContentType") : null;
         }
 
         private void LoadShared(string path)

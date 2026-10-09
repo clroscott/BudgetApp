@@ -166,3 +166,23 @@ certificate/loopback tests and Visual Studio SDK builds run outside the sandbox
 because their installed runtime/configuration files are sandbox-restricted. A
 dashboard assertion was changed to await its asynchronously loaded budget card;
 no dashboard behavior was changed. Live/manual checks above remain pending.
+
+### Sample-workbook compatibility follow-up (October 8, 2026)
+
+The first downloaded sample was incorrectly rejected as unsupported: its workbook
+MIME type uses an OPC extension `Default` rather than a part-specific `Override`.
+The reader now resolves both declarations, with an explicit override taking
+precedence. Unsupported/macro declarations, duplicate matching declarations and
+missing workbook types remain rejected; package/resource safeguards are unchanged.
+
+The exact synthetic download is retained as `BudgetApp/BudgetApp.Tests/Fixtures/Imports/testtemplate.xlsx`.
+Reader and API regressions confirm its two native dates/amounts survive preview and
+staging and that no official transactions are created. This follow-up requires no
+additional migration. Live retry of the same file after a server rebuild remains
+the user's manual check.
+
+Verification: all 66 Excel reader/API cases and all 628 backend tests pass. The
+full suite runs from its normal output directory because four existing maintenance
+script tests discover repository tools relative to that directory. The separate
+temporary build passed the Excel cases but could not locate those four scripts;
+the normal-output rerun passed them. Client code is unchanged in this follow-up.

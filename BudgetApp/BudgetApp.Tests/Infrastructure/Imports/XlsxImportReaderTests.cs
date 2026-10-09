@@ -14,6 +14,61 @@ public sealed class XlsxImportReaderTests
     private static readonly XNamespace Ns = Namespace;
 
     [Fact]
+    public async Task DownloadedSample_DefaultWorkbookContentType_PreviewsAndReadsExactNativeValues()
+    {
+        var bytes = await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "Imports", "testtemplate.xlsx"));
+        var preview = await Inspect(bytes);
+        Assert.Equal("Transactions", preview.SelectedWorksheetName);
+        Assert.Equal([2, 3], preview.PreviewRowNumbers);
+        Assert.Equal(["Date", "Description", "Amount"], preview.Headers);
+        var result = await Read(bytes);
+        Assert.Equal(2, result.Rows.Count);
+        Assert.Equal(["TestDescXL", "TestDescXL2"], result.Rows.Select(row => row.Description));
+        Assert.Equal([100.51m, 100.52m], result.Rows.Select(row => row.Amount));
+        Assert.All(result.Rows, row => {
+            Assert.Equal(new DateOnly(2026, 10, 7), row.TransactionDate);
+            Assert.Null(row.ValidationMessage);
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WorkbookContentType_UsesDefaultsOrAnExplicitOverride(bool useOverride)
+    {
+        var bytes = Create([new Sheet("Data", StandardRows())], false, mutate: parts => {
+            parts["[Content_Types].xml"] = "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
+                $"<Default Extension=\"XML\" ContentType=\"{(useOverride ? "application/xml" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml")}\"/>" +
+                (useOverride ? "<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>" : "") + "</Types>";
+        });
+        Assert.Null(Assert.Single((await Read(bytes)).Rows).ValidationMessage);
+    }
+
+    [Theory]
+    [InlineData("unsupportedOverride")]
+    [InlineData("macroOverride")]
+    [InlineData("macroDefault")]
+    [InlineData("duplicateOverride")]
+    [InlineData("duplicateDefault")]
+    [InlineData("missing")]
+    public async Task ContentTypeDefaults_DoNotBypassUnsupportedMacroOrAmbiguousDeclarations(string kind)
+    {
+        const string workbookType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
+        var bytes = Create([new Sheet("Data", StandardRows())], false, mutate: parts => {
+            var declared = kind == "macroDefault" ? "application/vnd.ms-excel.sheet.macroEnabled.main+xml" : workbookType;
+            var xml = $"<Default Extension=\"xml\" ContentType=\"{declared}\"/>";
+            if (kind == "unsupportedOverride") xml += "<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/xml\"/>";
+            if (kind == "macroOverride") xml += "<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.ms-excel.sheet.macroEnabled.main+xml\"/>";
+            if (kind == "duplicateDefault") xml += $"<Default Extension=\"XML\" ContentType=\"{workbookType}\"/>";
+            if (kind == "duplicateOverride") xml += string.Concat(Enumerable.Repeat($"<Override PartName=\"/xl/workbook.xml\" ContentType=\"{workbookType}\"/>", 2));
+            if (kind == "missing") xml = "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>";
+            parts["[Content_Types].xml"] = "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" + xml + "</Types>";
+        });
+        await Assert.ThrowsAsync<TransactionImportRejectedException>(() => Inspect(bytes));
+        await RejectRead(bytes);
+    }
+
+    [Fact]
     public async Task SingleVisibleSheet_AutoSelectsAndPreservesRealRowsHashExactAmountsAndRawData()
     {
         var bytes = Create(new Sheet("Chequing", StandardRows(amount: "-12.3456", firstRow: 7)), new Sheet("Blank", []));
