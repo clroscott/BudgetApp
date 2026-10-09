@@ -37,9 +37,9 @@ export interface ResetPasswordRequest {
   newPassword: string
 }
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export async function getCurrentUser(signal?: AbortSignal): Promise<CurrentUser | null> {
   try {
-    return await apiGet<CurrentUser>('/api/auth/me')
+    return await apiGet<CurrentUser>('/api/auth/me', signal)
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       return null

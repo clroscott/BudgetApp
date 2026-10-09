@@ -55,7 +55,10 @@ async function fetchWithCredentials(
 ): Promise<Response> {
   try {
     return await fetch(input, { ...init, credentials: 'include' })
-  } catch {
+  } catch (error) {
+    // Obsolete GET cancellation is not a connection failure. Writes are not
+    // canceled or replayed by this read-only plumbing.
+    if (init?.signal?.aborted || (error instanceof Error && error.name === 'AbortError')) throw error
     throw new ApiError('Unable to connect to BudgetApp. Please try again.')
   }
 }
@@ -77,9 +80,10 @@ async function getAntiforgeryToken(): Promise<string> {
   return body.token
 }
 
-export async function apiGet<TResponse>(path: string): Promise<TResponse> {
+export async function apiGet<TResponse>(path: string, signal?: AbortSignal): Promise<TResponse> {
   const response = await fetchWithCredentials(path, {
     headers: { Accept: 'application/json' },
+    ...(signal ? { signal } : {}),
   })
 
   if (!response.ok) {

@@ -11,8 +11,8 @@ export interface CategoryItem {
   children: CategoryItem[]
 }
 
-export function getCategories(householdId: string): Promise<CategoryItem[]> {
-  return apiGet<CategoryItem[]>(`/api/households/${householdId}/categories`)
+export function getCategories(householdId: string, signal?: AbortSignal): Promise<CategoryItem[]> {
+  return apiGet<CategoryItem[]>(`/api/households/${householdId}/categories`, signal)
 }
 
 export function createCategory(

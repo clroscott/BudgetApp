@@ -10,9 +10,10 @@ import { getCategories } from '../categories/categoryApi'
 import { getAccounts } from '../accounts/accountApi'
 import { getImportProfiles, inspectImportFile } from '../imports/importProfileApi'
 import { getImports, getImport, getImportCategorizationRulePreview, bulkUpdateImportDrafts, updateImportDraft,
-  uploadCsvImport, type ImportListItem, type ImportListResult, type ImportReviewDetail } from '../imports/importApi'
+  uploadCsvImport, completeImport, type ImportListItem, type ImportListResult, type ImportReviewDetail } from '../imports/importApi'
 import { ImportReviewPage } from './ImportReviewPage'
 import { CsvImportPage } from './CsvImportPage'
+import { deferred } from '../test/deferred'
 
 vi.mock('../categories/categoryApi', async original => ({
   ...await original<typeof import('../categories/categoryApi')>(), getCategories: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock('../imports/importProfileApi', async original => ({
 }))
 vi.mock('../imports/importApi', async original => ({
   ...await original<typeof import('../imports/importApi')>(), getImports: vi.fn(), getImport: vi.fn(),
-  getImportCategorizationRulePreview: vi.fn(), bulkUpdateImportDrafts: vi.fn(), updateImportDraft: vi.fn(), uploadCsvImport: vi.fn(),
+  getImportCategorizationRulePreview: vi.fn(), bulkUpdateImportDrafts: vi.fn(), updateImportDraft: vi.fn(), uploadCsvImport: vi.fn(), completeImport: vi.fn(),
 }))
 
 const listItem: ImportListItem = {
@@ -71,6 +72,97 @@ beforeEach(() => {
 })
 
 describe('staged import edit protection', () => {
+  it('keeps row controls unavailable through the full selected-refresh chain', async () => {
+    show(<ImportReviewPage />)
+    const input = await screen.findByLabelText('Description') as HTMLInputElement
+    await waitFor(() => expect(input.disabled).toBe(false))
+    const list = deferred<ImportListResult>()
+    vi.mocked(getImports).mockReturnValueOnce(list.promise)
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh selected import' }))
+    await waitFor(() => expect(getImports).toHaveBeenCalledTimes(2))
+    expect(input.disabled).toBe(true)
+    await act(async () => list.resolve(listPage([listItem])))
+    await waitFor(() => expect(input.disabled).toBe(false))
+  })
+  it('distinguishes initial detail failure, retained refresh failure, and safe read-only retry', async () => {
+    vi.mocked(getImport).mockRejectedValueOnce(new Error('Initial detail outage'))
+    show(<ImportReviewPage />)
+    const failed = await screen.findByRole('alert', { name: 'selected import load status' })
+    expect(screen.queryByLabelText('Description')).toBeNull()
+    expect(screen.queryByText('No imports yet')).toBeNull()
+    fireEvent.click(within(failed).getByRole('button', { name: 'Retry loading' }))
+    const input = await screen.findByLabelText('Description') as HTMLInputElement
+    await waitFor(() => expect(input.disabled).toBe(false))
+    vi.mocked(getImport).mockRejectedValueOnce(new Error('Refresh detail outage'))
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh selected import' }))
+    const stale = await screen.findByRole('alert', { name: 'selected import load status' })
+    expect(input.value).toBe('Original description')
+    expect(input.disabled).toBe(true)
+    fireEvent.click(within(stale).getByRole('button', { name: 'Retry loading' }))
+    await waitFor(() => expect(input.disabled).toBe(false))
+    expect(updateImportDraft).not.toHaveBeenCalled()
+  })
+  it('does not continue claiming no imports after an empty list fails to refresh', async () => {
+    vi.mocked(getImports).mockResolvedValueOnce(listPage([]))
+    show(<ImportReviewPage />, '/imports/review')
+    await screen.findByRole('heading', { name: 'No imports yet' })
+    vi.mocked(getImports).mockRejectedValueOnce(new Error('Empty-list refresh outage'))
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh import list' }))
+    await screen.findByRole('alert', { name: 'import list load status' })
+    expect(screen.queryByRole('heading', { name: 'No imports yet' })).toBeNull()
+    expect(screen.queryByRole('option', { name: 'No unfinished files' })).toBeNull()
+  })
+  it('offers a read-only retry when rule-preview loading fails', async () => {
+    vi.mocked(getImportCategorizationRulePreview).mockRejectedValueOnce(new Error('Preview outage'))
+    show(<ImportReviewPage />)
+    const feedback = await screen.findByRole('alert', { name: 'categorization rule matches load status' })
+    expect((screen.getByRole('button', { name: 'Fill uncategorized (unavailable)' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(within(feedback).getByRole('button', { name: 'Retry loading' }))
+    await waitFor(() => expect(screen.queryByRole('alert', { name: 'categorization rule matches load status' })).toBeNull())
+    expect(getImportCategorizationRulePreview).toHaveBeenCalledTimes(2)
+    expect(updateImportDraft).not.toHaveBeenCalled()
+  })
+  it('does not replay completion when the write succeeds but its detail refresh fails', async () => {
+    const reviewed = { ...detail(), approvedRows: 1, drafts: [{ ...detail().drafts[0], reviewDecision: 'Approved' }] }
+    vi.mocked(getImport).mockResolvedValue(reviewed)
+    vi.mocked(completeImport).mockResolvedValue({ importFileId: 'import-a', createdTransactionCount: 1, approvedRows: 1, excludedRows: 0, status: 'Completed' })
+    show(<ImportReviewPage />)
+    const create = await screen.findByRole('button', { name: 'Create approved transactions' }) as HTMLButtonElement
+    await waitFor(() => expect(create.disabled).toBe(false))
+    vi.mocked(getImport).mockRejectedValueOnce(new Error('Completion detail outage'))
+    fireEvent.click(create)
+    await screen.findByText(/Import completed\. Approved transactions were created\./)
+    const stale = await screen.findByRole('alert', { name: 'selected import load status' })
+    expect(create.disabled).toBe(true)
+    vi.mocked(getImport).mockResolvedValue({ ...reviewed, status: 'Completed' })
+    fireEvent.click(within(stale).getByRole('button', { name: 'Retry loading' }))
+    await screen.findByText('Completed imports are retained to preserve the history of official transactions.')
+    expect(screen.queryByText(/do not create the transactions again/)).toBeNull()
+    expect(completeImport).toHaveBeenCalledOnce()
+    expect(screen.queryByRole('button', { name: 'Create approved transactions' })).toBeNull()
+  })
+  it('does not clear B corrections when an A refresh finishes after switching the file-list context', async () => {
+    const other = { ...detail(), id: 'import-b', originalFileName: 'other.csv', drafts: [{ ...detail().drafts[0], id: 'row-b', description: 'B description' }] }
+    vi.mocked(getImport).mockImplementation(async (_householdId, id) => id === 'import-b' ? other : detail())
+    show(<ImportReviewPage />)
+    const input = await screen.findByLabelText('Description') as HTMLInputElement
+    await waitFor(() => expect(input.disabled).toBe(false))
+    const oldList = deferred<ImportListResult>()
+    vi.mocked(getImports).mockReturnValueOnce(oldList.promise).mockResolvedValue(listPage([{ ...listItem, id: 'import-b', originalFileName: 'other.csv' }]))
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh selected import' }))
+    await waitFor(() => expect(getImports).toHaveBeenCalledTimes(2))
+    fireEvent.change(screen.getByLabelText('File status'), { target: { value: 'all' } })
+    const otherInput = await screen.findByDisplayValue('B description') as HTMLInputElement
+    await waitFor(() => expect(otherInput.disabled).toBe(false))
+    fireEvent.change(otherInput, { target: { value: 'Keep B correction' } })
+    await screen.findByRole('button', { name: 'Save all corrections (1)' })
+    await act(async () => oldList.resolve(listPage([listItem])))
+    expect(otherInput.value).toBe('Keep B correction')
+    expect(screen.getByRole('button', { name: 'Save all corrections (1)' })).toBeTruthy()
+    expect((screen.getByLabelText('Uploaded file') as HTMLSelectElement).value).toBe('import-b')
+    expect(updateImportDraft).not.toHaveBeenCalled()
+    expect(bulkUpdateImportDrafts).not.toHaveBeenCalled()
+  })
   it('shows the original worksheet and Excel row provenance in review and row details', async () => {
     vi.mocked(getImports).mockResolvedValue(listPage([{ ...listItem, originalFileName: 'bank.xlsx', sourceWorksheetName: 'Chequing' }]))
     vi.mocked(getImport).mockResolvedValue({ ...detail(), originalFileName: 'bank.xlsx', sourceWorksheetName: 'Chequing' })
@@ -396,7 +488,7 @@ describe('import file browsing', () => {
     expect((screen.getByLabelText('Uploaded file') as HTMLSelectElement).value).toBe('old-import')
     expect(screen.getByRole('option', { name: 'older.csv — Sample account (ReadyForReview)' })).toBeTruthy()
     expect(screen.queryByText(/outside this list page/)).toBeNull()
-    expect(getImports).toHaveBeenCalledWith('household-a', 'all', 1)
+    expect(getImports).toHaveBeenCalledWith('household-a', 'all', 1, expect.any(AbortSignal))
   })
 
   it('changing file status closes the old file and opens the first matching file', async () => {
@@ -413,7 +505,7 @@ describe('import file browsing', () => {
     await act(async () => resolve(listPage([{ ...listItem, ...completed }])))
     await screen.findByRole('heading', { name: 'Review transactions in completed.csv' })
     expect((screen.getByLabelText('Uploaded file') as HTMLSelectElement).value).toBe('completed-b')
-    expect(getImports).toHaveBeenLastCalledWith('household-a', 'completed', 1)
+    expect(getImports).toHaveBeenLastCalledWith('household-a', 'completed', 1, expect.any(AbortSignal))
     expect(new URLSearchParams(window.location.search).get('importId')).toBe('completed-b')
     expect(screen.queryByRole('option', { name: /sample.csv/ })).toBeNull()
   })
@@ -466,7 +558,7 @@ describe('import file browsing', () => {
     fireEvent.click(next)
     await screen.findByText(/File page 2 of 2/)
     expect(document.activeElement).toBe(next)
-    expect(getImports).toHaveBeenLastCalledWith('household-a', 'inProgress', 2)
+    expect(getImports).toHaveBeenLastCalledWith('household-a', 'inProgress', 2, expect.any(AbortSignal))
     expect((screen.getByLabelText('Uploaded file') as HTMLSelectElement).value).toBe('import-a')
     expect(screen.getByRole('heading', { name: 'Review transactions in sample.csv' })).toBeTruthy()
     expect(new URLSearchParams(window.location.search).get('page')).toBe('2')
@@ -531,7 +623,7 @@ describe('import file browsing', () => {
     vi.mocked(getImport).mockResolvedValue(failed)
     show(<ImportReviewPage />, '/imports/review?importId=import-a&filter=ready')
     await screen.findByText(/This import is failed and is not ready for review/)
-    expect(getImports).toHaveBeenCalledWith('household-a', 'ready', 1)
+    expect(getImports).toHaveBeenCalledWith('household-a', 'ready', 1, expect.any(AbortSignal))
     expect((screen.getByLabelText('Description') as HTMLInputElement).disabled).toBe(true)
     expect(screen.queryByRole('button', { name: 'Create approved transactions' })).toBeNull()
   })

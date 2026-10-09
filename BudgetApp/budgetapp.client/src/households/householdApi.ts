@@ -33,8 +33,8 @@ export function saveHouseholdSettings(householdId: string, request: HouseholdSet
   return apiPut(`/api/households/${encodeURIComponent(householdId)}/settings`, request)
 }
 
-export function getHouseholds(): Promise<HouseholdMembership[]> {
-  return apiGet<HouseholdMembership[]>('/api/households')
+export function getHouseholds(signal?: AbortSignal): Promise<HouseholdMembership[]> {
+  return apiGet<HouseholdMembership[]>('/api/households', signal)
 }
 
 export function createHousehold(

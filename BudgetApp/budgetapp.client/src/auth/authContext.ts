@@ -11,6 +11,7 @@ export interface AuthContextValue {
   user: CurrentUser | null
   isLoading: boolean
   initializationError: string | null
+  hasLoaded?: boolean
   login: (request: LoginRequest) => Promise<CurrentUser | PendingLogin>
   register: (request: RegisterRequest) => Promise<PasswordRecoveryRequestedResponse>
   updateUser: (user: CurrentUser | null) => void

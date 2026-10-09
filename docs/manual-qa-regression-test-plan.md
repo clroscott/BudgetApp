@@ -901,6 +901,42 @@ compatibility checks against the combined feature as well.
       account. Archived accounts reject new imports. Other households/private
       imports remain invisible; unsaved upload/review guards remain intact.
 
+### Async read ownership and recovery (#214)
+
+Use fictional Development/Scratch data or the read-only browser harness. The
+owner's wider #197 manual sweep may remain deferred; do not mark these checks
+passed solely because automated tests pass. No database migration is required.
+See [read ownership rules and verification](async-read-ownership.md).
+
+- [ ] Delay a session status read, then sign out or complete confirmation. Release
+      the older response: it must not sign the user back in or undo confirmation.
+      Repeat overlapping status checks returning in reverse order. Only the latest
+      attempt finishes the current feedback; canceled reads do not show network errors.
+- [ ] Delay membership refresh while changing users or confirmed-email eligibility.
+      Former-user memberships, selection and errors must not appear in the new
+      context or overwrite its saved selection. Same-user refresh retains a valid
+      deliberate household selection; canceled switching still preserves edits.
+- [ ] Refresh provider data with an open edited form. A same-context refresh/failure
+      retains its values and explains retained/stale data. Controls are unavailable
+      while the retained region is pending/stale; the retry remains usable outside
+      it. Retry restores access without remounting/resetting the editor. Confirmed
+      logout/access revocation removes private content, rather than retaining it.
+- [ ] Test initial import-list/detail failure separately from a successful empty
+      list. Fail a subsequent refresh of that empty list: no current “No imports
+      yet” claim appears. Retained rows on a detail refresh failure are clearly
+      stale and cannot be edited until a successful read-only retry.
+- [ ] Delay import A's detail or list refresh; select/filter to B and correct a B
+      row. Release A's response. B's selection, corrections, messages and rule
+      preview remain intact. Repeat A → B → A and leaving the page during the read.
+- [ ] Fail a rule-preview read. Its named retry reloads matches only, never applies
+      rules or saves rows. Unknown/stale match counts cannot enable rule application.
+- [ ] Fail a save; safe corrections remain for retry. Separately let a correction
+      save or completion succeed, then fail its refresh: the page must explain the
+      successful write. Retry only reads data and creates no duplicate transactions.
+- [ ] Check keyboard/focus and narrow layout of new status/retry feedback, including
+      retained inert forms and account settings without a household. Existing
+      guards, private-account permissions, MFA and email-confirmation gates remain.
+
 ### Shared layout ownership (#218)
 
 Use fictional Development/Scratch data. These layout slices need no database migration.

@@ -9,6 +9,7 @@ export interface HouseholdContextValue {
   currentHousehold: HouseholdMembership | null
   isLoading: boolean
   initializationError: string | null
+  hasLoaded?: boolean
   selectHousehold: (householdId: string) => boolean
   updateHousehold: (household: HouseholdMembership) => void
   createHousehold: (
