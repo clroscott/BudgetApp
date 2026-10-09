@@ -995,6 +995,35 @@ the real local Production household.
 - [ ] Draft activation, return to Draft, closure, and reopening obey their rules.
 - [ ] Deleting a Draft requires confirmation and does not delete transactions.
 
+## Grouped monthly/historical/annual actuals (#210)
+
+Use disposable Development/Scratch data, not Production. Automated fixtures and
+SQL profiling: `tools/BudgetActualsBenchmarks/README.md`. This change has no new
+controls, migration, financial write or average-calculation redesign.
+
+- [ ] Compare Monthly budget Actual/Remaining, previous-month Actual, historical
+      Average/month and Annual overview with pre-change figures and transaction
+      drill-downs. Repeat both Personal/Household scopes and Owner/Viewer users.
+- [ ] A shared personal-account expense selected for both budgets counts once in
+      each selected budget. Another member's private-only expense (including a
+      stale Personal selection after it is unshared) contributes nothing visible.
+- [ ] Expense refunds retain their negative sign; positive income-category values
+      do not become income or spending. Uncategorized +10 and -10 in one month
+      remain +10 spending and +10 income annually, not net-zero cash-flow measures.
+      Monthly uncategorized retains its existing signed net behavior.
+- [ ] CAD/USD and mismatch **transaction** counts remain unchanged, even when many
+      mismatches share one category. Test four-decimal values, inactive categories,
+      direct parent and child amounts, excluded/voided rows, and year boundaries.
+- [ ] Missing monthly/category budgets retain No budget/null Remaining; budgeted
+      zero remains a real zero budget. Empty periods show zero actuals, not failed
+      loading; no existing budget/transaction/inclusion is modified by viewing.
+- [ ] Run disposable 1k/10k/100k SQL Server profiling. Exact old/new parity succeeds;
+      returned row counts reflect category/month/currency groups rather than history
+      size. Record logical reads, p50/p95, allocations and actual query plans; inspect
+      spill/index use before proposing indexes. Do not use timing gates in unit tests.
+- [ ] Loading/failure/retry, narrow/zoom layouts, drill-down links, and unsaved budget
+      edits still behave as before. Automated parity is not live manual sign-off.
+
 ## Transaction budget inclusion (#182)
 
 Use fictional CAD 1,200 rent in a personal account owned by User A. User B must

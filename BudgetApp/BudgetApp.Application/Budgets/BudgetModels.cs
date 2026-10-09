@@ -53,14 +53,17 @@ public sealed record BudgetHistoricalActualRecord(
     int Month,
     decimal Amount);
 
-public sealed record AnnualTransactionRecord(
+// One row per month/category, not per transaction. Keep both signs for
+// uncategorized cash flow: a refund/income must not cancel positive spending.
+public sealed record AnnualCategoryMonthActualRecord(
     int Month,
     Guid? CategoryId,
     CategoryType? CategoryType,
-    decimal Amount);
+    decimal SpendingAmount,
+    decimal IncomeAmount);
 
-public sealed record AnnualTransactionActualsRecord(
-    IReadOnlyList<AnnualTransactionRecord> Transactions,
+public sealed record AnnualBudgetActualsRecord(
+    IReadOnlyList<AnnualCategoryMonthActualRecord> CategoryMonths,
     int CurrencyMismatchTransactionCount);
 
 public sealed record AnnualBudgetOverviewModel(

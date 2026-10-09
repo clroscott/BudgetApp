@@ -1,0 +1,216 @@
+{
+  "Utc": "2026-10-08T23:24:53.8918636+00:00",
+  "SqlServer": "Express Edition (64-bit) / 16.0.1200.5",
+  "Runtime": "10.0.12",
+  "Configuration": "Release",
+  "Notes": "15 alternating warm samples per path. Repository-read latency, not HTTP/UI latency. Process-wide managed allocations. No global cache flush or index changes.",
+  "Results": [
+    {
+      "GeneratedTransactions": 1000,
+      "Operation": "monthly",
+      "ExactParity": true,
+      "Baseline": {
+        "P50Milliseconds": 1.9443,
+        "P95Milliseconds": 2.8659,
+        "MeanAllocatedBytes": 106725,
+        "ReturnedRows": 102,
+        "BytesReceived": 4821,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 464
+      },
+      "Grouped": {
+        "P50Milliseconds": 1.9561,
+        "P95Milliseconds": 2.6347,
+        "MeanAllocatedBytes": 82876,
+        "ReturnedRows": 6,
+        "BytesReceived": 2687,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 464
+      }
+    },
+    {
+      "GeneratedTransactions": 1000,
+      "Operation": "historical",
+      "ExactParity": true,
+      "Baseline": {
+        "P50Milliseconds": 4.2614,
+        "P95Milliseconds": 5.9003,
+        "MeanAllocatedBytes": 447606,
+        "ReturnedRows": 1009,
+        "BytesReceived": 31338,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2071
+      },
+      "Grouped": {
+        "P50Milliseconds": 4.1208,
+        "P95Milliseconds": 4.8799,
+        "MeanAllocatedBytes": 91995,
+        "ReturnedRows": 37,
+        "BytesReceived": 4328,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2071
+      }
+    },
+    {
+      "GeneratedTransactions": 1000,
+      "Operation": "annual",
+      "ExactParity": true,
+      "Baseline": {
+        "P50Milliseconds": 4.6379,
+        "P95Milliseconds": 5.5392,
+        "MeanAllocatedBytes": 547852,
+        "ReturnedRows": 1017,
+        "BytesReceived": 46778,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2079
+      },
+      "Grouped": {
+        "P50Milliseconds": 5.1351,
+        "P95Milliseconds": 5.8448,
+        "MeanAllocatedBytes": 118005,
+        "ReturnedRows": 42,
+        "BytesReceived": 5396,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2079
+      }
+    },
+    {
+      "GeneratedTransactions": 10000,
+      "Operation": "monthly",
+      "ExactParity": true,
+      "Baseline": {
+        "P50Milliseconds": 4.91,
+        "P95Milliseconds": 5.5238,
+        "MeanAllocatedBytes": 402819,
+        "ReturnedRows": 877,
+        "BytesReceived": 28488,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2060
+      },
+      "Grouped": {
+        "P50Milliseconds": 4.4812,
+        "P95Milliseconds": 5.003,
+        "MeanAllocatedBytes": 83704,
+        "ReturnedRows": 6,
+        "BytesReceived": 3270,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2060
+      }
+    },
+    {
+      "GeneratedTransactions": 10000,
+      "Operation": "historical",
+      "ExactParity": true,
+      "Baseline": {
+        "P50Milliseconds": 28.4344,
+        "P95Milliseconds": 39.2545,
+        "MeanAllocatedBytes": 3930754,
+        "ReturnedRows": 10009,
+        "BytesReceived": 283590,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 298
+      },
+      "Grouped": {
+        "P50Milliseconds": 21.3735,
+        "P95Milliseconds": 21.9924,
+        "MeanAllocatedBytes": 93274,
+        "ReturnedRows": 37,
+        "BytesReceived": 4332,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 20326
+      }
+    },
+    {
+      "GeneratedTransactions": 10000,
+      "Operation": "annual",
+      "ExactParity": true,
+      "Baseline": {
+        "P50Milliseconds": 33.2301,
+        "P95Milliseconds": 37.6761,
+        "MeanAllocatedBytes": 4923457,
+        "ReturnedRows": 10017,
+        "BytesReceived": 434166,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 298
+      },
+      "Grouped": {
+        "P50Milliseconds": 17.7893,
+        "P95Milliseconds": 23.6658,
+        "MeanAllocatedBytes": 118474,
+        "ReturnedRows": 42,
+        "BytesReceived": 5392,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 298
+      }
+    },
+    {
+      "GeneratedTransactions": 100000,
+      "Operation": "monthly",
+      "ExactParity": true,
+      "Baseline": {
+        "P50Milliseconds": 21.1619,
+        "P95Milliseconds": 29.9073,
+        "MeanAllocatedBytes": 3322858,
+        "ReturnedRows": 8503,
+        "BytesReceived": 249862,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2816
+      },
+      "Grouped": {
+        "P50Milliseconds": 19.6954,
+        "P95Milliseconds": 20.7568,
+        "MeanAllocatedBytes": 83014,
+        "ReturnedRows": 6,
+        "BytesReceived": 3268,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2834
+      }
+    },
+    {
+      "GeneratedTransactions": 100000,
+      "Operation": "historical",
+      "ExactParity": true,
+      "Baseline": {
+        "P50Milliseconds": 120.6408,
+        "P95Milliseconds": 135.7346,
+        "MeanAllocatedBytes": 37360666,
+        "ReturnedRows": 100009,
+        "BytesReceived": 2806112,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2816
+      },
+      "Grouped": {
+        "P50Milliseconds": 74.9578,
+        "P95Milliseconds": 110.6451,
+        "MeanAllocatedBytes": 91941,
+        "ReturnedRows": 37,
+        "BytesReceived": 4326,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2816
+      }
+    },
+    {
+      "GeneratedTransactions": 100000,
+      "Operation": "annual",
+      "ExactParity": true,
+      "Baseline": {
+        "P50Milliseconds": 149.9119,
+        "P95Milliseconds": 228.1499,
+        "MeanAllocatedBytes": 48047598,
+        "ReturnedRows": 100017,
+        "BytesReceived": 4308040,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2816
+      },
+      "Grouped": {
+        "P50Milliseconds": 149.7536,
+        "P95Milliseconds": 181.6866,
+        "MeanAllocatedBytes": 117052,
+        "ReturnedRows": 42,
+        "BytesReceived": 5394,
+        "LogicalReads": null,
+        "ActualPlanLogicalReads": 2816
+      }
+    }
+  ]
+}

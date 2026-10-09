@@ -37,7 +37,7 @@ public sealed class AnnualBudgetOverviewService(
         var categories = await budgetRepository.ListExpenseCategoriesAsync(
             householdId,
             cancellationToken);
-        var actuals = await budgetRepository.GetAnnualTransactionsAsync(
+        var actuals = await budgetRepository.GetAnnualActualsAsync(
             householdId,
             userId,
             year,
@@ -51,15 +51,15 @@ public sealed class AnnualBudgetOverviewService(
             .ToDictionary(
                 group => group.Key,
                 group => group.Sum(line => line.BudgetedAmount));
-        var expenseTransactions = actuals.Transactions
+        var expenseActuals = actuals.CategoryMonths
             .Where(transaction => transaction.CategoryType == CategoryType.Expense)
             .ToList();
-        var actualByCategory = expenseTransactions
+        var actualByCategory = expenseActuals
             .Where(transaction => transaction.CategoryId.HasValue)
             .GroupBy(transaction => transaction.CategoryId!.Value)
             .ToDictionary(
                 group => group.Key,
-                group => group.Sum(transaction => transaction.Amount));
+                group => group.Sum(transaction => transaction.SpendingAmount));
         var averageMonthCount = GetAverageMonthCount(year);
         var categoryModels = categories
             .Where(category => !category.ParentCategoryId.HasValue)
@@ -77,23 +77,22 @@ public sealed class AnnualBudgetOverviewService(
                 averageMonthCount))
             .ToList();
 
+        var actualsByMonth = actuals.CategoryMonths.ToLookup(item => item.Month);
         var months = Enumerable.Range(1, 12)
             .Select(month => BuildMonth(
                 year,
                 month,
                 budgets.SingleOrDefault(budget => budget.Month == month),
-                actuals.Transactions))
+                actualsByMonth[month]))
             .ToList();
         var annualBudgeted = budgets
             .SelectMany(budget => budget.Lines)
             .Sum(line => line.BudgetedAmount);
         var actualSpending = months.Sum(month => month.ActualSpendingAmount);
         var income = months.Sum(month => month.IncomeAmount);
-        var uncategorizedSpending = actuals.Transactions
-            .Where(transaction =>
-                !transaction.CategoryId.HasValue &&
-                transaction.Amount > 0)
-            .Sum(transaction => transaction.Amount);
+        var uncategorizedSpending = actuals.CategoryMonths
+            .Where(item => !item.CategoryId.HasValue)
+            .Sum(item => item.SpendingAmount);
 
         return new AnnualBudgetOverviewModel(
             year,
@@ -116,23 +115,12 @@ public sealed class AnnualBudgetOverviewService(
         int year,
         int month,
         BudgetMonth? budget,
-        IReadOnlyList<AnnualTransactionRecord> transactions)
+        IEnumerable<AnnualCategoryMonthActualRecord> actuals)
     {
-        var monthTransactions = transactions
-            .Where(transaction => transaction.Month == month)
-            .ToList();
+        var monthActuals = actuals.ToList();
         var budgeted = budget?.Lines.Sum(line => line.BudgetedAmount);
-        var spending = monthTransactions
-            .Where(transaction =>
-                transaction.CategoryType == CategoryType.Expense ||
-                !transaction.CategoryId.HasValue && transaction.Amount > 0)
-            .Sum(transaction => transaction.Amount);
-        var income = monthTransactions
-            .Where(transaction =>
-                (transaction.CategoryType == CategoryType.Income ||
-                 !transaction.CategoryId.HasValue) &&
-                transaction.Amount < 0)
-            .Sum(transaction => -transaction.Amount);
+        var spending = monthActuals.Sum(item => item.SpendingAmount);
+        var income = monthActuals.Sum(item => item.IncomeAmount);
         return new AnnualBudgetMonthModel(
             budget?.Id,
             year,

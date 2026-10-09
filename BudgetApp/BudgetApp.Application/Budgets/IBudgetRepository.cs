@@ -58,7 +58,7 @@ public interface IBudgetRepository
         string currency,
         CancellationToken cancellationToken);
 
-    Task<AnnualTransactionActualsRecord> GetAnnualTransactionsAsync(
+    Task<AnnualBudgetActualsRecord> GetAnnualActualsAsync(
         Guid householdId,
         Guid userId,
         int year,

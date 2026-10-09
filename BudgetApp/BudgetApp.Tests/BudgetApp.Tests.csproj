@@ -34,4 +34,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="../../tools/BudgetActualsBenchmarks/BudgetActualsFixture.cs" Link="Profiling/BudgetActualsFixture.cs" />
+    <Compile Include="../../tools/BudgetActualsBenchmarks/LegacyBudgetActualsReader.cs" Link="Profiling/LegacyBudgetActualsReader.cs" />
+  </ItemGroup>
+
 </Project>
