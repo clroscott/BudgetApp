@@ -1,3 +1,4 @@
+import { PageFrame } from '../components/PageFrame'
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/apiClient'
 import { getErrorMessages } from '../auth/errorMessages'
@@ -82,8 +83,7 @@ export function HouseholdSettingsPage() {
     setNotice(null)
   }
 
-  return <main className="management-page">
-    <section className="management-content narrow-management-content">
+  return <PageFrame>
       {currentHousehold && <HouseholdSectionNav current="settings" />}
       <header className="page-title-row">
         <div><p className="eyebrow">Household</p><h1>Household settings</h1>
@@ -97,7 +97,7 @@ export function HouseholdSettingsPage() {
         {notice && <p className="success-summary" role="status">{notice}</p>}
         {isSaving && <p role="status">Saving household settings…</p>}
         {requiresReload && <p className="field-help">Your entered values are kept. Reload the current settings before saving again; reloading asks before discarding edits.</p>}
-        {loadState.hasData && saved && <form className="household-settings-form" onSubmit={event => void save(event)}>
+        {loadState.hasData && saved && <form className="household-settings-form readable-panel" onSubmit={event => void save(event)}>
           <p>{saved.canEdit ? 'Owners and Admins can edit these shared settings.' : 'Only Owners and Admins can edit these settings. You have read-only access.'}</p>
           <label htmlFor={`${id}-name`}>Household name</label>
           <input id={`${id}-name`} required maxLength={100} autoComplete="organization" value={draft.name}
@@ -127,6 +127,5 @@ export function HouseholdSettingsPage() {
           </div>}
         </form>}
       </> : <p className="empty-state">Choose or create a household before opening its settings.</p>}
-    </section>
-  </main>
+    </PageFrame>
 }

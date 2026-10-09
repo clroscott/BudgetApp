@@ -1,3 +1,4 @@
+import { PageFrame } from '../components/PageFrame'
 import { useEffect, useId, useState, type FormEvent } from 'react'
 import { getApplicationUsers, type AdministratorList } from '../administration/administrationApi'
 import { useAuth } from '../auth/useAuth'
@@ -8,9 +9,9 @@ import { usePageLoad } from './usePageLoad'
 
 export function ApplicationUsersPage() {
   const { user } = useAuth()
-  if (!user?.isApplicationAdministrator || !user.loginVerificationEnabled) return <main className="management-page"><section className="management-content">
+  if (!user?.isApplicationAdministrator || !user.loginVerificationEnabled) return <PageFrame>
     <h1>Application users</h1><p role="alert">Application-administrator access and an MFA sign-in are required to view users. Household administrator roles do not grant this access.</p>
-    <AppLink to="/settings/account">Account settings</AppLink></section></main>
+    <AppLink to="/settings/account">Account settings</AppLink></PageFrame>
   return <UserDirectory />
 }
 function UserDirectory() {
@@ -24,7 +25,7 @@ function UserDirectory() {
   useEffect(() => { void run(() => getApplicationUsers(query.page, query.search), setDirectory) }, [query, run])
   const refresh = () => { void run(() => getApplicationUsers(query.page, query.search), setDirectory) }
   const applyFilter = (event: FormEvent) => { event.preventDefault(); setQuery({ page: 1, search: filter.trim() }) }
-  return <main className="management-page"><section className="management-content">
+  return <PageFrame>
     <header><p className="eyebrow">Application administration · account directory</p><h1>Application users</h1>
       <p>Browse existing accounts without searching first. Only basic account and security status is shown—not household memberships, budgets or transactions.</p></header>
     <ApplicationAdministrationNav />
@@ -57,5 +58,5 @@ function UserDirectory() {
         <button type="button" disabled={!load.isFresh || directory.page * directory.pageSize >= directory.totalCount} onClick={() => setQuery({ ...query, page: directory.page + 1 })}>Next users page</button>
       </nav>
     </>}
-  </section></main>
+  </PageFrame>
 }

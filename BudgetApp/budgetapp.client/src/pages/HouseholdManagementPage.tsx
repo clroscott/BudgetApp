@@ -1,3 +1,4 @@
+import { PageFrame } from '../components/PageFrame'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { getSafeReturnPath } from '../auth/returnPath'
@@ -153,8 +154,7 @@ export function HouseholdManagementPage() {
   }
 
   return (
-    <main className="management-page">
-      <div className="management-content">
+    <PageFrame>
         <HouseholdSectionNav current="members" />
         <header className="page-title-row">
           <div>
@@ -440,7 +440,6 @@ export function HouseholdManagementPage() {
             )}
           </section>
         )}
-      </div>
-    </main>
+    </PageFrame>
   )
 }

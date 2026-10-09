@@ -24,6 +24,13 @@ node .\tools\LayoutQa\verify-layout.mjs after
 node .\tools\LayoutQa\verify-layout.mjs before budgeting
 node .\tools\LayoutQa\verify-layout.mjs after budgeting
 
+# Remaining managed pages, with their own baseline:
+node .\tools\LayoutQa\verify-layout.mjs before remaining
+node .\tools\LayoutQa\verify-layout.mjs after remaining
+
+# Reprocess already-captured evidence after a comparison-code correction:
+node .\tools\LayoutQa\verify-layout.mjs compare remaining
+
 # Focused calculator switching/dismissal/Use-result checks (fictional form state):
 node .\tools\LayoutQa\verify-layout.mjs interactions budgeting
 ```
@@ -31,6 +38,8 @@ node .\tools\LayoutQa\verify-layout.mjs interactions budgeting
 The `before` run must precede the source change. Both runs must use the same
 browser version, fixture data, viewport definitions and host environment. Do not
 overwrite the before evidence after editing to make a comparison pass.
+`compare` starts no browser/server and cannot validate a later source change;
+capture a new `after` run whenever application source or fixtures change.
 
 Output lives under ignored `artifacts/layout-qa/before` and `after`:
 
@@ -40,7 +49,7 @@ Output lives under ignored `artifacts/layout-qa/before` and `after`:
   screenshots. Review differences; rendering/anti-aliasing varies across machines.
 
 The original first-slice evidence covers seven pages × five layouts. The current
-harness covers sixteen page/state variants × five layouts (80 cases), including
+default/budgeting harness covers sixteen page/state variants × five layouts (80 cases), including
 the five budgeting destinations, loaded/empty/failed/delayed data, Viewer targets
 and multiple-household selection. It waits for data-ready UI, not only a heading.
 It also checks keyboard, profile, sticky-header and budget action/calculator behavior.
@@ -48,6 +57,15 @@ All pages must avoid document-level horizontal overflow; wide review/annual tabl
 retain their own scrolling area. The monthly/annual internal responsive grids can
 change flow height; common column/title/tab/form geometry must otherwise match.
 Different image sizes and pixel counts are recorded for visual review, not ignored.
+
+The `remaining` slice covers 24 page/state variants × five layouts (120 cases):
+dashboard, financial accounts, household/settings/activity, Help/Tutorials and
+operator pages plus representative transactions/budgets. It includes signed-out
+and no-household Help, settings without a household, Viewer/failed-load states,
+and authorized/blocked operator views. Blocked views must make no admin-data reads.
+Standalone Help's return link intentionally moves into the common title row; its
+page column width/alignment remains fixed while header flow may change. Centered
+public authentication/initial setup screens are not migrated by #218.
 
 The 960×540/2× case is a **200%-equivalent CSS viewport**, not an actual zoom or
 screen-reader test. Complete the permanent manual checklist before merge. Future

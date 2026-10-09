@@ -1,3 +1,4 @@
+import { PageFrame } from '../components/PageFrame'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
   getAuditEvents,
@@ -83,8 +84,7 @@ export function ActivityPage() {
   }
 
   return (
-    <main className="management-page">
-      <section className="management-content activity-content">
+    <PageFrame contentClassName="activity-content">
         <HouseholdSectionNav current="activity" />
         <div className="page-title-row">
           <div>
@@ -263,7 +263,6 @@ export function ActivityPage() {
             </button>
           </nav>
         )}
-      </section>
-    </main>
+    </PageFrame>
   )
 }

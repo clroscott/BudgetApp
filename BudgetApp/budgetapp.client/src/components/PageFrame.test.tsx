@@ -4,6 +4,12 @@ import { describe, expect, it } from 'vitest'
 import { PageFrame } from './PageFrame'
 
 describe('shared page frame', () => {
+  it('preserves main accessibility attributes while pages load', () => {
+    const view = render(<PageFrame aria-busy><h1>Account settings</h1></PageFrame>)
+    expect(screen.getByRole('main').getAttribute('aria-busy')).toBe('true')
+    view.rerender(<PageFrame aria-busy={false}><h1>Account settings</h1></PageFrame>)
+    expect(screen.getByRole('main').getAttribute('aria-busy')).toBe('false')
+  })
   it('exposes the measured page ref and keeps fixed actions outside the content column', () => {
     const ref = createRef<HTMLElement>()
     const view = render(<PageFrame className="budget-page" contentClassName="budget-content" ref={ref}

@@ -1,0 +1,464 @@
+/* Dashboard cards, summaries and customization.
+   Page width, gutters and headings belong to page-frame.css. */
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.dashboard-columns-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-columns-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-columns-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.summary-card {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.4rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: var(--small-shadow);
+}
+
+.dashboard-panel {
+  min-width: 0;
+}
+
+.dashboard-panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.summary-card .dashboard-panel-icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0.7rem;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.dashboard-panel-icon svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.dashboard-customizing .dashboard-panel {
+  border-style: dashed;
+  cursor: grab;
+}
+
+.dashboard-customizing .dashboard-panel:active {
+  cursor: grabbing;
+}
+
+.dashboard-customizing .dashboard-panel.dragging {
+  opacity: 0.45;
+}
+
+.dashboard-customizing .dashboard-panel a {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.dashboard-panel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: -0.55rem -0.55rem 0.3rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-panel-controls > span {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dashboard-panel-controls > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.15rem;
+}
+
+.dashboard-panel-controls button {
+  padding: 0.35rem;
+  font-size: 0.72rem;
+}
+
+.dashboard-customizer,
+.dashboard-add-panels,
+.dashboard-empty {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+}
+
+.dashboard-customizer {
+  display: grid;
+  grid-template-columns: minmax(15rem, 1fr) auto;
+  align-items: center;
+  gap: 1rem 2rem;
+}
+
+.dashboard-customizer h2,
+.dashboard-add-panels h2,
+.dashboard-empty h2 {
+  margin-bottom: 0.35rem;
+  font-size: 1.05rem;
+}
+
+.dashboard-customizer p,
+.dashboard-add-panels p,
+.dashboard-empty p {
+  margin-bottom: 0;
+  color: var(--muted-text);
+}
+
+.dashboard-customizer fieldset {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.dashboard-customizer legend {
+  margin-bottom: 0.4rem;
+  color: var(--muted-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.dashboard-customizer fieldset button {
+  min-width: 2.5rem;
+  padding: 0.55rem;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+}
+
+.dashboard-customizer fieldset button.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.dashboard-customizer-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.dashboard-add-panels {
+  margin-top: 1.5rem;
+  margin-bottom: 0;
+}
+
+.dashboard-add-panels > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.dashboard-empty {
+  text-align: center;
+}
+
+.summary-card span,
+.summary-card small {
+  color: var(--muted-text);
+}
+
+.summary-card strong {
+  color: var(--heading);
+  overflow-wrap: anywhere;
+}
+
+.summary-card small {
+  overflow-wrap: anywhere;
+}
+
+.muted-card {
+  border-style: dashed;
+}
+
+.dashboard-tutorial-prompt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: 1rem;
+  background: linear-gradient(
+      115deg,
+      color-mix(in srgb, var(--accent) 12%, var(--surface)),
+      var(--surface)
+    );
+  box-shadow: var(--small-shadow);
+}
+
+.dashboard-tutorial-prompt h2,
+.dashboard-tutorial-prompt p {
+  margin: 0.2rem 0;
+}
+
+.dashboard-tutorial-prompt > div:last-child {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+@media (max-width: 700px) {
+  .dashboard-tutorial-prompt {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-tutorial-prompt > div:last-child {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 55rem) {
+  .dashboard-grid,
+  .dashboard-columns-2,
+  .dashboard-columns-3,
+  .dashboard-columns-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 40rem) {
+  .dashboard-customizer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dashboard-customizer {
+    display: flex;
+  }
+
+  .dashboard-customizer-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .dashboard-grid,
+  .dashboard-columns-2,
+  .dashboard-columns-3,
+  .dashboard-columns-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard-security-prompt {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-block: 1rem;
+}
+
+.dashboard-security-prompt > div {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.dashboard-security-prompt h2 {
+  font-size: 1.1rem;
+  margin-top: 0;
+}
+
+.dashboard-context-controls {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.dashboard-context-controls > label {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 10rem;
+  font-weight: 650;
+  font-size: 0.9rem;
+}
+
+.dashboard-context-controls > p {
+  flex: 1 1 16rem;
+  color: var(--muted-text);
+  font-size: 0.85rem;
+  margin: 0 0 0.25rem;
+}
+
+.dashboard-getting-started {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  margin: 1.25rem 0;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.dashboard-getting-started > div {
+  flex: 1 1 16rem;
+}
+
+.dashboard-getting-started h2 {
+  margin-top: 0.35rem;
+  font-size: 1.2rem;
+}
+
+.dashboard-getting-started p {
+  margin-bottom: 0;
+}
+
+.dashboard-getting-started ol {
+  flex: 1 1 18rem;
+  margin: 0;
+  padding-left: 1.5rem;
+  line-height: 1.7;
+}
+
+.dashboard-panel {
+  align-content: start;
+  min-width: 0;
+}
+
+.dashboard-panel h2 {
+  font-size: 1.2rem;
+  line-height: 1.4;
+  margin: 0.25rem 0;
+}
+
+.dashboard-panel p {
+  margin-block: 0.35rem;
+  line-height: 1.6;
+}
+
+.dashboard-card-context {
+  color: var(--muted-text);
+  font-size: 0.85rem;
+}
+
+.dashboard-metrics {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+}
+
+.dashboard-metrics > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-block: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-metrics dt {
+  color: var(--muted-text);
+}
+
+.dashboard-metrics dd {
+  margin: 0;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+}
+
+.dashboard-warning {
+  border-left: 3px solid var(--danger);
+  padding-left: 0.7rem;
+  font-size: 0.85rem;
+}
+
+.dashboard-attention-list,
+.dashboard-recent-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0;
+}
+
+.dashboard-attention-list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.75rem;
+  margin-bottom: 1rem;
+  align-items: baseline;
+}
+
+.dashboard-attention-list li > strong {
+  font-size: 1.4rem;
+}
+
+.dashboard-attention-list small {
+  grid-column: 2;
+  color: var(--muted-text);
+  line-height: 1.5;
+}
+
+.dashboard-recent-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-block: 0.65rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.dashboard-recent-list li > div {
+  min-width: 0;
+  flex: 1 1 10rem;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-recent-list small {
+  display: block;
+  color: var(--muted-text);
+}
+
+.dashboard-recent-list li > span {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 38rem) {
+  .dashboard-context-controls > label {
+    flex: 1 1 9rem;
+    min-width: 0;
+  }
+
+  .dashboard-panel {
+    padding: 1.15rem;
+  }
+
+  .dashboard-getting-started {
+    padding: 1.15rem;
+  }
+}

@@ -1,3 +1,4 @@
+import { PageFrame } from '../components/PageFrame'
 import {
   useEffect,
   useLayoutEffect,
@@ -296,8 +297,7 @@ export function DashboardPage() {
     : layout?.preferredColumnCount ?? 3
 
   return (
-    <main className="dashboard-page">
-      <section className="dashboard-content">
+    <PageFrame>
         <div className="dashboard-title-row" data-tutorial-id="dashboard-welcome">
           <div>
             <p className="eyebrow">Dashboard</p>
@@ -545,7 +545,6 @@ export function DashboardPage() {
             )}
           </section>
         )}
-      </section>
-    </main>
+    </PageFrame>
   )
 }

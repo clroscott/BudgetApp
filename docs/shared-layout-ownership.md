@@ -1,18 +1,21 @@
-# Shared layout ownership (#218, delivery slices 1–2)
+# Shared layout ownership (#218, delivery slices 1–3)
 
 This is a behavior-preserving foundation, not the #201 visual redesign. The
-transaction/import and budgeting groups now use `PageFrame`. Dashboard, settings,
-help and operator markup continue through an explicitly documented compatibility
-bridge until their own migration slices. Do not close #218 after these slices.
+22 managed application pages now use `PageFrame`, including transaction/import,
+budgeting, dashboard, account/household, Help/Tutorials and operator pages. The
+legacy geometry/header compatibility bridge is removed. The code migration is
+complete; live zoom, screen-reader and user acceptance checks remain below.
+Centered public authentication and initial household setup remain intentionally
+separate from the application page frame.
 
 ## Style owners
 
 `App.tsx` loads these in a deliberate order:
 
-1. `App.css`: legacy feature styles for groups not migrated yet. It no longer owns
-   shell, page-frame, transaction/import, budgeting or shared section-navigation rules.
+1. `App.css`: shared base controls, branding and centered authentication/setup.
+   It no longer owns application page-frame or feature layout rules.
 2. `styles/page-frame.css`: shared content max-width, gutters, vertical spacing,
-   titles, named overlay layers, and the temporary legacy-page bridge.
+   titles, named overlay layers and opt-in readable panels.
 3. `styles/shell.css`: desktop/collapsed/narrow navigation, household context and
    profile menu. The shell does not set individual feature widths.
 4. `styles/shared-controls.css`: focus/skip link, live announcement, load feedback,
@@ -24,22 +27,31 @@ bridge until their own migration slices. Do not close #218 after these slices.
    expenses, category management and calculator controls. Internal grids wrap
    within the available page column; fixed budget actions use the shared geometry
    tokens and the page's measured action-height clearance.
+7. `styles/dashboard.css`: dashboard cards, summary grids and customization.
+8. `styles/settings.css`: financial-account cards/forms, account/household
+   settings, members/invitations and activity. Reused account cards/actions also
+   serve import profiles and recurring expenses.
+9. `styles/help.css`: contextual help, topic articles and the tutorial
+   library/overlay. Existing target, layer and focus rules are preserved.
+10. `styles/administration.css`: application-operator directory/support/access.
 
 Shared geometry has one owner. Add a feature-local layout inside the common
 column; do not restore per-page max-width overrides or another late CSS patch.
 The upload form remains left-aligned and limited to 52rem within the same page
-column. Existing short settings/help forms remain 44rem through the bridge.
+column. Short settings/help forms opt into `.readable-panel` (44rem) within it.
 
 `PageFrame` supplies one main landmark and one content section. Pages keep their
 existing section navigation, headings, control labels and stable tutorial IDs.
-It has no data loading, navigation, permission or financial logic. The four
-transaction/import headers previously hidden by the shell are no longer rendered.
-The categorization-rules page uses the same convention.
+It has no data loading, navigation, permission or financial logic. Redundant
+feature headers previously hidden by the shell are no longer rendered. Public
+and no-household Help keep their return link in the common title row rather than
+in a separate legacy header; their title/content consequently start higher.
 
 Monthly budget, Annual targets, Annual overview, Recurring expenses and Categories
 now follow that convention too. `PageFrame` accepts a page ref/class and an optional
 footer outside the content section so measured monthly actions retain their
-existing positioning and Back-to-top portal. These are layout-only props.
+existing positioning and Back-to-top portal. Native main attributes are forwarded,
+including Account settings' loading `aria-busy`. These are layout-only props.
 
 ## Sticky and overlay policy
 
@@ -118,12 +130,31 @@ The annual save bar also supplies a Back-to-top host; its action buttons wrap
 together instead of letting a separate floating button overlap Save. Regression
 coverage checks containment, non-overlap and scrolling without clearing edits.
 
-## Remaining delivery order
+The final-slice harness captures separate evidence under
+`artifacts/layout-qa/remaining`: 24 page/state variants across five layouts (120
+cases). It covers the remaining pages plus representative transaction/budget
+pages, signed-out/no-household Help, settings without a household, Viewer and
+failed-load states, and authorized/blocked operator pages. Blocked operator pages
+make no admin-data reads. All requests remain fictional and read-only.
 
-- Dashboard and settings/help/operator pages: migrate their markup and remove
-  the corresponding compatibility bridge rules only after rendered comparisons.
-- Continue #201 design proposals using these canonical layout owners. Broad
-  visual enhancement does not require all legacy features to migrate first.
+Final-slice verification on October 9, 2026: all 558 client tests, client lint and
+production build pass. All 120 rendered comparisons pass; 110 initial screenshots
+are pixel-identical. The ten differences are the intended standalone Help
+header/return-link relocation. All cases avoid document-wide overflow. A CSS
+declaration comparison also preserves all 1,029 non-retired selector/context
+groups; the common page geometry is now direct rather than supplied by a bridge.
+One existing import test was stabilized to wait for an enabled row and registered
+dirty correction before attempting navigation. No import runtime logic changed.
+No backend, database, production configuration or financial calculation changed
+in this slice. This is an ownership refactor, not a measured performance gain.
 
-Each slice must retain privacy, accessibility, tutorial IDs and unsaved-change
+## Manual acceptance and design follow-up
+
+- Complete actual browser zoom, screen-reader, canceled-navigation and real
+  interactive checks before accepting #218; synthetic geometry checks do not
+  replace these. Check all migrated page groups and the standalone Help link.
+- Continue #201 design proposals using these canonical layout owners. The code
+  migration does not constitute that broader visual enhancement.
+
+Future changes must retain privacy, accessibility, tutorial IDs and unsaved-change
 guards, with the [permanent manual QA checklist](manual-qa-regression-test-plan.md).

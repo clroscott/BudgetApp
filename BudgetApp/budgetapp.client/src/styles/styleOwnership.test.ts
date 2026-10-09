@@ -11,6 +11,18 @@ import targetsPage from '../pages/YearlyPlanManagementPage.tsx?raw'
 import overviewPage from '../pages/AnnualBudgetOverviewPage.tsx?raw'
 import recurringPage from '../pages/RecurringExpenseManagementPage.tsx?raw'
 import categoriesPage from '../pages/CategoryManagementPage.tsx?raw'
+import dashboardPage from '../pages/DashboardPage.tsx?raw'
+import accountsPage from '../pages/AccountManagementPage.tsx?raw'
+import activityPage from '../pages/ActivityPage.tsx?raw'
+import householdPage from '../pages/HouseholdManagementPage.tsx?raw'
+import householdSettingsPage from '../pages/HouseholdSettingsPage.tsx?raw'
+import householdCreatePage from '../pages/HouseholdCreatePage.tsx?raw'
+import accountSettingsPage from '../pages/AccountSettingsPage.tsx?raw'
+import helpPage from '../pages/HelpPage.tsx?raw'
+import tutorialsPage from '../pages/TutorialHubPage.tsx?raw'
+import adminPage from '../pages/ApplicationAdministrationPage.tsx?raw'
+import adminUsersPage from '../pages/ApplicationUsersPage.tsx?raw'
+import adminAccessPage from '../pages/ApplicationAdministratorsPage.tsx?raw'
 
 // Vitest's default CSS transform replaces stylesheet imports (even ?raw) with
 // empty modules. Read source explicitly: these ownership checks must inspect it.
@@ -21,8 +33,33 @@ const layout = stylesheet('./page-frame.css')
 const transactions = stylesheet('./transactions.css')
 const shared = stylesheet('./shared-controls.css')
 const budgeting = stylesheet('./budgeting.css')
+const dashboard = stylesheet('./dashboard.css')
+const settings = stylesheet('./settings.css')
+const help = stylesheet('./help.css')
+const administration = stylesheet('./administration.css')
 
 describe('layout ownership regression guardrails', () => {
+  it('retires the legacy page bridge and assigns remaining feature styles explicitly', () => {
+    expect(layout).not.toMatch(/management-page|management-content|dashboard-page|dashboard-content|narrow-management|app-header|Compatibility bridge/)
+    expect(layout).toContain('.readable-panel')
+    expect(legacy).not.toMatch(/\.(?:dashboard-|summary-card|account-|activity-|help-|tutorial-|contextual-help|admin-)/)
+    expect(dashboard).toContain('.dashboard-grid')
+    expect(settings).toContain('.household-settings-form')
+    expect(settings).toContain('.account-settings-card')
+    expect(help).toContain('.tutorial-layer')
+    expect(administration).toContain('.admin-support-layout')
+    for (const feature of [dashboard, settings, help, administration]) {
+      expect(feature).not.toContain('--page-content-max:')
+      expect(feature).not.toContain('--page-content-gutter:')
+    }
+  })
+  it.each([['dashboard', dashboardPage], ['accounts', accountsPage], ['activity', activityPage], ['household', householdPage],
+    ['household settings', householdSettingsPage], ['household creation', householdCreatePage], ['account settings', accountSettingsPage],
+    ['help', helpPage], ['tutorials', tutorialsPage], ['admin', adminPage], ['users', adminUsersPage], ['administrator access', adminAccessPage]])(
+    'uses the shared frame without legacy wrapper markup on %s', (_name, source) => {
+      expect(source).toContain('<PageFrame')
+      expect(source).not.toMatch(/className="(?:management-|dashboard-content|dashboard-page|app-header)/)
+    })
   it('gives budgeting selectors one owner and retires their page-width bridge', () => {
     expect(legacy).not.toMatch(/\.(?:budget-(?!inclusion)|yearly-|annual-|recurring-|category-|subcategory-|add-category-form|inline-edit|inline-add-subcategory|currency-input|amount-calculator|amount-entry-with-calculator)/)
     expect(layout).not.toMatch(/\.annual-|\.yearly-|\.budget-save-bar/)

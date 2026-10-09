@@ -13,34 +13,16 @@
   --layer-skip-link: 11000;
 }
 
-.page-frame,
-.management-page,
-.dashboard-page {
+.page-frame {
   min-height: 100svh;
   background: var(--page-bg);
 }
 
-.page-frame-content,
-.management-content,
-.dashboard-content {
-  width: min(100% - 2rem, 70rem);
+.page-frame-content {
+  width: min(calc(100% - var(--page-content-gutter) - var(--page-content-gutter)), var(--page-content-max));
   margin: 0 auto;
   padding: var(--page-content-padding) 0;
   box-sizing: border-box;
-}
-
-.dashboard-content {
-  width: min(100% - 2rem, 76rem);
-}
-
-.narrow-management-content {
-  width: min(100% - 2rem, 44rem);
-}
-
-.app-shell :is(.page-frame-content, .management-content, .dashboard-content) {
-  width: min(calc(100% - var(--page-content-gutter) - var(--page-content-gutter)), var(--page-content-max));
-  max-width: none;
-  margin-inline: auto;
 }
 
 .page-title-row,
@@ -78,25 +60,11 @@
   max-width: 38rem;
 }
 
-/* Compatibility bridge: dashboard/settings/help/operator groups migrate later.
-   Do not add new feature-page widths or hidden headers to this bridge. */
-
-.app-shell .narrow-management-content > :is(.account-settings-stack, .household-settings-form, .household-form, .help-topic-list, .help-article) {
+/* Short forms/articles opt into a readable width inside the common page column. */
+.readable-panel {
   width: 100%;
   max-width: 44rem;
   margin-inline: 0;
-}
-
-.app-shell:not(.standalone-account-shell) .app-header {
-  display: none;
-}
-
-.app-shell-content .app-header {
-  justify-content: flex-end;
-}
-
-.app-shell-content .app-header > .brand-lockup {
-  display: none;
 }
 
 @media (max-width: 40rem) {

@@ -16,17 +16,17 @@ const sharp = clientRequire('sharp')
 const playwrightPath = process.env.BUDGETAPP_QA_PLAYWRIGHT_PATH
 const { chromium } = playwrightPath ? await import(pathToFileURL(playwrightPath).href) : await import('playwright')
 const mode = process.argv[2] ?? 'after'
-assert.ok(['before', 'after', 'interactions'].includes(mode), 'Use before, after or interactions')
+assert.ok(['before', 'after', 'interactions', 'compare'].includes(mode), 'Use before, after, interactions or compare')
 const slice = process.argv[3] ?? ''
 assert.ok(/^[a-z0-9-]*$/.test(slice), 'Use a lowercase slice name')
 const evidence = resolve(root, 'artifacts/layout-qa', slice)
-const output = resolve(evidence, mode)
+const output = resolve(evidence, mode === 'compare' ? 'after' : mode)
 await mkdir(output, { recursive: true })
-const before = mode === 'after' ? JSON.parse(await readFile(resolve(evidence, 'before/measurements.json'), 'utf8')) : []
-const server = await createServer({ root: client, configFile: false, plugins: [react()], server: { host: '127.0.0.1', port: 4178, strictPort: true } })
+const before = ['after', 'compare'].includes(mode) ? JSON.parse(await readFile(resolve(evidence, 'before/measurements.json'), 'utf8')) : []
+const server = mode === 'compare' ? null : await createServer({ root: client, configFile: false, plugins: [react()], server: { host: '127.0.0.1', port: 4178, strictPort: true } })
 let browser
 const errors = []
-const results = []
+const results = mode === 'compare' ? JSON.parse(await readFile(resolve(output, 'measurements.json'), 'utf8')) : []
 const layouts = [
   { name: 'desktop', width: 1440, height: 1000 },
   { name: 'collapsed', width: 1440, height: 1000, collapsed: true },
@@ -54,8 +54,32 @@ const allRoutes = [
   { name: 'budget-multiple-households', path: '/budgeting?year=2026&month=10', heading: 'Monthly budget', multipleHouseholds: true, ready: '.budget-save-bar', flowChange: true },
   { name: 'account-no-household', path: '/settings/account', heading: 'Account settings', noHousehold: true, ready: '.account-settings-details' },
 ]
-const routes = mode === 'interactions' ? allRoutes.filter(route => ['budget', 'annual-targets'].includes(route.name)) : allRoutes
+const remainingRoutes = [
+  { name: 'dashboard', path: '/dashboard', heading: 'Hello, Layout QA user', ready: '.dashboard-metrics', flowChange: true },
+  { name: 'accounts', path: '/accounts', heading: 'Financial accounts', ready: '.account-card' },
+  { name: 'activity', path: '/activity', heading: 'Change history', ready: '.activity-card' },
+  { name: 'household', path: '/household', heading: 'Sample household', ready: '.household-member-row' },
+  { name: 'household-settings', path: '/household/settings', heading: 'Household settings', ready: '.household-settings-form' },
+  { name: 'household-create', path: '/households/new', heading: 'Create another household', ready: '.household-create-form' },
+  { name: 'account-settings', path: '/settings/account', heading: 'Account settings', ready: '.account-settings-details' },
+  { name: 'tutorials', path: '/tutorials', heading: 'Tutorials', ready: '.tutorial-card' },
+  { name: 'help', path: '/help', heading: 'Help', ready: '.help-topic-list' },
+  { name: 'help-topic', path: '/help#scope-privacy', heading: 'Scope and privacy', ready: '.help-article' },
+  { name: 'help-public', path: '/help#scope-privacy', heading: 'Scope and privacy', ready: '.help-article', anonymous: true, noHousehold: true, headerChange: true },
+  { name: 'help-no-household', path: '/help', heading: 'Help', ready: '.help-topic-list', noHousehold: true, headerChange: true },
+  { name: 'admin-users', path: '/admin/users', heading: 'Application users', ready: '.admin-users-list li', administrator: true, mfa: true },
+  { name: 'admin-support', path: '/admin?account=layout-support-account', heading: 'Application administration', ready: '.admin-account-status', administrator: true, mfa: true },
+  { name: 'admin-access', path: '/admin/administrators?account=layout-support-account', heading: 'Application administrators', ready: 'form[aria-label="Administrator access change"]', owner: true, mfa: true },
+  { name: 'admin-denied', path: '/admin/users', heading: 'Application users', ready: 'main [role="alert"]', denied: true },
+  { name: 'admin-mfa-required', path: '/admin', heading: 'Application administration', ready: 'main a[href="/settings/account"]', administrator: true, denied: true },
+  { name: 'household-settings-viewer', path: '/household/settings', heading: 'Household settings', ready: '.household-settings-form', viewer: true },
+  { name: 'household-settings-failed', path: '/household/settings', heading: 'Household settings', ready: '.page-load-feedback', failure: /\/households\/[^/]+\/settings$/ },
+  { name: 'dashboard-failed', path: '/dashboard', heading: 'Hello, Layout QA user', ready: '.page-load-feedback', failure: /\/dashboard-summary$/, flowChange: true },
+]
+const routes = mode === 'interactions' ? allRoutes.filter(route => ['budget', 'annual-targets'].includes(route.name))
+  : slice === 'remaining' ? [...allRoutes.filter(route => ['transactions', 'budget', 'annual-targets', 'account-no-household'].includes(route.name)), ...remainingRoutes] : allRoutes
 try {
+  if (mode !== 'compare') {
   await server.listen()
   browser = await chromium.launch({ headless: true, ...(process.env.BUDGETAPP_QA_BROWSER_PATH ? { executablePath: process.env.BUDGETAPP_QA_BROWSER_PATH } : {}) })
   for (const layout of layouts) {
@@ -65,6 +89,7 @@ try {
         localStorage.setItem(`budgetapp.sidebar-collapsed.${id}`, String(collapsed))
       }, { id: user.id, collapsed: Boolean(layout.collapsed) })
       const page = await context.newPage()
+      const adminReads = []
       page.on('pageerror', error => errors.push(`${layout.name}/${route.name}: ${error.message}`))
       await page.route('**/*', async intercepted => {
         const request = intercepted.request()
@@ -74,6 +99,7 @@ try {
           return intercepted.abort()
         }
         if (!url.pathname.startsWith('/api/')) return intercepted.continue()
+        if (url.pathname.startsWith('/api/admin/')) adminReads.push(url.pathname)
         if (request.method() !== 'GET') {
           errors.push(`Blocked QA mutation: ${request.method()} ${url.pathname}`)
           return intercepted.abort()
@@ -90,7 +116,11 @@ try {
       await page.goto(`http://127.0.0.1:4178${route.path}`)
       await page.getByRole('heading', { name: route.heading, exact: true }).waitFor()
       await page.locator(route.ready).first().waitFor({ state: route.attached ? 'attached' : 'visible' })
-      if (route.viewer) assert.ok(await page.getByRole('button', { name: 'Save annual targets', exact: true }).isDisabled())
+      if (route.viewer) {
+        if (route.name.startsWith('household-settings')) assert.ok(await page.getByRole('textbox', { name: 'Household name', exact: true }).isDisabled())
+        else assert.ok(await page.getByRole('button', { name: 'Save annual targets', exact: true }).isDisabled())
+      }
+      if (route.denied) assert.deepEqual(adminReads, [], `${route.name}: unauthorized page must not read admin data`)
       if (route.failure) {
         assert.ok(await page.getByRole('button', { name: 'Retry loading', exact: true }).isVisible())
         assert.equal(await page.locator('.budget-empty-state, .budget-save-bar').count(), 0)
@@ -119,12 +149,14 @@ try {
         assert.equal(measurements.hiddenHeaders, 0, `${key}: no retired page header`)
       }
       const profile = page.locator('.profile-menu')
+      if (!route.anonymous) {
       await profile.locator('summary').click()
       assert.ok(await profile.getByRole('link', { name: 'Account settings', exact: true }).isVisible())
       await profile.getByRole('link', { name: 'Account settings', exact: true }).focus()
       await page.keyboard.press('Escape')
       assert.equal(await profile.getAttribute('open'), null)
       assert.ok(await profile.locator('summary').evaluate(element => element === document.activeElement))
+      } else assert.ok(await page.getByRole('link', { name: 'Return to sign in', exact: true }).isVisible())
       if (layout.width <= 880 && !route.noHousehold) {
         await page.getByRole('button', { name: 'Menu', exact: true }).click()
         await page.getByRole('link', { name: 'Skip to main content' }).focus()
@@ -206,14 +238,20 @@ try {
       await context.close()
     }
   }
+  }
   assert.deepEqual(errors, [], 'No unexpected requests or page errors')
   await writeFile(resolve(output, 'measurements.json'), JSON.stringify(results, null, 2))
-  if (mode === 'after') {
+  if (mode === 'after' || mode === 'compare') {
     for (const result of results) {
       const old = before.find(item => item.key === result.key)
       assert.ok(old, `${result.key}: missing baseline`)
-      const route = routes.find(route => result.key.endsWith(`-${route.name}`))
+      const route = routes.find(route => layouts.some(layout => result.key === `${layout.name}-${route.name}`))
+      assert.ok(route, `${result.key}: unknown route/layout`)
       for (const field of ['content', 'heading', 'nav', 'form']) {
+        if (route.headerChange) {
+          if (field === 'content') for (const axis of ['x', 'width']) assert.equal(result[field][axis], old[field][axis], `${result.key}: content ${axis} changed`)
+          continue
+        }
         if (field === 'content' && route.flowChange) {
           for (const axis of ['x', 'y', 'width']) assert.equal(result[field][axis], old[field][axis], `${result.key}: content ${axis} changed`)
         } else assert.deepEqual(result[field], old[field], `${result.key}: ${field} geometry changed`)
@@ -239,5 +277,5 @@ try {
   console.log(`${mode}: ${results.length} rendered page/layout cases passed; screenshots and measurements in ${output}`)
 } finally {
   await browser?.close()
-  await server.close()
+  await server?.close()
 }

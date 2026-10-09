@@ -901,10 +901,10 @@ compatibility checks against the combined feature as well.
       account. Archived accounts reject new imports. Other households/private
       imports remain invisible; unsaved upload/review guards remain intact.
 
-### Shared layout ownership (#218, first slice)
+### Shared layout ownership (#218)
 
-Use fictional Development/Scratch data. This slice needs no database migration.
-See [style ownership and remaining migrations](shared-layout-ownership.md) and
+Use fictional Development/Scratch data. These layout slices need no database migration.
+See [style ownership and verification](shared-layout-ownership.md) and
 the read-only rendered harness in `tools/LayoutQa`.
 
 - [ ] Navigate through Transactions, Import transactions, Review imports,
@@ -950,8 +950,24 @@ the read-only rendered harness in `tools/LayoutQa`.
       unchanged; the layout migration grants no additional access.
 - [ ] Open Account settings with no household. Main content and profile controls
       remain accessible with no phantom sidebar or empty household context strip.
-      Check representative dashboard, annual and settings/help pages for unchanged
-      common alignment before merging this shared-style change.
+- [ ] Switch through Dashboard, Financial accounts, Household members/settings,
+      Create another household, Change history, Account settings, Help and Tutorials.
+      Their common page columns stay aligned; short forms/articles remain readable
+      and left-aligned within that column. Repeat with long names and at narrow/zoom
+      layouts. Public sign-in and initial household setup remain centered.
+- [ ] Open Help while signed out, unverified and without a household. The visible
+      return link sits in the title row and leads to sign-in, confirmation or setup
+      as appropriate. Topic/deep-link and Back/Forward focus behavior still works.
+- [ ] Cancel navigation/household switching with an unsaved account name, household
+      setting or financial-account edit; values remain. Failed saves preserve safe
+      values. Passwords are not persisted by this layout change. Check initial-load
+      and stale-refresh feedback and read-only Household settings for a Viewer.
+- [ ] As an authorized application operator, check Users, Account support and
+      Administrator access at narrow widths/200% zoom and by keyboard. Check the
+      blocked state as an ordinary user and an operator without the required MFA.
+      Household roles do not grant operator access. Cancel leaving an unsaved support
+      form without losing it. No real reset emails or administrative writes are needed
+      for these layout checks; use disposable fixtures for separate action QA.
 
 ### Excel workbook import (#22, Part 2)
 
