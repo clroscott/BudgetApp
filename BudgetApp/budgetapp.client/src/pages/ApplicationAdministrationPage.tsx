@@ -1,3 +1,4 @@
+import { PageFrame } from '../components/PageFrame'
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { completeAdministrativeAction, getAdministrativeAccount, getAdministrativeAudit, getAdministrativeResult,
   prepareAdministrativeAction, resendAdministrativeCode, searchAdministrativeAccounts,
@@ -20,12 +21,12 @@ const labels: Record<AdministrativeAction, string> = {
 }
 export function ApplicationAdministrationPage() {
   const { user } = useAuth()
-  if (!user?.isApplicationAdministrator) return <main className="management-page"><section className="management-content">
+  if (!user?.isApplicationAdministrator) return <PageFrame>
     <h1>Application administration</h1><p role="alert">You do not have application-admin access. Household administrator roles do not grant this access.</p>
-    <AppLink to="/settings/account">Account settings</AppLink></section></main>
-  if (!user.loginVerificationEnabled) return <main className="management-page"><section className="management-content">
+    <AppLink to="/settings/account">Account settings</AppLink></PageFrame>
+  if (!user.loginVerificationEnabled) return <PageFrame>
     <h1>Application administration</h1><p>MFA must be enabled and completed at sign-in before you can use operator tools.</p>
-    <AppLink to="/settings/account">Set up MFA in Account settings</AppLink></section></main>
+    <AppLink to="/settings/account">Set up MFA in Account settings</AppLink></PageFrame>
   return <AdministrationContent />
 }
 function AdministrationContent() {
@@ -120,7 +121,7 @@ function AdministrationContent() {
     finally { pending.current = false; if (active.current) setBusy(false) }
   }
   const formLocked = busy || Boolean(challenge)
-  return <main className="management-page"><section className="management-content">
+  return <PageFrame>
     <header className="page-title-row"><div><p className="eyebrow">Application operators · not household administration</p>
       <h1>Application administration</h1><p>Account support and a private administrative audit. No financial-data browsing or impersonation.</p></div>
       <AppLink className="header-link" to="/settings/account">Your account settings</AppLink></header>
@@ -196,5 +197,5 @@ function AdministrationContent() {
         <button type="button" disabled={busy || !auditLoad.isFresh || audit.page * audit.pageSize >= audit.totalCount} onClick={() => void loadAudit(audit.page + 1)}>Next audit page</button>
       </div></>}
     </section>
-  </section></main>
+  </PageFrame>
 }

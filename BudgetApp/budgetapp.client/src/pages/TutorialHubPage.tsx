@@ -1,4 +1,4 @@
-import { BrandLockup } from '../components/Brand'
+import { PageFrame } from '../components/PageFrame'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { HelpSectionNav } from '../components/HelpSectionNav'
 import { AppLink } from '../routing/AppLink'
@@ -135,14 +135,7 @@ export function TutorialHubPage() {
   } = useTutorials()
 
   return (
-    <main className="management-page tutorial-hub-page">
-      <header className="app-header">
-        <BrandLockup />
-        <AppLink className="header-link" to="/dashboard">
-          Return to dashboard
-        </AppLink>
-      </header>
-      <section className="management-content tutorial-hub-content">
+    <PageFrame contentClassName="tutorial-hub-content">
         <HelpSectionNav />
         <div className="page-title-row">
           <div>
@@ -234,7 +227,6 @@ export function TutorialHubPage() {
             </section>
           ))}
         </div>
-      </section>
-    </main>
+    </PageFrame>
   )
 }

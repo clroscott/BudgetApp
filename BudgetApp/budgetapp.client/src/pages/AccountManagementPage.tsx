@@ -1,3 +1,4 @@
+import { PageFrame } from '../components/PageFrame'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   createAccount,
@@ -10,12 +11,10 @@ import {
   type UpdateAccountRequest,
 } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
-import { BrandLockup } from '../components/Brand'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { currencies } from '../finance/currencies'
 import { useHouseholds } from '../households/useHouseholds'
 import { ContextualHelp } from '../components/ContextualHelp'
-import { AppLink } from '../routing/AppLink'
 import { useUnsavedForm, useUnsavedNativeForm } from '../routing/useUnsavedForm'
 
 const accountTypes: AccountType[] = [
@@ -308,13 +307,7 @@ export function AccountManagementPage() {
   }
 
   return (
-    <main className="management-page">
-      <header className="app-header">
-        <BrandLockup />
-        <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
-      </header>
-
-      <section className="management-content">
+    <PageFrame>
         <div className="page-title-row" data-tutorial-id="accounts-page-title">
           <div>
             <p className="eyebrow">Household</p>
@@ -429,7 +422,6 @@ export function AccountManagementPage() {
             })}
           </div>
         )}
-      </section>
-    </main>
+    </PageFrame>
   )
 }

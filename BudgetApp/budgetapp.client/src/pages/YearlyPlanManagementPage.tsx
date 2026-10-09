@@ -11,7 +11,7 @@ import {
   saveYearlyPlan,
   type YearlyPlanData,
 } from '../budgets/yearlyPlanApi'
-import { BrandLockup } from '../components/Brand'
+import { PageFrame } from '../components/PageFrame'
 import { AmountCalculator } from '../components/AmountCalculator'
 import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import { ErrorSummary } from '../components/ErrorSummary'
@@ -315,12 +315,7 @@ export function YearlyPlanManagementPage() {
     0,
   )
 
-  return <div className="page yearly-plan-page">
-    <header className="app-header">
-      <BrandLockup />
-      <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
-    </header>
-    <main className="page-content management-content">
+  return <PageFrame contentClassName="yearly-plan-content">
       <BudgetingSectionNav current="annual-targets" />
       <div className="page-title-row">
         <div>
@@ -593,20 +588,22 @@ export function YearlyPlanManagementPage() {
         </div>
       </section>}
 
-      {loadState.hasData && plan && <div className="yearly-save-bar">
+      {loadState.hasData && plan && <div className="yearly-save-bar" role="region" aria-label="Annual target actions">
         <div>
           <span>{!loadState.isFresh ? 'Previously loaded annual targets'
             : isDirty ? 'Unsaved annual targets' : plan.id ? 'Annual targets saved' : 'No saved annual targets'}</span>
           <strong>{currency.format(annualTotal)}</strong>
         </div>
-        <button
-          className="primary-button"
-          disabled={!canManage || isSaving || !isDirty}
-          onClick={() => void handleSave()}
-        >{isSaving ? 'Saving…' : 'Save annual targets'}</button>
+        <div className="yearly-save-actions">
+          <span className="budget-back-to-top-host" data-back-to-top-host />
+          <button
+            className="primary-button"
+            disabled={!canManage || isSaving || !isDirty}
+            onClick={() => void handleSave()}
+          >{isSaving ? 'Saving…' : 'Save annual targets'}</button>
+        </div>
       </div>}
-    </main>
-  </div>
+  </PageFrame>
 }
 
 function TargetRow({

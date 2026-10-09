@@ -1,3 +1,4 @@
+import { PageFrame } from '../components/PageFrame'
 import { useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { ErrorSummary } from '../components/ErrorSummary'
@@ -27,8 +28,7 @@ export function HouseholdCreatePage() {
   }
 
   return (
-    <main className="management-page">
-      <div className="management-content narrow-management-content">
+    <PageFrame>
         <header className="page-title-row">
           <div>
             <span className="eyebrow">Households</span>
@@ -51,7 +51,6 @@ export function HouseholdCreatePage() {
             onSubmit={handleSubmit}
           />
         </section>
-      </div>
-    </main>
+    </PageFrame>
   )
 }

@@ -29,7 +29,7 @@ export function focusPageElement(element: HTMLElement) {
   // Page headings now follow a shared section-tab row. Begin at the page's
   // natural top instead of scrolling the heading past that navigation. Other
   // focus stops (editors, cards, tutorial controls) retain their local position.
-  if (element.matches('h1') && element.closest('.management-content, .dashboard-content')) {
+  if (element.matches('h1') && element.closest('.page-frame-content, .management-content, .dashboard-content')) {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
     const bounds = element.getBoundingClientRect()
     if (bounds.top >= 0 && bounds.bottom <= window.innerHeight) {

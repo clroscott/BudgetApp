@@ -1,0 +1,141 @@
+/* Application operators and account directory, separate from household settings.
+   Page width, gutters and headings belong to page-frame.css. */
+
+.admin-support-layout {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) minmax(0, 2fr);
+  align-items: start;
+  gap: 1rem;
+  margin-block: 1rem;
+}
+
+.admin-support-layout form {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.admin-support-layout textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 5rem;
+  font: inherit;
+  padding: 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 0.65rem;
+  background: var(--surface);
+  color: var(--heading);
+}
+
+.admin-account-list,
+.admin-audit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-account-list li,
+.admin-audit-list li {
+  display: grid;
+  gap: 0.4rem;
+  padding-block: 0.8rem;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.admin-account-status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+}
+
+.admin-account-status dt {
+  font-weight: 600;
+}
+
+.admin-account-status dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 55rem) {
+  .admin-support-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.admin-users-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+  margin-block: 1rem;
+}
+
+.admin-users-filter > div {
+  flex: 1 1 20rem;
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.admin-users-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.admin-users-list .account-settings-card {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-user-identity h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.admin-user-identity p {
+  margin-block: 0.35rem;
+}
+
+.admin-user-details {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem 1rem;
+  margin-block: 0.8rem;
+}
+
+.admin-user-details dt {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.admin-user-details dd {
+  margin: 0.2rem 0 0;
+  font-weight: 600;
+}
+
+.admin-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.admin-user-actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  box-sizing: border-box;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.7rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+@media (max-width: 55rem) {
+  .admin-user-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

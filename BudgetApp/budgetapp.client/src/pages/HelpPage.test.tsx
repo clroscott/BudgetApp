@@ -90,7 +90,8 @@ describe('read-only help page', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Import review and approval' })).toBeTruthy()
     expect(screen.queryByRole('navigation', { name: 'Main navigation' })).toBeNull()
     expect(screen.queryByRole('link', { name: 'Browse tutorials' })).toBeNull()
-    expect(screen.getByRole('link', { name: mode === 'anonymous' ? 'Return to sign in' : mode === 'unverified' ? 'Return to confirmation' : 'Return to household setup' })).toBeTruthy()
+    const returnLink = screen.getByRole('link', { name: mode === 'anonymous' ? 'Return to sign in' : mode === 'unverified' ? 'Return to confirmation' : 'Return to household setup' })
+    expect(returnLink.closest('.page-title-row')).toBeTruthy()
     expect(fetch).not.toHaveBeenCalled()
   })
   it('handles unknown/malformed topic IDs with a safe browse fallback instead of rendering URL HTML', () => {

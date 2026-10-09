@@ -183,8 +183,12 @@ describe('staged import edit protection', () => {
   })
   it('protects and bulk-saves budget inclusion choices without duplicating rows', async () => {
     show(<ImportReviewPage />)
-    await screen.findByLabelText('Description')
+    const input = await screen.findByLabelText('Description') as HTMLInputElement
+    // A row can render before its load completes. Exercise an enabled control
+    // and wait for the parent dirty cache before attempting navigation.
+    await waitFor(() => expect(input.disabled).toBe(false))
     fireEvent.click(screen.getByLabelText('My personal budget'))
+    await screen.findByRole('button', { name: 'Save all corrections (1)' })
     fireEvent.click(screen.getByText('Leave page'))
     expect(window.confirm).toHaveBeenCalledOnce()
     const saved = detail()

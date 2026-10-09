@@ -1,3 +1,4 @@
+import { PageFrame } from '../components/PageFrame'
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { ApiError } from '../api/apiClient'
 import { changePassword, getAccountSettings, saveDisplayName, type AccountSettings } from '../auth/accountSettingsApi'
@@ -183,8 +184,7 @@ export function AccountSettingsPage() {
   }
   const returnTo = !user?.emailConfirmed ? '/verify-email' : currentHousehold ? '/dashboard' : '/household/setup'
   const returnLabel = !user?.emailConfirmed ? 'Return to confirmation' : currentHousehold ? 'Return to dashboard' : 'Return to household setup'
-  return <main className="management-page" aria-busy={loadState.status === 'loading'}>
-    <section className="management-content narrow-management-content">
+  return <PageFrame aria-busy={loadState.status === 'loading'}>
       <header className="page-title-row">
         <div><p className="eyebrow">Your account</p><h1>Account settings</h1><p>Manage your own profile and sign-in details, independent of any household.</p></div>
         <AppLink className="header-link" to={returnTo} aria-disabled={busy} onClick={event => { if (busy) event.preventDefault() }}>{returnLabel}</AppLink>
@@ -195,7 +195,7 @@ export function AccountSettingsPage() {
       <ErrorSummary errors={errors} />
       {action && <p role="status">{actionLabels[action]}</p>}
       {requiresReload && <p className="field-help">Your safe form values are kept. Reload before saving again; you will be asked before discarding edits. Re-enter passwords when retrying.</p>}
-      {loadState.hasData && saved && <div className="account-settings-stack">
+      {loadState.hasData && saved && <div className="account-settings-stack readable-panel">
         <form className="account-settings-card" aria-labelledby={`${id}-profile`} onSubmit={saveName}>
           <h2 id={`${id}-profile`}>Display name</h2>
           <label htmlFor={`${id}-name`}>Display name</label>
@@ -266,6 +266,5 @@ export function AccountSettingsPage() {
           await load()
         }} />}
       <div className="household-settings-actions"><button className="text-button" type="button" disabled={busy} onClick={() => void signOut()}>Sign out</button></div>
-    </section>
-  </main>
+    </PageFrame>
 }

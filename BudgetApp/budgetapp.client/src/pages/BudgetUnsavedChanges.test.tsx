@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HouseholdContext } from '../households/householdContext'
 import { RouterProvider } from '../routing/RouterProvider'
+import { AppLink } from '../routing/AppLink'
 import { useRouter } from '../routing/useRouter'
 import { budgetFixture, annualFixture, householdsFixture } from '../test/fixtures'
 import { getBudget, getBudgetMonthOptions, saveBudget, deleteDraftBudget } from '../budgets/budgetApi'
@@ -22,7 +23,10 @@ vi.mock('../budgets/yearlyPlanApi', async importOriginal => ({
 
 function Routes({ children }: { children: ReactNode }) {
   const { path } = useRouter()
-  return path === '/dashboard' ? <p>Dashboard destination</p> : children
+  // Exercise a visible shell-like exit, not the retired CSS-hidden page header.
+  return path === '/dashboard' ? <p>Dashboard destination</p> : <>
+    <AppLink to="/dashboard">Return to dashboard</AppLink>{children}
+  </>
 }
 function show(page: ReactNode, path: string) {
   window.history.replaceState(null, '', path)
@@ -204,7 +208,7 @@ describe('annual targets and independent default setting', () => {
   it('saving a plan-period edit leaves the shared default unchanged', async () => {
     window.history.replaceState(null, '', '/budgeting/annual-targets')
     render(<RouterProvider><HouseholdContext.Provider value={householdsFixture()}>
-      <YearlyPlanManagementPage />
+      <Routes><YearlyPlanManagementPage /></Routes>
     </HouseholdContext.Provider></RouterProvider>)
     fireEvent.change(await screen.findByLabelText('Housing overall annual target'), { target: { value: '2400' } })
     vi.mocked(window.confirm).mockReturnValue(true)

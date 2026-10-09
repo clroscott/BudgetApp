@@ -5,7 +5,7 @@ import {
 } from '../budgets/annualBudgetOverviewApi'
 import type { BudgetScope } from '../budgets/budgetApi'
 import { annualOverviewSelection, transactionLink } from '../budgets/transactionDrilldown'
-import { BrandLockup } from '../components/Brand'
+import { PageFrame } from '../components/PageFrame'
 import { AnnualCategoryTable } from '../components/AnnualCategoryTable'
 import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import { ContextualHelp } from '../components/ContextualHelp'
@@ -42,12 +42,7 @@ export function AnnualBudgetOverviewPage() {
   const remainingClass = (amount: number | null) =>
     amount !== null && amount < 0 ? 'budget-over' : ''
 
-  return <main className="management-page annual-overview-page">
-    <header className="app-header">
-      <BrandLockup />
-      <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
-    </header>
-    <section className="management-content annual-overview-content">
+  return <PageFrame contentClassName="annual-overview-content">
       <BudgetingSectionNav current="annual-overview" />
       <div className="page-title-row">
         <div>
@@ -193,8 +188,7 @@ export function AnnualBudgetOverviewPage() {
           )}
         </section>
       </>}
-    </section>
-  </main>
+  </PageFrame>
 }
 
 function Summary({

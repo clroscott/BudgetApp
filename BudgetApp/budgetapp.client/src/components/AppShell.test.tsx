@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AuthContext } from '../auth/authContext'
 import { HouseholdContext } from '../households/householdContext'
 import { RouterProvider } from '../routing/RouterProvider'
@@ -20,8 +20,72 @@ function show({ path = '/dashboard', administrator = false, noHousehold = false,
   </HouseholdContext.Provider></RouterProvider></AuthContext.Provider>), auth }
 }
 beforeEach(() => { localStorage.clear(); vi.spyOn(window, 'confirm').mockReturnValue(false) })
+afterEach(() => vi.unstubAllGlobals())
 
 describe('grouped application navigation', () => {
+  it('measures changing navigation height and releases its observer on unmount', () => {
+    let height = 74.2
+    let resized!: () => void
+    const disconnect = vi.fn()
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resized = callback }
+      observe() {}
+      disconnect = disconnect
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return new DOMRect(0, 0, 390, this.classList.contains('app-sidebar') ? height : 0)
+    })
+    const view = show()
+    const shell = view.container.querySelector<HTMLElement>('.app-shell')!
+    expect(shell.style.getPropertyValue('--shell-navigation-height')).toBe('75px')
+    height = 340
+    act(() => resized())
+    expect(shell.style.getPropertyValue('--shell-navigation-height')).toBe('340px')
+    height = 92
+    act(() => window.dispatchEvent(new Event('resize')))
+    expect(shell.style.getPropertyValue('--shell-navigation-height')).toBe('92px')
+    view.unmount()
+    expect(disconnect).toHaveBeenCalledOnce()
+    expect(shell.style.getPropertyValue('--shell-navigation-height')).toBe('')
+  })
+  it('works without ResizeObserver and does not offset a hidden standalone sidebar', () => {
+    vi.stubGlobal('ResizeObserver', undefined)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 0, 0))
+    const view = show({ noHousehold: true })
+    expect(view.container.querySelector<HTMLElement>('.app-shell')!.style.getPropertyValue('--shell-navigation-height')).toBe('0px')
+    expect(screen.getByRole('heading', { name: 'Example page' })).toBeTruthy()
+  })
+  it('remeasures expanded navigation groups without ResizeObserver', () => {
+    vi.stubGlobal('ResizeObserver', undefined)
+    let height = 74
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return new DOMRect(0, 0, 390, this.classList.contains('app-sidebar') ? height : 0)
+    })
+    const view = show()
+    const shell = view.container.querySelector<HTMLElement>('.app-shell')!
+    expect(shell.style.getPropertyValue('--shell-navigation-height')).toBe('74px')
+    height = 260
+    fireEvent.click(screen.getByRole('button', { name: 'Expand Transactions navigation' }))
+    expect(shell.style.getPropertyValue('--shell-navigation-height')).toBe('260px')
+    height = 74
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse Transactions navigation' }))
+    expect(shell.style.getPropertyValue('--shell-navigation-height')).toBe('74px')
+  })
+  it('does not repeat an unchanged navigation-height style mutation', () => {
+    let resized!: () => void
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resized = callback }
+      observe() {}
+      disconnect() {}
+    })
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 390, 74))
+    const view = show()
+    const shell = view.container.querySelector<HTMLElement>('.app-shell')!
+    const write = vi.spyOn(shell.style, 'setProperty')
+    act(() => resized())
+    act(() => window.dispatchEvent(new Event('resize')))
+    expect(write).not.toHaveBeenCalled()
+  })
   it('starts with six clear destinations and keeps secondary pages under their section', () => {
     show()
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })

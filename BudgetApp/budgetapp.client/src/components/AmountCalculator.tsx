@@ -1,5 +1,7 @@
-import { useId, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import { AppIcon } from './AppIcon'
+
+const activeCalculators = new WeakMap<Document, () => void>()
 
 function evaluateExpression(displayExpression: string): number {
   const source = displayExpression
@@ -88,15 +90,49 @@ export function AmountCalculator({
   const [expression, setExpression] = useState('')
   const [result, setResult] = useState<number | null>(null)
   const [error, setError] = useState('')
+  const containerRef = useRef<HTMLSpanElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popoverId = useId()
 
-  const close = () => {
+  const dismiss = useCallback(function dismiss() {
     setIsOpen(false)
+    const ownerDocument = containerRef.current?.ownerDocument
+    if (ownerDocument && activeCalculators.get(ownerDocument) === dismiss) {
+      activeCalculators.delete(ownerDocument)
+    }
+  }, [])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!isOpen || !container) return
+    const ownerDocument = container.ownerDocument
+    const ownerWindow = ownerDocument.defaultView
+    const dismissOutside = (event: Event) => {
+      if (!event.composedPath().includes(container)) dismiss()
+    }
+
+    // Outside dismissal must not steal focus from the control being clicked.
+    ownerDocument.addEventListener('pointerdown', dismissOutside, true)
+    ownerDocument.addEventListener('click', dismissOutside, true)
+    ownerWindow?.addEventListener('blur', dismiss)
+    return () => {
+      ownerDocument.removeEventListener('pointerdown', dismissOutside, true)
+      ownerDocument.removeEventListener('click', dismissOutside, true)
+      ownerWindow?.removeEventListener('blur', dismiss)
+      if (activeCalculators.get(ownerDocument) === dismiss) activeCalculators.delete(ownerDocument)
+    }
+  }, [isOpen, dismiss])
+
+  const close = () => {
+    dismiss()
     triggerRef.current?.focus()
   }
 
   const open = () => {
+    const ownerDocument = containerRef.current?.ownerDocument
+    if (!ownerDocument) return
+    activeCalculators.get(ownerDocument)?.()
+    activeCalculators.set(ownerDocument, dismiss)
     setExpression(value)
     setResult(null)
     setError('')
@@ -155,7 +191,7 @@ export function AmountCalculator({
   ]
 
   return (
-    <span className="amount-calculator" onKeyDown={event => {
+    <span className="amount-calculator" ref={containerRef} onKeyDown={event => {
       if (!isOpen || event.key !== 'Escape') return
       event.preventDefault()
       event.stopPropagation()

@@ -677,6 +677,16 @@ are manual sign-off cases, not claims established by automated DOM tests. See
       once and returns focus. Invalid arithmetic stays open with an announced
       error. Repeat near the bottom of a long page and at 200% zoom/narrow width;
       Close/keypad/result controls can be reached by keyboard and scrolling.
+- [ ] Scroll Annual targets with saved and unsaved values. Back to top appears
+      inside the annual save bar, beside or wrapped above Save annual targets;
+      neither button overlaps or clips at normal/narrow widths or 200% zoom.
+      Back to top scrolls without saving, clearing edits or bypassing the guard.
+- [ ] In monthly and annual budgets, calculate without applying, then open a
+      different row's calculator by mouse and keyboard. Only the new calculator
+      remains open and its Calculation field receives focus. The old row's amount
+      is unchanged. Clicking/tapping outside or switching away from the browser
+      dismisses without applying or pulling focus back; calculator keypad/input
+      interactions remain open. Reopening starts from the row's current amount.
 
 ## Tutorial resilience regression (#177)
 
@@ -890,6 +900,74 @@ compatibility checks against the combined feature as well.
       their own active personal account, and cannot use another member's private
       account. Archived accounts reject new imports. Other households/private
       imports remain invisible; unsaved upload/review guards remain intact.
+
+### Shared layout ownership (#218)
+
+Use fictional Development/Scratch data. These layout slices need no database migration.
+See [style ownership and verification](shared-layout-ownership.md) and
+the read-only rendered harness in `tools/LayoutQa`.
+
+- [ ] Navigate through Transactions, Import transactions, Review imports,
+      Categorization rules and Import profiles. At the same width/sidebar state,
+      tabs, headings and content share one left/right column without jumping.
+      Upload forms remain narrower but left-aligned; compact review rows, column
+      boundaries, Details and internal horizontal scrolling retain their appearance.
+- [ ] Repeat with an expanded and collapsed desktop sidebar, 880px, 800px, 760px,
+      narrow width and actual 200% browser zoom. Controls and focus rings remain
+      readable/reachable without document-wide overflow on the migrated pages.
+- [ ] Scroll with the narrow Menu closed and open. Household/profile context
+      remains below the actual Menu/navigation height, not hidden underneath it.
+      Wrapped household names, multiple-household selection and resized viewports
+      retain their correct offset. Profile-menu Escape returns focus to its summary.
+- [ ] Tab to Skip to main content. It closes transient narrow navigation and
+      focuses the page heading without skipping past section tabs. Navigate to a
+      different page and confirm title/focus/announcement; ordinary filters and
+      canceled navigation do not steal focus. Check with a screen reader.
+- [ ] Make an unsaved transaction correction, import correction, rule edit,
+      profile mapping or file selection. Canceled navigation/household switching
+      preserves it. Upload/approve/save behavior, budget inclusions, scope/privacy
+      and existing keyboard/screen-reader labels remain unchanged.
+- [ ] Start a Learn-only tutorial with collapsed/narrow navigation; stable targets
+      still reveal and focus correctly. Retry/Back/Exit/Escape remain usable and
+      blocked unrelated controls are not keyboard reachable. No financial writes.
+- [ ] Switch between Monthly budget, Annual targets, Annual overview, Recurring
+      expenses and Categories. Common columns, section tabs and headings remain
+      aligned. At intermediate widths with the desktop sidebar expanded/collapsed,
+      month/year/scope controls and annual-target rows wrap without overflowing
+      the page. Annual tables retain their own labeled horizontal scrolling.
+- [ ] Check a long monthly budget: footer clearance still
+      follows its measured height, Back to top stays within actions, and calculators
+      are not covered. Escape closes the calculator and returns focus. Opening
+      another calculator or clicking outside dismisses without applying an amount.
+      Repeat near the final row with unsaved text and at actual 200% zoom.
+- [ ] Preserve an unsaved monthly amount, annual target/plan-period edit, category
+      rename/new subcategory and recurring-expense edit when navigation or household
+      switching is canceled. Failed saves retain edits, and successful saves retain
+      the existing scope, fiscal-default, allocation and permission rules.
+- [ ] Test an empty budget separately from an initial failed load, then a refresh
+      failure with retained data. Retry stays visible and stale data cannot be edited.
+      Verify Viewer restrictions and personal-account/expense permissions remain
+      unchanged; the layout migration grants no additional access.
+- [ ] Open Account settings with no household. Main content and profile controls
+      remain accessible with no phantom sidebar or empty household context strip.
+- [ ] Switch through Dashboard, Financial accounts, Household members/settings,
+      Create another household, Change history, Account settings, Help and Tutorials.
+      Their common page columns stay aligned; short forms/articles remain readable
+      and left-aligned within that column. Repeat with long names and at narrow/zoom
+      layouts. Public sign-in and initial household setup remain centered.
+- [ ] Open Help while signed out, unverified and without a household. The visible
+      return link sits in the title row and leads to sign-in, confirmation or setup
+      as appropriate. Topic/deep-link and Back/Forward focus behavior still works.
+- [ ] Cancel navigation/household switching with an unsaved account name, household
+      setting or financial-account edit; values remain. Failed saves preserve safe
+      values. Passwords are not persisted by this layout change. Check initial-load
+      and stale-refresh feedback and read-only Household settings for a Viewer.
+- [ ] As an authorized application operator, check Users, Account support and
+      Administrator access at narrow widths/200% zoom and by keyboard. Check the
+      blocked state as an ordinary user and an operator without the required MFA.
+      Household roles do not grant operator access. Cancel leaving an unsaved support
+      form without losing it. No real reset emails or administrative writes are needed
+      for these layout checks; use disposable fixtures for separate action QA.
 
 ### Excel workbook import (#22, Part 2)
 

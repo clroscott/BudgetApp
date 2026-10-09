@@ -1,0 +1,90 @@
+/* Canonical page geometry. Features own their internal grids, not page gutters. */
+
+:root {
+  --page-content-max: 76rem;
+  --page-content-gutter: 1.5rem;
+  --page-content-padding: 2.25rem;
+  --layer-back-to-top: 10;
+  --layer-context-header: 15;
+  --layer-sidebar: 20;
+  --layer-budget-actions: 20;
+  --layer-calculator: 40;
+  --layer-tutorial: 10000;
+  --layer-skip-link: 11000;
+}
+
+.page-frame {
+  min-height: 100svh;
+  background: var(--page-bg);
+}
+
+.page-frame-content {
+  width: min(calc(100% - var(--page-content-gutter) - var(--page-content-gutter)), var(--page-content-max));
+  margin: 0 auto;
+  padding: var(--page-content-padding) 0;
+  box-sizing: border-box;
+}
+
+.page-title-row,
+.dashboard-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.page-title-row > div,
+.dashboard-title-row > div {
+  min-width: 0;
+}
+
+.page-title-row h1,
+.dashboard-title-row h1 {
+  margin: 0.25rem 0 0.65rem;
+  line-height: 1.15;
+}
+
+.page-title-row p,
+.dashboard-intro {
+  line-height: 1.6;
+  margin-block: 0.35rem;
+}
+
+.page-title-row p:last-child,
+.dashboard-intro {
+  color: var(--muted-text);
+}
+
+.dashboard-intro {
+  max-width: 38rem;
+}
+
+/* Short forms/articles opt into a readable width inside the common page column. */
+.readable-panel {
+  width: 100%;
+  max-width: 44rem;
+  margin-inline: 0;
+}
+
+@media (max-width: 40rem) {
+  .page-title-row,
+  .dashboard-title-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 38rem) {
+  :root {
+    --page-content-gutter: 1rem;
+    --page-content-padding: 1.5rem;
+  }
+
+  .page-title-row,
+  .dashboard-title-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+}

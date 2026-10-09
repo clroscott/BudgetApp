@@ -21,6 +21,7 @@ import {
 } from '../categorizationRules/categorizationRuleApi'
 import { getCategories, type CategoryItem } from '../categories/categoryApi'
 import { ErrorSummary } from '../components/ErrorSummary'
+import { PageFrame } from '../components/PageFrame'
 import { TransactionsSectionNav } from '../components/TransactionsSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
 import { useUnsavedForm } from '../routing/useUnsavedForm'
@@ -301,8 +302,7 @@ export function CategorizationRuleManagementPage() {
   const inactiveRules = rules.filter(rule => !rule.isActive)
 
   return (
-    <main className="management-page">
-      <section className="management-content">
+    <PageFrame>
         <TransactionsSectionNav />
         <div className="page-title-row">
           <div>
@@ -458,7 +458,6 @@ export function CategorizationRuleManagementPage() {
             </section>
           </div>
         )}
-      </section>
-    </main>
+    </PageFrame>
   )
 }

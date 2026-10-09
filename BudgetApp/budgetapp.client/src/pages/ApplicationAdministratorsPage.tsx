@@ -1,3 +1,4 @@
+import { PageFrame } from '../components/PageFrame'
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { completeAdministrativeAction, getAdministrativeAccount, getAdministrativeResult, getApplicationAdministrators,
   prepareAdministrativeAction, resendAdministrativeCode, searchAdministrativeAccounts,
@@ -19,9 +20,9 @@ const administratorRoleLabels: Record<AdministratorRole, string> = {
 }
 export function ApplicationAdministratorsPage() {
   const { user } = useAuth()
-  if (!user?.isApplicationOwner || !user.loginVerificationEnabled) return <main className="management-page"><section className="management-content">
+  if (!user?.isApplicationOwner || !user.loginVerificationEnabled) return <PageFrame>
     <h1>Application administrators</h1><p role="alert">Only installation owners signed in with MFA can manage application-administrator access. Household ownership and support-administrator access do not grant this permission.</p>
-    <AppLink to="/settings/account">Account settings</AppLink></section></main>
+    <AppLink to="/settings/account">Account settings</AppLink></PageFrame>
   return <AdministratorManagement />
 }
 function AdministratorManagement() {
@@ -116,7 +117,7 @@ function AdministratorManagement() {
     } catch (error) { if (active.current) setErrors(getErrorMessages(error)) }
     finally { pending.current = false; if (active.current) setBusy(false) }
   }
-  return <main className="management-page"><section className="management-content">
+  return <PageFrame>
     <header><p className="eyebrow">Installation owner controls · not household roles</p><h1>Application administrators</h1>
       <p>Manage who can operate this installation. No restart or configuration-file editing is needed for these access changes.</p></header>
     <ApplicationAdministrationNav />
@@ -167,5 +168,5 @@ function AdministratorManagement() {
       </>}
     </section></div>
     <p><AppLink to="/admin">View private administrative audit and account-support tools</AppLink></p>
-  </section></main>
+  </PageFrame>
 }

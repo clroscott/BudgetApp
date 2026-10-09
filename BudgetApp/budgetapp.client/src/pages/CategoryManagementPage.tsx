@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
-import { BrandLockup } from '../components/Brand'
+import { PageFrame } from '../components/PageFrame'
 import {
   createCategory,
   getCategories,
@@ -21,7 +21,6 @@ import {
 import { ErrorSummary } from '../components/ErrorSummary'
 import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
-import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 import { useUnsavedNativeForm } from '../routing/useUnsavedForm'
 
@@ -373,13 +372,7 @@ export function CategoryManagementPage() {
   }
 
   return (
-    <main className="management-page">
-      <header className="app-header">
-        <BrandLockup />
-        <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
-      </header>
-
-      <section className="management-content">
+    <PageFrame>
         <BudgetingSectionNav current="categories" />
         <div className="page-title-row">
           <div>
@@ -471,7 +464,6 @@ export function CategoryManagementPage() {
             })}
           </div>
         )}
-      </section>
-    </main>
+    </PageFrame>
   )
 }

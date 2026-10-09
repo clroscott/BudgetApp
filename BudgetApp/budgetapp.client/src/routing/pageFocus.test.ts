@@ -81,10 +81,10 @@ function fixture(narrow = false) {
   return { sidebar, context, heading, scroll, margin: () => scrollMargin }
 }
 describe('visible heading scroll offset', () => {
-  it('keeps the shared page start and section tabs visible while focusing a page heading', () => {
+  it.each(['management-content', 'page-frame-content'])('keeps the shared page start and section tabs visible for %s', contentClass => {
     const root = document.createElement('section')
     root.dataset.focusFixture = ''
-    root.className = 'management-content'
+    root.className = contentClass
     root.innerHTML = '<nav class="budgeting-section-nav"><a href="/import">Import transactions</a></nav><div class="page-title-row"><h1>Import CSV</h1></div>'
     document.body.append(root)
     const heading = root.querySelector('h1')!

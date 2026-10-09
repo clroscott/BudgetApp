@@ -5,7 +5,7 @@ import {
   createCategorizationRule,
   type CategorizationRuleMatchOperator,
 } from '../categorizationRules/categorizationRuleApi'
-import { BrandLockup } from '../components/Brand'
+import { PageFrame } from '../components/PageFrame'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { TransactionsSectionNav } from '../components/TransactionsSectionNav'
 import { ContextualHelp } from '../components/ContextualHelp'
@@ -1022,13 +1022,7 @@ export function ImportReviewPage() {
   }
 
   return (
-    <main className="management-page">
-      <header className="app-header">
-        <BrandLockup />
-        <AppLink className="header-link" to="/dashboard">Return to dashboard</AppLink>
-      </header>
-
-      <section className="management-content import-review-content">
+    <PageFrame contentClassName="import-review-content">
         <TransactionsSectionNav />
         <div className="page-title-row">
           <div>
@@ -1400,7 +1394,6 @@ export function ImportReviewPage() {
 
           </>
         )}
-      </section>
-    </main>
+    </PageFrame>
   )
 }
