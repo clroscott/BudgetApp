@@ -16,10 +16,9 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
     : IClassFixture<BudgetAppWebApplicationFactory>
 {
     [Theory]
-    [InlineData("transactions.xlsx")]
     [InlineData("transactions.xls")]
     [InlineData("transactions.xlsm")]
-    public async Task FormatNeutralFoundation_DoesNotEnableWorkbookUploadOrInspection(string fileName)
+    public async Task LegacyAndMacroFormats_AreRejectedByUploadAndInspection(string fileName)
     {
         using var client = factory.CreateAuthenticatedTestClient();
         await Register(client);
@@ -29,7 +28,7 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         const string data = "Date,Description,Amount\n2026-07-20,Synthetic purchase,10\n";
         var upload = await Upload(client, household, account, data, token, fileName: fileName);
         Assert.Equal(HttpStatusCode.BadRequest, upload.StatusCode);
-        Assert.Contains("Only .csv files are supported.", await upload.Content.ReadAsStringAsync());
+        Assert.Contains("Only .csv and .xlsx files are supported.", await upload.Content.ReadAsStringAsync());
         using var body = new MultipartFormDataContent();
         body.Add(new StringContent(account.ToString()), "accountId");
         body.Add(new ByteArrayContent(Encoding.UTF8.GetBytes(data)), "file", fileName);
@@ -37,7 +36,7 @@ public sealed class CsvImportTests(BudgetAppWebApplicationFactory factory)
         request.Headers.Add("X-XSRF-TOKEN", token);
         var inspection = await client.SendAsync(request);
         Assert.Equal(HttpStatusCode.BadRequest, inspection.StatusCode);
-        Assert.Contains("Only .csv files are supported.", await inspection.Content.ReadAsStringAsync());
+        Assert.Contains("Only .csv and .xlsx files are supported.", await inspection.Content.ReadAsStringAsync());
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
         Assert.False(await db.ImportFiles.AnyAsync(f => f.HouseholdId == household));

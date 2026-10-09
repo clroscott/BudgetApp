@@ -33,6 +33,8 @@ internal sealed class ImportFileConfiguration : IEntityTypeConfiguration<ImportF
         });
 
         builder.HasKey(importFile => importFile.Id);
+        builder.Property(file => file.SourceWorksheetId).HasMaxLength(64);
+        builder.Property(file => file.SourceWorksheetName).HasMaxLength(31);
 
         builder.HasIndex(importFile => new
         {

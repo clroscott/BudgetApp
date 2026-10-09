@@ -82,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<IImportProfileRepository, ImportProfileRepository>();
         services.AddScoped<ImportProfileService>();
         services.AddScoped<CsvImportReader>();
+        services.AddScoped<XlsxImportReader>();
         services.AddScoped<ITransactionImportReader, TransactionImportReader>();
         services.AddScoped<TransactionImportService>();
         services.AddScoped<ImportReviewService>();

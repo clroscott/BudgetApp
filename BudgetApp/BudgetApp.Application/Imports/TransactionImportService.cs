@@ -31,7 +31,7 @@ public sealed class TransactionImportService(
         Stream content,
         bool allowDuplicateFile,
         Guid? profileId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? worksheetId = null)
     {
         ArgumentNullException.ThrowIfNull(content);
 
@@ -52,13 +52,13 @@ public sealed class TransactionImportService(
                 householdId, profileId.Value, cancellationToken)
             : null;
         var readResult = profile is null
-            ? await importReader.ReadAsync(content, normalizedFileName, cancellationToken)
-            : await importReader.ReadAsync(content, normalizedFileName, profile, cancellationToken);
+            ? await importReader.ReadAsync(content, normalizedFileName, cancellationToken, worksheetId)
+            : await importReader.ReadAsync(content, normalizedFileName, profile, cancellationToken, worksheetId);
         if (!allowDuplicateFile &&
             await importRepository.ExistsByAccountAndHashAsync(
                 account.Id,
                 readResult.Sha256Hash,
-                cancellationToken))
+                cancellationToken, readResult.SourceWorksheetId))
         {
             throw new DuplicateImportFileException();
         }
@@ -73,6 +73,7 @@ public sealed class TransactionImportService(
             readResult.Sha256Hash,
             now);
         importFile.StartProcessing(now);
+        importFile.SetWorksheetSource(readResult.SourceWorksheetId, readResult.SourceWorksheetName);
 
         var categories = await categoryRepository.ListAsync(
             householdId,
@@ -128,6 +129,7 @@ public sealed class TransactionImportService(
             new Dictionary<string, string?>
             {
                 ["File name"] = importFile.OriginalFileName,
+                ["Worksheet"] = importFile.SourceWorksheetName,
                 ["Account"] = account.Name,
                 ["Rows staged"] = importFile.TotalRowCount.ToString(),
                 ["Valid rows"] = importFile.ValidRowCount.ToString(),
@@ -144,7 +146,7 @@ public sealed class TransactionImportService(
             importFile.TotalRowCount,
             importFile.ValidRowCount,
             importFile.InvalidRowCount,
-            importFile.DuplicateRowCount);
+            importFile.DuplicateRowCount, importFile.SourceWorksheetName);
     }
 
     private static ImportTransactionDraft CreateDraft(
@@ -232,7 +234,7 @@ public sealed class TransactionImportService(
     private static string? NormalizeCategoryName(string? name) =>
         string.IsNullOrWhiteSpace(name) ? null : name.Trim().ToUpperInvariant();
 
-    private static void RequireImportPermission(
+    internal static void RequireImportPermission(
         Account account,
         HouseholdRole role,
         Guid userId)

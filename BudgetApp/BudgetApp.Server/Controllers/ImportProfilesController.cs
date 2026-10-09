@@ -117,21 +117,22 @@ public sealed class ImportProfilesController(ImportProfileService service) : Con
         Guid householdId,
         [FromForm] Guid accountId,
         [FromForm] IFormFile? file,
+        [FromForm] string? worksheetId,
         CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
-        if (file is null) return BadRequest("Select a CSV file.");
+        if (file is null) return BadRequest("Select a CSV or Excel (.xlsx) file.");
         if (file.Length > TransactionImportLimits.MaxFileSizeBytes)
         {
             return BadRequest(
-                $"CSV files cannot exceed {TransactionImportLimits.MaxFileSizeBytes / 1024 / 1024} MB.");
+                $"Import files cannot exceed {TransactionImportLimits.MaxFileSizeBytes / 1024 / 1024} MB.");
         }
 
         try
         {
             await using var content = file.OpenReadStream();
             return Ok(await service.InspectAsync(
-                householdId, userId, accountId, file.FileName, content, cancellationToken));
+                householdId, userId, accountId, file.FileName, content, cancellationToken, worksheetId));
         }
         catch (Exception exception) when (IsExpected(exception))
         {

@@ -13,7 +13,9 @@ public sealed record TransactionImportRow(
 public sealed record TransactionImportReadResult(
     long FileSizeBytes,
     string Sha256Hash,
-    IReadOnlyList<TransactionImportRow> Rows);
+    IReadOnlyList<TransactionImportRow> Rows,
+    string? SourceWorksheetId = null,
+    string? SourceWorksheetName = null);
 
 public sealed record TransactionImportResult(
     Guid ImportFileId,
@@ -23,4 +25,12 @@ public sealed record TransactionImportResult(
     int TotalRows,
     int ValidRows,
     int InvalidRows,
-    int DuplicateRows);
+    int DuplicateRows,
+    string? SourceWorksheetName = null);
+
+public sealed record ImportWorksheetOption(
+    string Id,
+    string Name,
+    bool IsHidden,
+    int TransactionRows,
+    string? Problem);

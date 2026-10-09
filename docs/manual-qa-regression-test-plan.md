@@ -866,10 +866,10 @@ initial findings and pending live tasks.
 
 ### Format-neutral import foundation (#22, Part 1)
 
-This part is a backend refactor only. CSV labels/routes/templates remain in place;
-Excel support and worksheet selection are deliberately not enabled yet. Use
-fictional Development/Scratch data; no migration is required. Restart the server
-after updating because the internal service/reader types have changed.
+Historical checkpoint for the Part 1 commit only: it is a backend CSV refactor;
+no migration or Excel capability exists at that checkpoint. Part 2 below supersedes
+the workbook-rejection check and adds a nullable metadata migration. Run the CSV
+compatibility checks against the combined feature as well.
 
 - [ ] Import a standard CSV: source values, row numbers, raw details, category
       suggestions and Personal/Household inclusion match the existing behavior.
@@ -890,6 +890,65 @@ after updating because the internal service/reader types have changed.
       their own active personal account, and cannot use another member's private
       account. Archived accounts reject new imports. Other households/private
       imports remain invisible; unsaved upload/review guards remain intact.
+
+### Excel workbook import (#22, Part 2)
+
+Use fictional Development/Scratch data only. Apply the new nullable-column migration
+through the existing Development procedure and restart the server/client first.
+Never use Production data or real email for these checks. Record workbook source
+(Excel/version or another exporter), browser, viewport/zoom and role with results.
+See [supported layouts and enforced limits](excel-import-foundation.md#enforced-resource-limits).
+
+- [ ] Save a standard Date/Description/Amount/Category/Subcategory workbook as
+      `.xlsx`. Preview it on Import transactions: selected worksheet and first five
+      original source row numbers are clear. Upload stages drafts only. Review shows
+      the worksheet name; row corrections, categories/subcategories, budget choices,
+      approval/exclusion and completion still work. Restart/refresh retains provenance.
+- [ ] Use two populated sheets plus blank/header-only sheets. Preview does not stage
+      anything or silently merge sheets. Select each usable sheet deliberately and
+      verify the preview and staged rows come only from that sheet. Blank or invalid
+      headers/merged sheets have explained disabled choices or safe rejection.
+- [ ] Hide a populated sheet. It is labeled hidden, never automatically selected,
+      and can be deliberately chosen. A hidden-only workbook requires explicit choice.
+- [ ] Include leading blank rows and gaps; a row originally at Excel row 9 remains
+      row 9 in review/error messages and its official transaction source linkage.
+- [ ] Reuse a CSV mapping in Excel and an Excel mapping in CSV. Native numeric and
+      date cells, leading-zero text, exact four-decimal signed amounts, refunds and
+      debit/credit layouts preserve their meaning. Original CSV defaults remain intact.
+- [ ] Map unfamiliar headers, choose an explicit day-first text date and comma-decimal
+      number format, save and reuse it. Edit/rename that profile without losing its
+      parsing options. A failed save retains mapping choices and unsaved protection.
+- [ ] Check 1900/1904 workbooks and native ISO dates. Time-only cells are not silently
+      invented calendar dates; unsupported/locale-ambiguous date styles explain how
+      to save unambiguous values. Financial totals reconcile after review/completion.
+- [ ] Test a saved formula result, missing cache and Excel error in mapped cells.
+      Preview warns about stale caches; nothing is calculated or fetched. Missing/error
+      values become invalid, correctable drafts with worksheet/row context. An ignored
+      formula column does not invalidate an otherwise valid row.
+- [ ] Import the same workbook/sheet twice: explicit repeat confirmation is required.
+      A different sheet in the same workbook is allowed. Complete equivalent CSV rows
+      first, then stage Excel: normal possible-duplicate acknowledgement remains required.
+      Completion retry creates no additional official transactions.
+- [ ] Try `.xls`, `.xlsm`, encrypted/password-protected files, renamed non-workbooks,
+      malformed XML, duplicate/missing headers and unsupported layouts. Errors provide
+      recovery guidance and create no partial imports or official transactions.
+- [ ] Use a disposable 10,000-row workbook; preview remains bounded to five rows and
+      review/completion work. Exceed 10 MB/10,000 rows/cell-length limits and verify safe
+      rejection. Automated package tests also cover expansion and metadata limits.
+- [ ] Simulate read/upload failure: file, selected sheet, preview and safe edits remain
+      available. If the mapping saved but staging failed, retry reuses the saved profile
+      instead of creating it again. Rapid double-click/Enter does not send parallel writes.
+- [ ] During a slow preview, controls cannot change upload context. Accepted household
+      switching/navigation ignores late responses; canceled switching/navigation preserves
+      the file/mapping. Replacing a file or changing accounts clears old worksheet context.
+- [ ] Owner/Admin may import shared accounts. Viewer may inspect/stage/edit their own
+      private account with a compatible existing profile, cannot save shared profiles or
+      edit shared-account imports, and cannot discover another member's private workbook.
+      Archived accounts reject both preview and staging.
+- [ ] At narrow width and 200% zoom, worksheet/profile controls and upload/review actions
+      remain reachable. Preview columns scroll inside their region without bleeding into
+      adjacent controls. Keyboard/screen reader can identify the selected sheet, table
+      headers/source rows, errors, retry and completion actions; focus remains visible.
 
 Automated coverage exercises the neutral dispatcher, CSV parser, limits, input
 ownership/cancellation, unsupported formats and staging/approval integration.

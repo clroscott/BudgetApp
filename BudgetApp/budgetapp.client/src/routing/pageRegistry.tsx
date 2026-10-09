@@ -210,8 +210,8 @@ export const appPages: AppPageDefinition[] = [
       panelLabel: 'Import & review',
       panelTitle: 'Bank transactions',
       panelDescription:
-        'Upload CSV activity, then review it before creating transactions.',
-      linkLabel: 'Import a CSV',
+        'Upload CSV or Excel activity, then review it before creating transactions.',
+      linkLabel: 'Import transactions',
       defaultOrder: 20,
     },
     component: page(() => import('../pages/CsvImportPage'), 'CsvImportPage'),
@@ -228,7 +228,7 @@ export const appPages: AppPageDefinition[] = [
       panelLabel: 'Import & review',
       panelTitle: 'Bank transactions',
       panelDescription:
-        'Upload CSV activity, then review it before creating transactions.',
+        'Upload CSV or Excel activity, then review it before creating transactions.',
       linkLabel: 'Review imports',
       defaultOrder: 20,
     },
@@ -423,17 +423,17 @@ export const appPages: AppPageDefinition[] = [
   {
     id: 'import-profiles',
     path: '/settings/import-profiles',
-    label: 'CSV profiles',
+    label: 'Import profiles',
     icon: 'profiles',
     access: 'household',
     navigation: { section: 'settings', order: 30 },
     dashboard: {
       panelKey: 'import-profiles',
-      panelLabel: 'CSV profiles',
+      panelLabel: 'Import profiles',
       panelTitle: 'Saved import structures',
       panelDescription:
         'Reuse mappings for bank and custom transaction file formats.',
-      linkLabel: 'Manage CSV profiles',
+      linkLabel: 'Manage import profiles',
     },
     component: page(
       () => import('../pages/ImportProfileManagementPage'),

@@ -9,7 +9,7 @@ namespace BudgetApp.Tests.Infrastructure.Imports;
 
 public sealed class TransactionImportReaderTests
 {
-    private readonly ITransactionImportReader reader = new TransactionImportReader(new CsvImportReader());
+    private readonly ITransactionImportReader reader = new TransactionImportReader(new CsvImportReader(), new XlsxImportReader());
 
     [Theory]
     [InlineData("bank.csv")]
@@ -38,7 +38,6 @@ public sealed class TransactionImportReaderTests
     }
 
     [Theory]
-    [InlineData("bank.xlsx")]
     [InlineData("bank.xls")]
     [InlineData("bank.xlsm")]
     [InlineData("bank.csv.exe")]
@@ -48,7 +47,7 @@ public sealed class TransactionImportReaderTests
     {
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes("Date,Description,Amount\n2026-07-20,Purchase,10\n"));
         var profile = Profile(["Date", "Description", "Amount"]);
-        Assert.Equal("Only .csv files are supported.", Assert.Throws<TransactionImportRejectedException>(() => reader.ValidateFileName(fileName)).Message);
+        Assert.Contains("Only .csv and .xlsx files are supported.", Assert.Throws<TransactionImportRejectedException>(() => reader.ValidateFileName(fileName)).Message);
         await Assert.ThrowsAsync<TransactionImportRejectedException>(() => reader.InspectAsync(stream, fileName, default));
         await Assert.ThrowsAsync<TransactionImportRejectedException>(() => reader.ReadAsync(stream, fileName, default));
         await Assert.ThrowsAsync<TransactionImportRejectedException>(() => reader.ReadAsync(stream, fileName, profile, default));
@@ -59,7 +58,7 @@ public sealed class TransactionImportReaderTests
     [InlineData("")]
     [InlineData("  ")]
     public void MissingName_RetainsExistingGuidance(string fileName) =>
-        Assert.Equal("Select a CSV file to import.", Assert.Throws<TransactionImportRejectedException>(() => reader.ValidateFileName(fileName)).Message);
+        Assert.Equal("Select a CSV or Excel (.xlsx) file to import.", Assert.Throws<TransactionImportRejectedException>(() => reader.ValidateFileName(fileName)).Message);
 
     [Fact]
     public async Task InspectionAndExplicitProfile_KeepTheSameColumnsPreviewAndSignConvention()
@@ -69,7 +68,7 @@ public sealed class TransactionImportReaderTests
         var inspection = await reader.InspectAsync(stream, "custom.csv", default);
         Assert.Equal(["When", "Vendor", "Value"], inspection.Headers);
         Assert.Equal(["2026-07-20", "Purchase", "-12.3456"], Assert.Single(inspection.PreviewRows));
-        Assert.Equal("New CSV profile", inspection.SuggestedProfile.Name);
+        Assert.Equal("New CSV profile", inspection.SuggestedProfile!.Name);
         stream.Position = 0;
         var profile = Profile(inspection.Headers, "When", "Vendor", "Value", ImportAmountConvention.MoneyInPositive);
         var result = await reader.ReadAsync(stream, "custom.csv", profile, default);

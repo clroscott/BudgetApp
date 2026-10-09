@@ -15,7 +15,9 @@ public sealed record ImportProfileModel(
     string? SubcategoryColumn,
     string AmountConvention,
     Guid? DefaultAccountId,
-    bool IsActive);
+    bool IsActive,
+    string? DateFormat = null,
+    string? NumberCulture = null);
 
 public sealed record SaveImportProfileInput(
     string Name,
@@ -28,7 +30,9 @@ public sealed record SaveImportProfileInput(
     string? CategoryColumn,
     string? SubcategoryColumn,
     string AmountConvention,
-    Guid? DefaultAccountId);
+    Guid? DefaultAccountId,
+    string? DateFormat = null,
+    string? NumberCulture = null);
 
 public sealed record ImportProfileDefinition(
     Guid? Id,
@@ -41,17 +45,27 @@ public sealed record ImportProfileDefinition(
     string? CreditColumn,
     string? CategoryColumn,
     string? SubcategoryColumn,
-    ImportAmountConvention AmountConvention);
+    ImportAmountConvention AmountConvention,
+    string? DateFormat = null,
+    string? NumberCulture = null);
 
 public sealed record TransactionImportInspection(
     long FileSizeBytes,
     string Sha256Hash,
     IReadOnlyList<string> Headers,
     IReadOnlyList<IReadOnlyList<string>> PreviewRows,
-    ImportProfileDefinition SuggestedProfile);
+    ImportProfileDefinition? SuggestedProfile,
+    IReadOnlyList<ImportWorksheetOption>? Worksheets = null,
+    string? SelectedWorksheetId = null,
+    string? SelectedWorksheetName = null,
+    IReadOnlyList<int>? PreviewRowNumbers = null);
 
 public sealed record ImportProfileInspectionModel(
     IReadOnlyList<string> Headers,
     IReadOnlyList<IReadOnlyList<string>> PreviewRows,
     ImportProfileModel? MatchedProfile,
-    ImportProfileModel SuggestedProfile);
+    ImportProfileModel? SuggestedProfile,
+    IReadOnlyList<ImportWorksheetOption>? Worksheets = null,
+    string? SelectedWorksheetId = null,
+    string? SelectedWorksheetName = null,
+    IReadOnlyList<int>? PreviewRowNumbers = null);

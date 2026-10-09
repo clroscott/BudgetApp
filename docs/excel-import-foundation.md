@@ -1,5 +1,8 @@
 # Excel import foundation (#22)
 
+Part 2 enables `.xlsx` in the existing Import transactions page. Part 1 below
+documents the earlier, CSV-only checkpoint; it is not the current feature gate.
+
 ## Part 1: format-neutral boundary, CSV only
 
 `TransactionImportService` and profile inspection now depend on
@@ -41,30 +44,125 @@ reports zero warnings/errors. Test databases are isolated; no application databa
 or real email delivery was used. The live CSV smoke checks remain pending in the
 permanent manual checklist.
 
-## Part 2: pending, same branch / separate commit
+## Part 2: Excel staging, same branch / separate commit
 
-Do not enable an Excel reader until these pieces land together:
+### User workflow and compatibility
 
-- Enforced ZIP/XML expansion, entry, worksheet, column, cell/text and row limits;
-  bounded shared strings/styles and cancellation. The compressed upload cap alone
-  does not prevent excessive resource use. No filesystem extraction or fetching
-  external relationships.
-- `.xlsx` inspection, visible single-sheet auto-selection, explicit multi-sheet
-  selection/preview and clearly labeled worksheet context. Blank/hidden sheets
-  have explained handling; no automatic merging or hidden-sheet selection.
-- Typed stored cell values, Excel date-system conversion, leading-zero text,
-  cached-formula handling without calculation, and explicit parsing options for
-  ambiguous regional text values. Error cells or missing usable formula caches
-  are explained; macros, encrypted and unsupported workbooks are rejected.
-- Persisted original worksheet and row provenance, and worksheet-aware same-file
-  duplicate checks so a second worksheet is not mistaken for a repeat of the
-  first. Existing transaction duplicate rules apply across formats.
-- Shared profile integration and account/privacy permissions; neutral upload
-  labels/accept filter without a separate review workflow. Failed/late inspection
-  reads cannot replace another file/account/household context or discard edits.
-- Reader, API and UI regressions plus large disposable-workbook manual QA. No
-  direct official-transaction creation from upload.
+1. Choose an account, CSV or `.xlsx` file, and optional existing import profile.
+2. For Excel, choose **Preview workbook**. The sole usable visible worksheet is
+   selected automatically. Multiple candidates (or hidden-only candidates) require
+   a deliberate choice. Blank/header-only/merged or invalid-header sheets explain
+   why they cannot be selected. No worksheets are combined.
+3. Check the selected worksheet name and first five rows, including original Excel
+   row numbers. Use an existing CSV-compatible profile or save an unfamiliar column
+   mapping. Profile creation remains Owner/Admin only; a Viewer may use an existing
+   profile for their own private account, but cannot create shared configuration.
+4. **Upload for review** stages only that worksheet. The existing review page keeps
+   corrections, categories/subcategories, duplicate acknowledgements, budget
+   inclusion, approval/exclusion and completion. Upload and preview never create
+   official transactions. Completion keeps its atomic/idempotent behavior.
 
-The foundation does not add regional parsing preferences or change existing CSV
-interpretation. They require an explicit, backward-compatible design in Part 2.
-Permanent Part 1 manual checks are in the [QA checklist](manual-qa-regression-test-plan.md#format-neutral-import-foundation-22-part-1).
+The API routes and existing CSV multipart fields remain unchanged; `worksheetId`
+is optional for Excel and rejected for CSV. Profiles/templates remain shared
+household configuration; imported private-account data remains owner-only. Both
+inspection and staging enforce active account and existing account-owner/role rules
+before reading workbook contents. Stable tutorial target IDs remain unchanged.
+
+`ImportFiles` gains nullable original worksheet ID/name; existing rows remain null.
+The original row number continues on each draft and official transaction linkage.
+Same-file detection uses account + byte hash + worksheet ID, so two sheets from
+the same workbook can be staged separately. Transaction duplicate matching still
+uses existing date/amount/description rules across CSV and Excel.
+
+`ImportProfiles` gains nullable `DateFormat` and `NumberCulture`. Null retains
+legacy CSV defaults (including month-first ambiguous text dates). Explicit text
+date formats are `yyyy-MM-dd`, `yyyyMMdd`, `MM/dd/yyyy`, `dd/MM/yyyy`; number formats
+are `en-US`, `en-CA`, `en-GB`, `fr-CA`, `de-DE`. The mapping and profile editors show
+these options. They affect future imports only, not saved transactions. Native
+numeric/date Excel cells are rendered for that profile before shared validation,
+so a comma-decimal profile does not reinterpret a native decimal's dot separator.
+
+### Stored values, not an Excel calculation engine
+
+`XlsxImportReader` is a restricted, streaming SpreadsheetML reader using .NET ZIP
+and XML APIs; it does not add a general workbook-editing/calculation dependency.
+It reads standard/strict `.xlsx` workbook relationships, worksheets, inline/shared
+rich strings, cached scalar results, numeric values and date styles. No ZIP parts
+are extracted, relationships fetched, formulas/macros run, or embedded objects
+opened. Legacy `.xls`, `.xlsm`, macro parts and encrypted OLE containers are rejected.
+
+The first nonblank row must be a simple, unique nonempty header row. Transaction
+rows must remain within those columns; blank rows are skipped without renumbering.
+Merged layouts, chartsheets and unsupported/ambiguous values receive guidance;
+this is not a visual-format/layout interpreter. Leading-zero **text** survives;
+display-only padding of a numeric cell does not turn that stored number into text.
+Financial values use stored decimal values, not rounded Excel display strings.
+
+Formula cells use their saved result only. Missing/error/unsupported results in
+mapped columns make correctable invalid drafts with worksheet/row context; ignored
+columns do not invalidate transactions. The preview warns that caches can be stale
+and asks users to recalculate/save or paste values. This follows Excel's stored
+[formula-result representation](https://learn.microsoft.com/en-us/office/open-xml/spreadsheet/working-with-formulas).
+
+Dates respect the workbook's [1900/1904 date system](https://support.microsoft.com/en-us/excel/date-systems-in-excel).
+Serial 60 in the 1900 system is rejected rather than inventing a calendar date.
+Time-only styles are not treated as dates. Locale-dependent built-in date/time
+styles without an explicit format code are correctable failures rather than guesses;
+see Microsoft's [number-format definitions](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.numberingformat).
+
+### Enforced resource limits
+
+Limits apply during inspection and staging; oversized/malformed reads occur before
+persisting the import. ZIP expansion is measured, not merely trusted from its index.
+MB means 1,024 × 1,024 bytes here.
+
+| Resource | Limit |
+| --- | --- |
+| Compressed upload / multipart request | 10 MB / 11 MB |
+| Total expanded package / single expanded part | 100 MB / 32 MB |
+| Metadata XML part | 1 MB; maximum depth 32 |
+| Package entries / worksheets | 512 / 20 |
+| Columns / nonblank transaction rows per sheet | 100 / 10,000 |
+| Physical rows per sheet (including blanks) | 20,000 |
+| Cell or shared-string text | 4,096 characters |
+| Shared strings / combined shared text | 100,000 / 2,000,000 characters |
+| Number formats / cell styles | 4,096 each |
+| Decoded cells per operation (survey + selected reread) | 500,000 |
+| Retained selected-sheet text | 5,000,000 characters |
+| Cell/shared-string complexity | 512 XML nodes; depth 16 |
+| Worksheet XML depth / read timeout | 32 / 15 seconds |
+
+Unsafe/duplicate ZIP paths, DTDs/entities, malformed references, invalid ordering,
+and data beyond header width fail safely. All worksheets are bounded while surveyed;
+an oversized sheet is not ignored simply because another sheet was selected. The
+survey keeps at most five preview rows per worksheet. Cancellation is checked while
+copying, decompressing and parsing; callers retain ownership of the input stream.
+
+### Deployment and verification
+
+Migration `20261009012635_AddExcelImportProvenanceAndParsing` adds four nullable
+columns only; it does not change budgets, transaction amounts or existing profiles.
+Apply it with the existing Development database update procedure before running the
+new server locally; Production uses its normal backed-up deployment procedure.
+No database update is run as part of implementation/testing.
+
+Automated coverage includes CSV compatibility, worksheet discovery/selection,
+actual row provenance, native/ISO/serial dates, text escapes and leading zeros,
+localized text/native numeric values, cached/missing/error formulas, negative and
+four-decimal amounts, sparse rows, malformed/expanded/oversized packages, a 10,000-row
+synthetic workbook, cross-format duplicates, repeat-sheet uploads, profile reuse,
+owner/Viewer privacy, invalid-draft completion, completion retry, late responses,
+concurrent requests and failed saves. All test data is synthetic/disposable;
+test databases and email delivery are isolated/fake or loopback, not Production.
+
+Live Excel/browser/keyboard/zoom checks remain pending with the user. Permanent
+cases are in the [manual QA checklist](manual-qa-regression-test-plan.md#excel-workbook-import-22-part-2).
+
+Part 2 verification (October 8, 2026): 618 backend and 514 client tests pass,
+as do client lint/build and the solution build (zero warnings/errors). The offline
+EF model check reports no pending model changes; its SQL preview contains only
+the four nullable column additions and migration-history entry. Existing Windows
+certificate/loopback tests and Visual Studio SDK builds run outside the sandbox
+because their installed runtime/configuration files are sandbox-restricted. A
+dashboard assertion was changed to await its asynchronously loaded budget card;
+no dashboard behavior was changed. Live/manual checks above remain pending.

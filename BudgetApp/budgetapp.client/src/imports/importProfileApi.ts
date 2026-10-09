@@ -16,6 +16,8 @@ export interface ImportProfile {
   amountConvention: AmountConvention
   defaultAccountId: string | null
   isActive: boolean
+  dateFormat?: string | null
+  numberCulture?: string | null
 }
 
 export type SaveImportProfile = Omit<ImportProfile, 'id' | 'isActive'>
@@ -24,7 +26,19 @@ export interface ImportProfileInspection {
   headers: string[]
   previewRows: string[][]
   matchedProfile: ImportProfile | null
-  suggestedProfile: ImportProfile
+  suggestedProfile: ImportProfile | null
+  worksheets?: ImportWorksheetOption[] | null
+  selectedWorksheetId?: string | null
+  selectedWorksheetName?: string | null
+  previewRowNumbers?: number[] | null
+}
+
+export interface ImportWorksheetOption {
+  id: string
+  name: string
+  isHidden: boolean
+  transactionRows: number
+  problem: string | null
 }
 
 const base = (householdId: string) =>
@@ -74,10 +88,12 @@ export function inspectImportFile(
   householdId: string,
   accountId: string,
   file: File,
+  worksheetId?: string,
 ): Promise<ImportProfileInspection> {
   const form = new FormData()
   form.append('accountId', accountId)
   form.append('file', file)
+  if (worksheetId) form.append('worksheetId', worksheetId)
   return apiPostForm(`${base(householdId)}/inspect`, form)
 }
 

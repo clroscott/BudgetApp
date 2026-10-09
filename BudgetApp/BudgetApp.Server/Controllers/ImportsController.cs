@@ -79,6 +79,7 @@ public sealed class ImportsController(
         [FromForm] IFormFile? file,
         [FromForm] bool allowDuplicateFile,
         [FromForm] Guid? profileId,
+        [FromForm] string? worksheetId,
         CancellationToken cancellationToken)
     {
         if (!TryGetUserId(out var userId))
@@ -88,13 +89,13 @@ public sealed class ImportsController(
 
         if (file is null)
         {
-            return BadRequestProblem("Select a CSV file to import.");
+            return BadRequestProblem("Select a CSV or Excel (.xlsx) file to import.");
         }
 
         if (file.Length > TransactionImportLimits.MaxFileSizeBytes)
         {
             return BadRequestProblem(
-                $"CSV files cannot exceed {TransactionImportLimits.MaxFileSizeBytes / 1024 / 1024} MB.");
+                $"Import files cannot exceed {TransactionImportLimits.MaxFileSizeBytes / 1024 / 1024} MB.");
         }
 
         var safeFileName = Path.GetFileName(file.FileName.Replace('\\', '/'));
@@ -110,7 +111,7 @@ public sealed class ImportsController(
                 content,
                 allowDuplicateFile,
                 profileId,
-                cancellationToken);
+                cancellationToken, worksheetId);
             logger.LogInformation(
                 "User {UserId} staged import {ImportFileId} with {TotalRows} rows " +
                 "for account {AccountId} in household {HouseholdId}",
@@ -420,7 +421,7 @@ public sealed class ImportsController(
                 (StatusCodes.Status400BadRequest, "Category not found"),
             DuplicateImportFileException =>
                 (StatusCodes.Status409Conflict, "Possible duplicate file"),
-            _ => (StatusCodes.Status400BadRequest, "CSV import was rejected")
+            _ => (StatusCodes.Status400BadRequest, "Transaction import was rejected")
         };
 
         return StatusCode(status, new ProblemDetails
@@ -435,7 +436,7 @@ public sealed class ImportsController(
         BadRequest(new ProblemDetails
         {
             Status = StatusCodes.Status400BadRequest,
-            Title = "CSV import was rejected",
+            Title = "Transaction import was rejected",
             Detail = detail
         });
 }

@@ -71,6 +71,16 @@ beforeEach(() => {
 })
 
 describe('staged import edit protection', () => {
+  it('shows the original worksheet and Excel row provenance in review and row details', async () => {
+    vi.mocked(getImports).mockResolvedValue(listPage([{ ...listItem, originalFileName: 'bank.xlsx', sourceWorksheetName: 'Chequing' }]))
+    vi.mocked(getImport).mockResolvedValue({ ...detail(), originalFileName: 'bank.xlsx', sourceWorksheetName: 'Chequing' })
+    show(<ImportReviewPage />)
+    const row = await screen.findByRole('article', { name: 'Excel row 2' })
+    expect(screen.getByText(/Row numbers refer to the original Excel worksheet/)).toBeTruthy()
+    expect(screen.getByRole('option', { name: /bank.xlsx · Chequing/ })).toBeTruthy()
+    fireEvent.click(within(row).getByRole('button', { name: 'Details' }))
+    await screen.findByText(/Worksheet Chequing · Excel row 2/)
+  })
   it('bulk choices preserve row corrections, support cancellation, and save through the existing bulk endpoint', async () => {
     show(<ImportReviewPage />)
     const input = await screen.findByLabelText('Description') as HTMLInputElement
@@ -545,7 +555,7 @@ describe('pending CSV uploads', () => {
     }])
     show(<CsvImportPage />, '/import')
     await screen.findByRole('option', { name: 'Sample CSV profile' })
-    fireEvent.change(screen.getByLabelText(/^CSV profile/), { target: { value: profileId } })
+    fireEvent.change(screen.getByLabelText(/^Import profile/), { target: { value: profileId } })
     const link = await screen.findByRole('link', { name: 'Download selected profile template' })
     expect(link.getAttribute('href'))
       .toBe(`/api/households/household-a/import-profiles/${encodeURIComponent(profileId)}/template`)
@@ -558,7 +568,7 @@ describe('pending CSV uploads', () => {
 
   it('protects a selected file before upload and clears protection after a successful upload', async () => {
     show(<CsvImportPage />, '/import')
-    const fileInput = await screen.findByLabelText(/^CSV file/)
+    const fileInput = await screen.findByLabelText(/^CSV or Excel file/)
     fireEvent.change(fileInput, { target: { files: [new File(['Date,Description,Amount\n2026-01-01,Sample,100'], 'sample.csv', { type: 'text/csv' })] } })
     fireEvent.click(screen.getByText('Leave page'))
     expect(window.confirm).toHaveBeenCalledTimes(1)

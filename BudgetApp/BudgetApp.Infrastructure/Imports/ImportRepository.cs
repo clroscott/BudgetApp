@@ -52,7 +52,8 @@ internal sealed class ImportRepository(BudgetAppDbContext dbContext)
                 item.File.DuplicateRowCount,
                 item.File.UploadedAtUtc,
                 item.Account.Scope == AccountScope.Personal,
-                item.Account.OwnerUserId))
+                item.Account.OwnerUserId,
+                item.File.SourceWorksheetName))
             .ToListAsync(cancellationToken);
         return new ImportListQueryResult(items, actualPage, total, summary.TotalCount);
     }
@@ -146,11 +147,11 @@ internal sealed class ImportRepository(BudgetAppDbContext dbContext)
     public Task<bool> ExistsByAccountAndHashAsync(
         Guid accountId,
         string sha256Hash,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken, string? sourceWorksheetId = null) =>
         dbContext.ImportFiles.AsNoTracking().AnyAsync(
             importFile =>
                 importFile.AccountId == accountId &&
-                importFile.Sha256Hash == sha256Hash,
+                importFile.Sha256Hash == sha256Hash && importFile.SourceWorksheetId == sourceWorksheetId,
             cancellationToken);
 
     public async Task AddAsync(

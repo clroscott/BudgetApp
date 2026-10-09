@@ -9,16 +9,19 @@ public interface ITransactionImportReader
     Task<TransactionImportInspection> InspectAsync(
         Stream content,
         string originalFileName,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? worksheetId = null);
 
     Task<TransactionImportReadResult> ReadAsync(
         Stream content,
         string originalFileName,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? worksheetId = null);
 
     Task<TransactionImportReadResult> ReadAsync(
         Stream content,
         string originalFileName,
         ImportProfileDefinition profile,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        string? worksheetId = null);
 }

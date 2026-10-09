@@ -55,6 +55,8 @@ public sealed class ImportProfile
     public string? SubcategoryColumn { get; private set; }
     public ImportAmountConvention AmountConvention { get; private set; }
     public Guid? DefaultAccountId { get; private set; }
+    public string? DateFormat { get; private set; }
+    public string? NumberCulture { get; private set; }
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
@@ -107,6 +109,14 @@ public sealed class ImportProfile
         IsActive = false;
         DefaultAccountId = null;
         UpdatedAtUtc = updatedAtUtc;
+    }
+
+    public void SetParsingOptions(string? dateFormat, string? numberCulture)
+    {
+        var cleanDate = ImportParsingOptions.ValidateDateFormat(dateFormat);
+        var cleanCulture = ImportParsingOptions.ValidateNumberCulture(numberCulture);
+        DateFormat = cleanDate;
+        NumberCulture = cleanCulture;
     }
 
     public void Reactivate(DateTimeOffset updatedAtUtc)

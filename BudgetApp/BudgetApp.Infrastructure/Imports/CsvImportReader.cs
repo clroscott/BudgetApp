@@ -63,7 +63,8 @@ public sealed class CsvImportReader
                 fields.ToArray(),
                 columns,
                 index + 2,
-                profile?.AmountConvention ?? ImportAmountConvention.SpendingPositive))
+                profile?.AmountConvention ?? ImportAmountConvention.SpendingPositive,
+                dateFormat: profile?.DateFormat, numberCulture: profile?.NumberCulture))
             .ToList();
         return new TransactionImportReadResult(
             bytes.Length,

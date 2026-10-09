@@ -64,15 +64,15 @@ internal static class TransactionImportRowParser
         ImportColumnMapping columns,
         int sourceRowNumber,
         ImportAmountConvention convention,
-        string sourceFormat = "CSV")
+        string sourceFormat = "CSV", string? dateFormat = null, string? numberCulture = null)
     {
         var errors = new List<string>();
         var amount = columns.AmountIndex >= 0
-            ? ParseAmount(GetField(fields, columns.AmountIndex), errors)
+            ? ParseAmount(GetField(fields, columns.AmountIndex), errors, numberCulture)
             : ParseDebitCredit(
                 GetField(fields, columns.DebitIndex),
                 GetField(fields, columns.CreditIndex),
-                errors);
+                errors, numberCulture);
         if (amount.HasValue &&
             columns.AmountIndex >= 0 &&
             convention == ImportAmountConvention.MoneyInPositive)
@@ -87,7 +87,7 @@ internal static class TransactionImportRowParser
         return new TransactionImportRow(
             sourceRowNumber,
             SerializeRawRow(headers, fields, sourceFormat),
-            ParseDate(GetField(fields, columns.DateIndex), errors),
+            ParseDate(GetField(fields, columns.DateIndex), errors, dateFormat),
             amount,
             string.IsNullOrWhiteSpace(description) ? null : description,
             CleanOptional(GetField(fields, columns.CategoryIndex)),
@@ -95,21 +95,21 @@ internal static class TransactionImportRowParser
             errors.Count == 0 ? null : string.Join(" ", errors.Distinct()));
     }
 
-    private static DateOnly? ParseDate(string? value, ICollection<string> errors)
+    private static DateOnly? ParseDate(string? value, ICollection<string> errors, string? dateFormat)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
         if (DateOnly.TryParseExact(
-            value.Trim(), DateFormats, CultureInfo.InvariantCulture,
+            value.Trim(), dateFormat is null ? DateFormats : [dateFormat], CultureInfo.InvariantCulture,
             DateTimeStyles.AllowWhiteSpaces, out var result))
             return result;
         errors.Add($"Date '{value.Trim()}' could not be parsed.");
         return null;
     }
 
-    private static decimal? ParseAmount(string? value, ICollection<string> errors)
+    private static decimal? ParseAmount(string? value, ICollection<string> errors, string? numberCulture)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
-        if (TryParseDecimal(value, out var result)) return result;
+        if (TryParseDecimal(value, numberCulture, out var result)) return result;
         errors.Add($"Amount '{value.Trim()}' could not be parsed.");
         return null;
     }
@@ -117,18 +117,18 @@ internal static class TransactionImportRowParser
     private static decimal? ParseDebitCredit(
         string? debitValue,
         string? creditValue,
-        ICollection<string> errors)
+        ICollection<string> errors, string? numberCulture)
     {
         var hasDebit = !string.IsNullOrWhiteSpace(debitValue);
         var hasCredit = !string.IsNullOrWhiteSpace(creditValue);
         var debit = 0m;
         var credit = 0m;
-        if (hasDebit && !TryParseDecimal(debitValue!, out debit))
+        if (hasDebit && !TryParseDecimal(debitValue!, numberCulture, out debit))
         {
             errors.Add($"Debit '{debitValue!.Trim()}' could not be parsed.");
             hasDebit = false;
         }
-        if (hasCredit && !TryParseDecimal(creditValue!, out credit))
+        if (hasCredit && !TryParseDecimal(creditValue!, numberCulture, out credit))
         {
             errors.Add($"Credit '{creditValue!.Trim()}' could not be parsed.");
             hasCredit = false;
@@ -142,7 +142,7 @@ internal static class TransactionImportRowParser
         return hasCredit && credit != 0 ? -decimal.Abs(credit) : decimal.Abs(debit);
     }
 
-    private static bool TryParseDecimal(string value, out decimal amount)
+    private static bool TryParseDecimal(string value, string? numberCulture, out decimal amount)
     {
         var normalized = value.Trim()
             .Replace("CAD", "", StringComparison.OrdinalIgnoreCase)
@@ -151,11 +151,11 @@ internal static class TransactionImportRowParser
             normalized,
             NumberStyles.Number | NumberStyles.AllowCurrencySymbol |
             NumberStyles.AllowParentheses,
-            CultureInfo.InvariantCulture,
+            numberCulture is null ? CultureInfo.InvariantCulture : CultureInfo.GetCultureInfo(numberCulture),
             out amount);
     }
 
-    private static string SerializeRawRow(string[] headers, string[] fields, string sourceFormat)
+    public static string SerializeRawRow(string[] headers, string[] fields, string sourceFormat)
     {
         var values = headers.Select((header, index) =>
             new KeyValuePair<string, string?>(header.Trim(), GetField(fields, index)))

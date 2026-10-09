@@ -95,7 +95,7 @@ public sealed class CsvImportReaderTests
         var inspection = await reader.InspectAsync(
             new MemoryStream(content), CancellationToken.None);
         Assert.Equal(["When", "Vendor", "Value", "Group"], inspection.Headers);
-        Assert.Null(inspection.SuggestedProfile.AmountColumn);
+        Assert.Null(inspection.SuggestedProfile!.AmountColumn);
 
         var profile = new ImportProfileDefinition(
             Guid.NewGuid(),

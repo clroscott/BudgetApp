@@ -46,7 +46,8 @@ public sealed class ImportReviewService(
                 record.ExcludedRows,
                 record.DuplicateRows,
                 record.UploadedAtUtc,
-                CanEdit(record.IsPersonalAccount, record.AccountOwnerUserId, role, userId)))
+                CanEdit(record.IsPersonalAccount, record.AccountOwnerUserId, role, userId),
+                record.SourceWorksheetName))
             .ToList();
         return new ImportListResult(items, result.Page, ImportListPageSize, result.TotalCount,
             (int)Math.Ceiling((double)result.TotalCount / ImportListPageSize), result.TotalVisibleCount);
@@ -307,7 +308,7 @@ public sealed class ImportReviewService(
             $"Corrected a staged row in '{access.ImportFile.OriginalFileName}'.",
             new Dictionary<string, string?>
             {
-                ["CSV row"] = draft.SourceRowNumber.ToString()
+                ["Import row"] = draft.SourceRowNumber.ToString()
             });
         await importRepository.SaveChangesAsync(cancellationToken);
     }
@@ -451,7 +452,7 @@ public sealed class ImportReviewService(
             access,
             userId,
             action,
-            $"{action} CSV row {draft.SourceRowNumber} in " +
+            $"{action} import row {draft.SourceRowNumber} in " +
             $"'{access.ImportFile.OriginalFileName}'.");
         await importRepository.SaveChangesAsync(cancellationToken);
     }
@@ -567,7 +568,7 @@ public sealed class ImportReviewService(
             access,
             userId,
             AuditActions.Deleted,
-            $"Removed CSV row {draft.SourceRowNumber} from " +
+            $"Removed import row {draft.SourceRowNumber} from " +
             $"'{access.ImportFile.OriginalFileName}'.");
         await importRepository.SaveChangesAsync(cancellationToken);
     }
@@ -835,7 +836,7 @@ public sealed class ImportReviewService(
             file.InvalidRowCount, file.ApprovedRowCount, file.ExcludedRowCount,
             file.DuplicateRowCount,
             CanEdit(access.IsPersonalAccount, access.AccountOwnerUserId, role, userId),
-            drafts.Select(draft => ToDraftItem(draft, access, role, userId)).ToList());
+            drafts.Select(draft => ToDraftItem(draft, access, role, userId)).ToList(), file.SourceWorksheetName);
     }
 
     private static ImportDraftItem ToDraftItem(ImportTransactionDraft draft, ImportAccessRecord access, HouseholdRole role, Guid userId)

@@ -206,7 +206,8 @@ describe('mixed dashboard', () => {
     show('Viewer'); await screen.findByRole('heading', { name: 'Quick actions' })
     expect(screen.queryByRole('link', { name: 'Import transactions' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Getting started checklist' })).toBeNull()
-    expect(screen.getAllByRole('link', { name: 'View monthly budget' })).toHaveLength(2)
+    // Quick actions can render before the asynchronously loaded budget card.
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'View monthly budget' })).toHaveLength(2))
   })
   it('disables layout editing while its save is pending, without sending a second write', async () => {
     const pending = deferred<typeof defaultLayout>()
