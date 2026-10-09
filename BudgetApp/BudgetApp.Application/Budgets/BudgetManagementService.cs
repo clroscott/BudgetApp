@@ -42,6 +42,37 @@ public sealed class BudgetManagementService(
             householdId, userId, cancellationToken);
     }
 
+    public async Task<BudgetSummaryModel> GetSummaryAsync(
+        Guid householdId, Guid userId, int year, int month, string scope,
+        CancellationToken cancellationToken)
+    {
+        await authorizationService.RequireViewAsync(householdId, userId, cancellationToken);
+        var budgetScope = ParseScope(scope);
+        ValidatePeriod(year, month);
+        var budget = await budgetRepository.GetAsync(
+            householdId, year, month, budgetScope,
+            budgetScope == BudgetScope.Personal ? userId : null, false, cancellationToken);
+        var currency = budget?.Currency ??
+            await budgetRepository.GetHouseholdCurrencyAsync(householdId, cancellationToken) ??
+            throw new HouseholdAccessDeniedException();
+        var categories = await budgetRepository.ListExpenseCategoriesAsync(householdId, cancellationToken);
+        var actuals = await budgetRepository.GetActualsAsync(
+            householdId, userId, year, month, budgetScope, currency, cancellationToken);
+
+        // Reuse the editor's current category projection/rollup, but do not read
+        // history, a previous budget or annual targets. Target-only zero rows
+        // cannot affect current totals. Only scalar totals leave this method.
+        var current = BuildModel(budget, year, month, budgetScope, currency, categories, actuals,
+            new Dictionary<Guid, decimal>(), new Dictionary<Guid, decimal>(),
+            new Dictionary<Guid, decimal?>(), new Dictionary<Guid, decimal>());
+        var budgeted = current.Categories.Sum(root => root.Children.Any(child => child.BudgetedAmount.HasValue)
+            ? root.Children.Sum(child => child.BudgetedAmount ?? 0m)
+            : root.BudgetedAmount ?? 0m);
+        var actual = current.Categories.Sum(root => root.ActualAmount);
+        return new(budget?.Id, year, month, budgetScope.ToString(), currency, budget?.Status.ToString(),
+            budgeted, actual, budgeted - actual, actuals.UncategorizedAmount, actuals.CurrencyMismatchTransactionCount);
+    }
+
     public async Task<BudgetPageModel> CreateAsync(
         Guid householdId,
         Guid userId,

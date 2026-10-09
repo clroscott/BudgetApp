@@ -61,7 +61,9 @@ export function DashboardPage() {
   const [scope, setScope] = useState<BudgetScope>('Household')
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
   const layoutLoad = usePageLoad(`${user?.id}/${currentHousehold?.id}/layout`)
-  const summaryLoad = usePageLoad(`${user?.id}/${currentHousehold?.id}/${period}/${scope}`)
+  const includeRecent = layoutLoad.hasData && (isCustomizing ? draftPanelKeys : layout?.visiblePanelKeys ?? []).includes('recent-transactions')
+  const layoutResolved = layoutLoad.status !== 'loading'
+  const summaryLoad = usePageLoad(`${user?.id}/${currentHousehold?.id}/${period}/${scope}/${includeRecent}`)
   const { run: runLayout, markReady: layoutReady } = layoutLoad
   const { run: runSummary } = summaryLoad
   const isDirty = isCustomizing && Boolean(layout) && (draftColumnCount !== layout!.preferredColumnCount ||
@@ -103,9 +105,9 @@ export function DashboardPage() {
     })
   }, [currentHousehold, runLayout])
   const loadSummary = useCallback(async () => {
-    if (!currentHousehold) return
-    await runSummary(() => readDashboardSnapshot(currentHousehold.id, period, scope), setSnapshot)
-  }, [currentHousehold, period, scope, runSummary])
+    if (!currentHousehold || !layoutResolved) return
+    await runSummary(() => readDashboardSnapshot(currentHousehold.id, period, scope, includeRecent), setSnapshot)
+  }, [currentHousehold, period, scope, includeRecent, layoutResolved, runSummary])
   useEffect(() => { void loadLayout() }, [loadLayout])
   useEffect(() => { void loadSummary() }, [loadSummary])
   useEffect(() => () => { activeContext.current = '' }, [])
@@ -325,11 +327,11 @@ export function DashboardPage() {
         </div>
         <PageLoadFeedback subject="dashboard summary" status={summaryLoad.status} errors={summaryLoad.errors}
           onReload={() => void loadSummary()} disabled={summaryLoad.isPending} />
-        {summaryLoad.hasData && snapshot && snapshot.recent.totalCount === 0 && !snapshot.budget.id && currentHousehold.role !== 'Viewer' &&
+        {summaryLoad.hasData && snapshot && !snapshot.hasVisibleTransactions && !snapshot.budget.id && currentHousehold.role !== 'Viewer' &&
           <section className="dashboard-getting-started" aria-label="Getting started checklist">
             <div><p className="eyebrow">Getting started</p><h2>Build your starting point</h2><p>Use these steps at your own pace. Nothing is created until you choose to save it.</p></div>
             <ol>
-              <li>{snapshot.accounts.some(account => account.isActive) ? '✓ ' : ''}<AppLink to="/accounts">Add a financial account</AppLink></li>
+              <li>{snapshot.hasActiveAccount ? '✓ ' : ''}<AppLink to="/accounts">Add a financial account</AppLink></li>
               <li><AppLink to="/import">Import transactions</AppLink>, then <AppLink to="/imports/review">review and approve them</AppLink></li>
               <li><AppLink to={dashboardBudgetLink(period, scope)}>Plan your monthly budget</AppLink></li>
             </ol>

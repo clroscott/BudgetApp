@@ -1,14 +1,37 @@
-import { getAccounts, type AccountItem } from '../accounts/accountApi'
-import { getBudget, type BudgetPageData, type BudgetScope } from '../budgets/budgetApi'
-import { getImportSummary, type ImportSummary } from '../imports/importApi'
-import { getTransactions, type TransactionListResult, type TransactionQuery } from '../transactions/transactionApi'
+import { apiGet } from '../api/apiClient'
+import type { BudgetScope } from '../budgets/budgetApi'
+import type { TransactionQuery } from '../transactions/transactionApi'
+
+export interface DashboardBudgetSummary {
+  id: string | null
+  year: number
+  month: number
+  scope: BudgetScope
+  currency: string
+  status: string | null
+  budgetedAmount: number
+  actualAmount: number
+  remainingAmount: number
+  uncategorizedActualAmount: number
+  currencyMismatchTransactionCount: number
+}
+
+export interface DashboardRecentTransaction {
+  id: string
+  accountName: string
+  currency: string
+  transactionDate: string
+  amount: number
+  description: string
+}
 
 export interface DashboardSnapshot {
-  budget: BudgetPageData
-  accounts: AccountItem[]
-  importSummary: ImportSummary
-  recent: TransactionListResult
-  uncategorized: TransactionListResult
+  budget: DashboardBudgetSummary
+  readyForReviewCount: number
+  uncategorizedSpendingCount: number
+  hasActiveAccount: boolean
+  hasVisibleTransactions: boolean
+  recent: DashboardRecentTransaction[] | null
 }
 
 export function dashboardPeriod(timeZoneId: string, now = new Date()) {
@@ -41,23 +64,9 @@ export function dashboardBudgetLink(period: string, scope: BudgetScope) {
   return `/budgeting?${new URLSearchParams({ year: String(year), month: String(month), scope })}`
 }
 
-// Match the existing monthly budget: detailed child lines replace a parent
-// line, and parent actuals already contain their children's actuals. Do not
-// double-count children or add Personal and Household views together.
-export function budgetSnapshotTotals(budget: BudgetPageData) {
-  const budgeted = budget.categories.reduce((sum, root) => sum + (root.children.some(child => child.budgetedAmount !== null)
-    ? root.children.reduce((subtotal, child) => subtotal + (child.budgetedAmount ?? 0), 0)
-    : root.budgetedAmount ?? 0), 0)
-  const actual = budget.categories.reduce((sum, root) => sum + root.actualAmount, 0)
-  return { budgeted, actual, remaining: budgeted - actual }
-}
-
-export async function readDashboardSnapshot(householdId: string, period: string, scope: BudgetScope): Promise<DashboardSnapshot> {
+export async function readDashboardSnapshot(householdId: string, period: string, scope: BudgetScope, includeRecent = false): Promise<DashboardSnapshot> {
   const [year, month] = period.split('-').map(Number)
-  const [budget, accounts, importSummary, recent] = await Promise.all([
-    getBudget(householdId, year, month, scope), getAccounts(householdId), getImportSummary(householdId),
-    getTransactions(householdId, { page: 1 }),
-  ])
-  const uncategorized = await getTransactions(householdId, { ...dashboardQuery(period, scope, budget.currency), uncategorizedOnly: true })
-  return { budget, accounts, importSummary, recent, uncategorized }
+  const query = new URLSearchParams({ year: String(year), month: String(month), scope })
+  if (includeRecent) query.set('includeRecent', 'true')
+  return apiGet<DashboardSnapshot>(`/api/households/${encodeURIComponent(householdId)}/dashboard-summary?${query}`)
 }
