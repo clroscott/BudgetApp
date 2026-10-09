@@ -58,6 +58,8 @@ public static class DependencyInjection
         services.AddScoped<CategorizationRuleManagementService>();
         services.AddScoped<IDashboardLayoutRepository, DashboardLayoutRepository>();
         services.AddScoped<DashboardLayoutService>();
+        services.AddScoped<IDashboardSummaryRepository, DashboardSummaryRepository>();
+        services.AddScoped<DashboardSummaryService>();
         services.AddScoped<IBudgetRepository, BudgetRepository>();
         services.AddScoped<BudgetManagementService>();
         services.AddScoped<AnnualBudgetOverviewService>();

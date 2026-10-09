@@ -25,9 +25,9 @@ const tutorial: TutorialContextValue = { activeTutorial: null, activeStepIndex: 
   progress: [{ tutorialKey: 'getting-started', tutorialVersion: 1, status: 'Dismissed', currentStepIndex: 0, startedAtUtc: '2026-10-07T00:00:00Z', updatedAtUtc: '', completedAtUtc: null, dismissedAtUtc: '' }],
   start: vi.fn(), dismiss: vi.fn(), exit: vi.fn(), next: vi.fn(), back: vi.fn() }
 function snapshot(): DashboardSnapshot {
-  return { budget: budgetFixture(), accounts: [], importSummary: { totalCount: 0, unfinishedCount: 0, readyForReviewCount: 0 },
-    recent: { items: [], totalCount: 1, page: 1, pageSize: 50, totalPages: 1, hasMore: false, totalsByCurrency: {} },
-    uncategorized: { items: [], totalCount: 2, page: 1, pageSize: 50, totalPages: 1, hasMore: false, totalsByCurrency: {} } }
+  return { budget: { ...budgetFixture(), budgetedAmount: 100, actualAmount: 0, remainingAmount: 100 },
+    readyForReviewCount: 0, uncategorizedSpendingCount: 2,
+    hasActiveAccount: false, hasVisibleTransactions: true, recent: null }
 }
 function deferred<T>() { let resolve!: (value: T) => void; let reject!: (reason: Error) => void
   const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
@@ -49,9 +49,57 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/dashboard')
 })
 describe('mixed dashboard', () => {
+  it('loads one summary without recent rows for the default layout', async () => {
+    show(); await loadedAmounts()
+    expect(readDashboardSnapshot).toHaveBeenCalledExactlyOnceWith('household-a', expect.any(String), 'Household', false)
+  })
+  it('waits for the saved layout and requests only its displayed recent card', async () => {
+    const layout = deferred<typeof defaultLayout>()
+    vi.mocked(getDashboardLayout).mockReturnValueOnce(layout.promise)
+    const data = snapshot()
+    data.recent = [{ id: 'recent-1', accountName: 'Shared expense (private account)', currency: 'USD', transactionDate: '2026-01-02', amount: 12.3456, description: 'Visible shared purchase' }]
+    vi.mocked(readDashboardSnapshot).mockResolvedValue(data)
+    show()
+    expect(readDashboardSnapshot).not.toHaveBeenCalled()
+    await act(async () => layout.resolve({ ...defaultLayout, visiblePanelKeys: ['recent-transactions'], isDefault: false }))
+    await screen.findByText('Visible shared purchase')
+    expect(readDashboardSnapshot).toHaveBeenCalledExactlyOnceWith('household-a', expect.any(String), 'Household', true)
+    expect(screen.getByText(/Latest visible records across scopes and currencies/)).toBeTruthy()
+  })
+  it('loads recent rows when adding the card, but does not reload for column changes or reordering', async () => {
+    vi.mocked(readDashboardSnapshot).mockImplementation(async (_id, _period, _scope, includeRecent) => ({ ...snapshot(), recent: includeRecent ? [] : null }))
+    show(); await loadedAmounts()
+    fireEvent.click(screen.getByRole('button', { name: 'Customize dashboard' }))
+    fireEvent.click(screen.getByRole('button', { name: '+ Recent transactions' }))
+    await screen.findByText('No visible transactions yet.')
+    expect(readDashboardSnapshot).toHaveBeenCalledTimes(2)
+    expect(readDashboardSnapshot).toHaveBeenLastCalledWith('household-a', expect.any(String), 'Household', true)
+    fireEvent.click(screen.getByRole('button', { name: '2' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Move Recent transactions earlier' }))
+    expect(readDashboardSnapshot).toHaveBeenCalledTimes(2)
+    fireEvent.click(within(screen.getByRole('heading', { name: 'Recent transactions' }).closest('article')!).getByRole('button', { name: 'Remove' }))
+    await waitFor(() => expect(readDashboardSnapshot).toHaveBeenLastCalledWith('household-a', expect.any(String), 'Household', false))
+    expect(screen.queryByRole('heading', { name: 'Recent transactions' })).toBeNull()
+  })
+  it('uses setup existence flags even when no recent records were requested', async () => {
+    const data = snapshot(); data.budget.id = null; data.hasVisibleTransactions = false; data.hasActiveAccount = true
+    vi.mocked(readDashboardSnapshot).mockResolvedValue(data)
+    show()
+    const checklist = await screen.findByRole('region', { name: 'Getting started checklist' })
+    expect(within(checklist).getByRole('link', { name: 'Add a financial account' }).closest('li')!.textContent).toContain('✓')
+    expect(data.recent).toBeNull()
+  })
+  it('does not label a failed recent-card load as having no transactions', async () => {
+    vi.mocked(getDashboardLayout).mockResolvedValue({ ...defaultLayout, visiblePanelKeys: ['recent-transactions'], isDefault: false })
+    vi.mocked(readDashboardSnapshot).mockRejectedValueOnce(new Error('Read failed'))
+    show()
+    await screen.findByRole('alert', { name: 'dashboard summary load status' })
+    expect(screen.queryByText('No visible transactions yet.')).toBeNull()
+    expect(screen.getByText(/Summary data is unavailable/)).toBeTruthy()
+  })
   it('shows the uncapped server review count and links to ready imports', async () => {
     const data = snapshot()
-    data.importSummary = { totalCount: 220, unfinishedCount: 125, readyForReviewCount: 120 }
+    data.readyForReviewCount = 120
     vi.mocked(readDashboardSnapshot).mockResolvedValue(data)
     show('Viewer')
     const link = await screen.findByRole('link', { name: 'Imports awaiting review' })
@@ -70,14 +118,14 @@ describe('mixed dashboard', () => {
     expect(resetDashboardLayout).not.toHaveBeenCalled()
   })
   it('distinguishes no saved budget, budgeted zero and negative remaining without color alone', async () => {
-    const data = snapshot(); data.budget.categories[0].budgetedAmount = 0; data.budget.categories[0].actualAmount = 10
+    const data = snapshot(); data.budget.budgetedAmount = 0; data.budget.actualAmount = 10; data.budget.remainingAmount = -10
     vi.mocked(readDashboardSnapshot).mockResolvedValue(data)
     show()
     await screen.findByText(`Over budget by ${amount(10)}.`)
     expect(screen.queryByText(/No saved household budget/)).toBeNull()
   })
   it('shows setup guidance only after a successful empty response, without creating anything', async () => {
-    const data = snapshot(); data.budget.id = null; data.recent.totalCount = 0
+    const data = snapshot(); data.budget.id = null; data.hasVisibleTransactions = false
     vi.mocked(readDashboardSnapshot).mockResolvedValue(data)
     show()
     await screen.findByRole('region', { name: 'Getting started checklist' })
@@ -123,10 +171,10 @@ describe('mixed dashboard', () => {
     view.switchHousehold()
     await act(async () => old.resolve(snapshot()))
     expect(screen.queryAllByText(amount(100))).toHaveLength(0)
-    const data = snapshot(); data.budget.scope = 'Personal'; data.budget.categories[0].budgetedAmount = 200
+    const data = snapshot(); data.budget.scope = 'Personal'; data.budget.budgetedAmount = 200; data.budget.remainingAmount = 200
     await act(async () => latest.resolve(data))
     await loadedAmounts(200)
-    expect(readDashboardSnapshot).toHaveBeenLastCalledWith(otherHousehold.id, expect.any(String), 'Personal')
+    expect(readDashboardSnapshot).toHaveBeenLastCalledWith(otherHousehold.id, expect.any(String), 'Personal', false)
   })
   it('keeps existing saved shortcut choices rather than resetting them to the new default', async () => {
     vi.mocked(getDashboardLayout).mockResolvedValue({ preferredColumnCount: 2, visiblePanelKeys: ['accounts', 'categories'], isDefault: false })
@@ -153,7 +201,7 @@ describe('mixed dashboard', () => {
     expect(window.confirm).toHaveBeenCalledOnce()
   })
   it('provides view-only quick actions and does not offer a setup checklist for viewers', async () => {
-    const data = snapshot(); data.budget.id = null; data.recent.totalCount = 0
+    const data = snapshot(); data.budget.id = null; data.hasVisibleTransactions = false
     vi.mocked(readDashboardSnapshot).mockResolvedValue(data)
     show('Viewer'); await screen.findByRole('heading', { name: 'Quick actions' })
     expect(screen.queryByRole('link', { name: 'Import transactions' })).toBeNull()

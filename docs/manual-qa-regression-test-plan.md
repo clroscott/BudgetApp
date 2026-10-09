@@ -1175,6 +1175,55 @@ semantic tests do not replace live screen-reader or zoom sign-off.
 - [ ] No passwords, tokens, full uploaded files, or unnecessary sensitive values
       appear in activity details.
 
+### Lightweight dashboard summaries (#211)
+
+Use fictional Development/Scratch data. No schema migration is required. Restart
+the server/client after updating; do not use a Production database or real email
+for this verification. Automated tests do not complete the live checks below.
+
+- [ ] For the same month, Household/Personal scope and currency, compare dashboard
+      Budgeted, Actual and Remaining with Monthly budget. Check Overall/Detailed
+      categories, explicit zero, inactive categories with amounts, refunds and
+      four-decimal values. Parent/child totals are not double-counted.
+- [ ] Check no saved budget separately from a saved zero budget. No budget is
+      labeled as such; transactions remain independent. Mixed-currency warnings
+      retain exact transaction counts; no amounts are silently converted.
+- [ ] Follow the monthly-spending and uncategorized links. Month/scope/currency
+      filters survive; the uncategorized attention count matches the filtered
+      transaction list. Positive uncategorized spending is counted for attention;
+      the monthly uncategorized amount retains its existing signed-net meaning.
+- [ ] More than 50 ready imports still give the exact awaiting-review count.
+      As a Viewer, household imports remain read-only and own personal imports
+      remain permitted. Other members' private imports are not counted.
+- [ ] With Recent transactions hidden, inspect the Network panel: one
+      dashboard-summary request, no budget-editor/account-list/import-summary or
+      normal transaction-list requests from the dashboard. Layout/auth/tutorial
+      requests are separate and expected. The response has recent=null.
+- [ ] With a saved Recent transactions card, load the dashboard: the summary
+      requests includeRecent=true and returns at most five minimal records, not
+      100 rows or list totals. Recent records remain across periods/scopes and
+      currencies, with date/ID ordering. Another member's explicitly shared
+      expense masks the private account; unshared records remain invisible.
+- [ ] Add/remove Recent transactions in Customize dashboard. It loads only when
+      shown; changing columns/reordering alone does not reload the summary.
+      Cancel, failed save, successful save and unsaved-navigation protection still
+      retain the intended layout and keyboard focus.
+- [ ] With Recent transactions hidden, getting-started guidance still distinguishes
+      no visible transactions from existing visible transactions, and recognizes
+      an active visible account without loading a full account list. Viewers do
+      not gain editing/setup actions. Another member's private records do not
+      suppress the current user's genuinely empty setup state.
+- [ ] Fail the initial summary request: no false empty/no-budget claim; Retry
+      loading works. Fail a refresh: retained data is explicitly stale. Switch
+      household/month/scope while a request is delayed: old data disappears and
+      the late response is ignored. A 401/403 removes retained financial data.
+- [ ] Verify the summary response has Cache-Control: no-store and changing users
+      or households never reuses another context's records. At narrow widths and
+      200% zoom, cards/links retain their existing layout and keyboard usability.
+
+Measurements and repeatable synthetic verification are documented in
+[dashboard-summary-performance.md](dashboard-summary-performance.md).
+
 ### UI cleanup and mixed dashboard (#200)
 
 Use the [navigation and dashboard guide](ui-cleanup.md) for the exact summary

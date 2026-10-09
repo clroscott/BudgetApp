@@ -24,53 +24,16 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
         CancellationToken cancellationToken,
         string? budgetInclusion = null, string? currency = null, bool spendingOnly = false)
     {
-        var filtered =
-            from transaction in dbContext.Transactions.AsNoTracking()
-            join account in dbContext.Accounts.AsNoTracking()
-                on transaction.AccountId equals account.Id
-            join category in dbContext.Categories.AsNoTracking()
-                on transaction.CategoryId equals category.Id into categories
-            from category in categories.DefaultIfEmpty()
-            where transaction.HouseholdId == householdId &&
-                  (account.Scope == AccountScope.Household || account.OwnerUserId == userId ||
-                   transaction.IncludeInHouseholdBudget == true && !transaction.IsExcludedFromBudget) &&
-                  (!accountId.HasValue || (account.Scope == AccountScope.Household || account.OwnerUserId == userId) && transaction.AccountId == accountId.Value) &&
-                  (currency == null || account.Currency == currency) &&
-                  (!spendingOnly || category != null && category.Type == CategoryType.Expense ||
-                   category == null && transaction.Amount > 0) &&
-                  (budgetInclusion == null ||
-                   !transaction.IsVoided && (
-                    budgetInclusion == "NotIncluded" &&
-                     (transaction.IsExcludedFromBudget ||
-                      !(transaction.IncludeInHouseholdBudget ?? account.Scope == AccountScope.Household) &&
-                      !transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) &&
-                      !(transaction.IncludeInHouseholdBudget == null && account.Scope == AccountScope.Personal && account.OwnerUserId == userId)) ||
-                    !transaction.IsExcludedFromBudget &&
-                     ((budgetInclusion == "Household" || budgetInclusion == "PersonalAndHousehold") &&
-                       (transaction.IncludeInHouseholdBudget ?? account.Scope == AccountScope.Household) &&
-                       (budgetInclusion != "PersonalAndHousehold" || transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId)) ||
-                      budgetInclusion == "Personal" &&
-                       (transaction.PersonalBudgetInclusions.Any(item => item.UserId == userId) ||
-                        transaction.IncludeInHouseholdBudget == null && account.Scope == AccountScope.Personal && account.OwnerUserId == userId)))) &&
-                  (!fromDate.HasValue || transaction.TransactionDate >= fromDate.Value) &&
-                  (!toDate.HasValue || transaction.TransactionDate <= toDate.Value) &&
-                  (!categoryType.HasValue ||
-                      (category != null && category.Type == categoryType.Value)) &&
-                  (!categoryId.HasValue ||
-                      transaction.CategoryId == categoryId.Value ||
-                      (category != null && category.ParentCategoryId == categoryId.Value)) &&
-                  (!uncategorizedOnly || !transaction.CategoryId.HasValue) &&
-                  (descriptionSearch == null ||
-                      transaction.Description.ToUpper().Contains(descriptionSearch.ToUpper()))
-            orderby transaction.TransactionDate descending,
-                transaction.Id descending
-            select new { transaction, account, category };
+        var filtered = VisibleTransactionQuery.Create(dbContext, householdId, userId,
+            accountId, fromDate, toDate, categoryType, categoryId, uncategorizedOnly,
+            descriptionSearch, budgetInclusion, currency, spendingOnly);
 
         var query =
-            from row in filtered
-            let transaction = row.transaction
-            let account = row.account
-            let category = row.category
+            from row in filtered.OrderByDescending(row => row.Transaction.TransactionDate)
+                .ThenByDescending(row => row.Transaction.Id)
+            let transaction = row.Transaction
+            let account = row.Account
+            let category = row.Category
             select new TransactionRecord(
                 transaction.Id,
                 account.Scope == AccountScope.Personal && account.OwnerUserId != userId ? null : account.Id,
@@ -101,7 +64,7 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
         var totalCount = await filtered.CountAsync(cancellationToken);
         // Aggregate entity fields before the DTO constructor, so EF can translate
         // GROUP BY/SUM on SQL Server instead of evaluating a record in the query.
-        var amounts = filtered.Select(row => new { row.account.Currency, row.transaction.Amount });
+        var amounts = filtered.Select(row => new { row.Account.Currency, row.Transaction.Amount });
         // Keep exact decimal totals. SQL Server aggregates in SQL; the isolated
         // SQLite test provider cannot SUM decimal, so it groups this light projection in memory.
         var totals = dbContext.Database.ProviderName == "Microsoft.EntityFrameworkCore.Sqlite"

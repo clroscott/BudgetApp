@@ -29,6 +29,11 @@ public sealed record BudgetCategoryModel(
 
 public sealed record BudgetLineInput(Guid CategoryId, decimal BudgetedAmount);
 
+public sealed record BudgetSummaryModel(
+    Guid? Id, int Year, int Month, string Scope, string Currency, string? Status,
+    decimal BudgetedAmount, decimal ActualAmount, decimal RemainingAmount,
+    decimal UncategorizedActualAmount, int CurrencyMismatchTransactionCount);
+
 public sealed record BudgetMonthOption(
     Guid Id,
     int Year,
