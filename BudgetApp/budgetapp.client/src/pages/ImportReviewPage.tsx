@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { getCategories, type CategoryItem } from '../categories/categoryApi'
 import {
@@ -37,6 +37,7 @@ import { AppLink } from '../routing/AppLink'
 import { useRouter } from '../routing/useRouter'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 import { previewBulkBudgetInclusion, type BudgetInclusionPreset, type PendingDraftUpdate } from '../imports/importBudgetInclusion'
+import { importReviewLocation, readImportReviewLocation, type ImportReviewSelection } from '../imports/importReviewLocation'
 
 const rowsPerPage = 100
 
@@ -54,20 +55,6 @@ function findCategorySelection(categories: CategoryItem[], selectedCategoryId: s
   }
 
   return { categoryId: '', subcategoryId: '' }
-}
-
-function selectedImportFromUrl() {
-  return new URLSearchParams(window.location.search).get('importId') ?? ''
-}
-
-function importFilterFromUrl(): ImportListFilter {
-  const filter = new URLSearchParams(window.location.search).get('filter')
-  return filter === 'completed' || filter === 'all' || filter === 'ready' ? filter : 'inProgress'
-}
-
-function importPageFromUrl() {
-  const page = Number(new URLSearchParams(window.location.search).get('page'))
-  return Number.isSafeInteger(page) && page >= 1 && page <= 2_147_483_647 ? page : 1
 }
 
 function generatedRuleName(
@@ -581,13 +568,20 @@ function DraftRow({
 
 export function ImportReviewPage() {
   const { currentHousehold } = useHouseholds()
-  const { navigate, confirmNavigation } = useRouter()
+  const { search, navigate, confirmNavigation } = useRouter()
+  const selection = useMemo(() => readImportReviewLocation(search), [search])
+  const { importId: selectedImportId, page: importPage, filter: importFilter } = selection
+  const selectionRef = useRef(selection)
+  useLayoutEffect(() => { selectionRef.current = selection }, [selection])
+  const changeSelection = useCallback((update: (current: ImportReviewSelection) => ImportReviewSelection, replace = false) => {
+    const next = update(selectionRef.current)
+    if (navigate(importReviewLocation(next), { replace, bypassBlocker: true })) selectionRef.current = next
+  }, [navigate])
+  const setSelectedImportId = (importId: string) => changeSelection(current => ({ ...current, importId }))
+  const setImportPage = (update: (current: number) => number) => changeSelection(current => ({ ...current, page: update(current.page) }))
   const [importList, setImportList] = useState<ImportListResult | null>(null)
-  const [importPage, setImportPage] = useState(importPageFromUrl)
-  const [selectedImportId, setSelectedImportId] = useState(selectedImportFromUrl)
   const [detail, setDetail] = useState<ImportReviewDetail | null>(null)
   const [categories, setCategories] = useState<CategoryItem[]>([])
-  const [importFilter, setImportFilter] = useState<ImportListFilter>(importFilterFromUrl)
   const [rowFilter, setRowFilter] = useState<DraftRowFilter>('all')
   const [draftPage, setDraftPage] = useState(1)
   const [isCompleting, setIsCompleting] = useState(false)
@@ -656,10 +650,11 @@ export function ImportReviewPage() {
   const refreshList = useCallback(async (householdId: string) => {
     await runList(signal => getImports(householdId, importFilter, importPage, signal), result => {
       setImportList(result)
-      setImportPage(result.page)
-      setSelectedImportId(current => current || result.items[0]?.id || '')
+      // Server normalization/automatic selection replaces the current entry.
+      // It must not add a second Back step for one deliberate file choice.
+      changeSelection(current => ({ ...current, page: result.page, importId: current.importId || result.items[0]?.id || '' }), true)
     })
-  }, [runList, importFilter, importPage])
+  }, [runList, importFilter, importPage, changeSelection])
 
   const refreshDetail = async () => {
     if (!currentHousehold || !selectedImportId) return false
@@ -706,14 +701,6 @@ export function ImportReviewPage() {
   useEffect(() => {
     if (householdId) void refreshList(householdId)
   }, [householdId, refreshList])
-
-  useEffect(() => {
-    const query = new URLSearchParams()
-    if (selectedImportId) query.set('importId', selectedImportId)
-    if (importFilter !== 'inProgress') query.set('filter', importFilter)
-    if (importPage > 1) query.set('page', String(importPage))
-    navigate(`/imports/review${query.size ? `?${query}` : ''}`, { replace: true, bypassBlocker: true })
-  }, [selectedImportId, importFilter, importPage, navigate])
 
   useEffect(() => {
     setCompletionMessage('')
@@ -1037,7 +1024,7 @@ export function ImportReviewPage() {
       setDetail(null)
       setDraftPage(1)
       setDirtyDraftUpdates(new Map())
-      setSelectedImportId('')
+      changeSelection(current => ({ ...current, importId: '' }), true)
       await refreshList(currentHousehold.id)
     } catch (error) {
       if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
@@ -1084,13 +1071,11 @@ export function ImportReviewPage() {
                 if (filter === importFilter || !confirmNavigation()) return
                 // An intentional filter change opens a matching file. Ordinary
                 // list refreshes and direct links still retain the selected file.
-                setSelectedImportId('')
+                changeSelection(() => ({ importId: '', filter, page: 1 }))
                 setDetail(null)
                 setDirtyDraftUpdates(new Map())
                 setRowFilter('all')
                 setDraftPage(1)
-                setImportFilter(filter)
-                setImportPage(1)
               }}>
                 <option value="inProgress">Unfinished</option>
                 <option value="ready">Awaiting review</option>

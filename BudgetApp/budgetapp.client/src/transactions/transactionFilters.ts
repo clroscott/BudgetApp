@@ -36,17 +36,26 @@ export function createDefaultFilters(today = new Date()): TransactionFilters {
     toDate: formatLocalDate(today), categoryType: '', categoryId: '', subcategoryId: '', description: '',
   }
 }
-export function createInitialFilters(): TransactionFilters {
+export function createInitialFilters(searchText = window.location.search): TransactionFilters {
   const defaults = createDefaultFilters()
-  const search = new URLSearchParams(window.location.search)
+  const search = new URLSearchParams(searchText)
+  defaults.accountId = search.get('accountId') ?? ''
   defaults.budgetInclusion = search.get('budgetInclusion') ?? ''
   defaults.currency = search.get('currency') ?? ''
   defaults.spendingOnly = search.get('spendingOnly') === 'true'
+  defaults.categoryType = (search.get('categoryType') ?? '') as CategoryType | ''
+  defaults.categoryId = search.get('uncategorizedOnly') === 'true' ? uncategorizedFilterValue : search.get('categoryId') ?? ''
+  defaults.subcategoryId = search.get('subcategoryId') ?? ''
+  defaults.description = search.get('description') ?? ''
   const fromDate = search.get('fromDate') ?? ''
   const toDate = search.get('toDate') ?? ''
-  if (!fromDate || !toDate) return defaults
-  return { ...defaults, dateMode: 'range', fromDate, toDate,
-    categoryId: search.get('uncategorizedOnly') === 'true' ? uncategorizedFilterValue : search.get('categoryId') ?? '' }
+  const dateMode = search.get('dateMode')
+  if (dateMode) return { ...defaults, dateMode: dateMode as DateFilterMode,
+    pastDays: search.get('pastDays') ?? defaults.pastDays,
+    specificDate: search.get('specificDate') ?? defaults.specificDate,
+    specificMonth: search.get('specificMonth') ?? defaults.specificMonth, fromDate, toDate }
+  if (fromDate || toDate) return { ...defaults, dateMode: 'range', fromDate, toDate }
+  return defaults
 }
 
 function validDate(value: string) {

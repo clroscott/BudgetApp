@@ -901,6 +901,41 @@ compatibility checks against the combined feature as well.
       account. Archived accounts reject new imports. Other households/private
       imports remain invisible; unsaved upload/review guards remain intact.
 
+### Query-only navigation and filter history (#215)
+
+Use Development/Scratch data only. The owner's full manual sweep remains deferred;
+automated/browser-fixture results do not mark these manual cases as passed.
+History rules are documented in [filter-history-navigation.md](filter-history-navigation.md).
+
+- [ ] Open two annual drill-down links on `/transactions` with different periods,
+  scopes, currencies and categories. Back/Forward restores all filters, page,
+  original report context and matching totals. Export uses the restored query.
+- [ ] Type a filter without applying: URL and results stay unchanged. Apply,
+  Reset, restore report filters, apply a saved preset and page results. Back/Forward
+  restores applied choices, including child/uncategorized and unavailable IDs,
+  without broadening the search or changing transactions.
+- [ ] Apply a rolling preset, revisit its URL on another day, and confirm history
+  retains its applied dates. Reapplying recalculates the range; saving still stores
+  rolling intent. Fixed dates/months and mixed-currency totals retain their meaning.
+- [ ] Edit a transaction, then cancel Back and Forward between query entries.
+  Correction, editor, focus and URL remain intact; no extra history entries or
+  duplicate writes. Accept navigation and verify the destination query. Repeat
+  with staged import corrections and a selected file outside the current list page.
+- [ ] Change import file status, file selection and file-list page. Back/Forward
+  restores the selection. Automatic first-file selection/page normalization adds
+  no second history entry. Completed/private/Viewer imports retain existing permissions.
+- [ ] Change annual year/scope, follow a drill-down, and return. The original
+  report period/scope are restored. Changing current-household context retains
+  visibility checks and never claims another household's report reconciles.
+- [ ] Delay or fail an old query, navigate to another query, then release it.
+  Old rows, totals, errors and save-refresh completion cannot overwrite the
+  new view or clear a newer correction. Failed reads have safe retry behavior.
+- [ ] At desktop/narrow layouts and 200% zoom, keep focus on a filter or scope
+  control while using Back/Forward. No heading-focus jump or new-page announcement
+  for same-path changes. Real page changes, Skip and Help topic focus still work.
+- [ ] Open a malformed filter URL: show a correctable error; do not load/export
+  unrestricted transactions. Reset or correct/apply filters to recover.
+
 ### Async read ownership and recovery (#214)
 
 Use fictional Development/Scratch data or the read-only browser harness. The

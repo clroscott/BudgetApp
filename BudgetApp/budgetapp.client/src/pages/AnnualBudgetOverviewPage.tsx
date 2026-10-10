@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   getAnnualBudgetOverview,
   type AnnualBudgetOverview,
@@ -13,6 +13,7 @@ import { PageLoadFeedback } from '../components/PageLoadFeedback'
 import { usePageLoad } from './usePageLoad'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
+import { useRouter } from '../routing/useRouter'
 
 const monthNames = Array.from({ length: 12 }, (_, index) =>
   new Intl.DateTimeFormat(undefined, { month: 'short' })
@@ -20,8 +21,12 @@ const monthNames = Array.from({ length: 12 }, (_, index) =>
 
 export function AnnualBudgetOverviewPage() {
   const { currentHousehold } = useHouseholds()
-  const [year, setYear] = useState(() => annualOverviewSelection(window.location.search).year)
-  const [scope, setScope] = useState<BudgetScope>(() => annualOverviewSelection(window.location.search).scope)
+  const { search, navigate } = useRouter()
+  const { year, scope } = useMemo(() => annualOverviewSelection(search), [search])
+  const [yearInput, setYearInput] = useState(String(year))
+  useEffect(() => { setYearInput(String(year)) }, [search, year])
+  const choosePeriod = (nextYear: number, nextScope: BudgetScope, replace = false) =>
+    navigate(`/budgeting/annual-overview?${new URLSearchParams({ year: String(nextYear), scope: nextScope })}`, { replace })
   const [overview, setOverview] = useState<AnnualBudgetOverview | null>(null)
   const loadState = usePageLoad(`${currentHousehold?.id}/${year}/${scope}`)
   const { run } = loadState
@@ -64,15 +69,19 @@ export function AnnualBudgetOverviewPage() {
             type="number"
             min="1"
             max="9999"
-            value={year}
-            onChange={event => setYear(Number(event.target.value))}
+            value={yearInput}
+            onChange={event => {
+              setYearInput(event.target.value)
+              const nextYear = Number(event.target.value)
+              if (Number.isInteger(nextYear) && nextYear >= 1 && nextYear <= 9999) choosePeriod(nextYear, scope, true)
+            }}
           />
         </label>
         <label>
           <span>Scope</span>
           <select
             value={scope}
-            onChange={event => setScope(event.target.value as BudgetScope)}
+            onChange={event => choosePeriod(year, event.target.value as BudgetScope)}
           >
             <option value="Household">Household</option>
             <option value="Personal">Personal</option>

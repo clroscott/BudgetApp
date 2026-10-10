@@ -9,11 +9,15 @@ import { useUnsavedForm, useUnsavedNativeForm } from './useUnsavedForm'
 
 function Editor() {
   const [value, setValue] = useState('original')
-  const { path, navigate } = useRouter()
+  const { path, search, hash, navigate } = useRouter()
   const guard = useUnsavedForm(value, 'Discard unsaved editor changes?')
   return <>
     <input aria-label="Value" value={value} onChange={e => setValue(e.target.value)} />
     <span data-testid="path">{path}</span>
+    <span data-testid="query">{search}{hash}</span>
+    <AppLink to="/first?query=one#first">Query one</AppLink>
+    <AppLink to="/first?query=two#second">Query two</AppLink>
+    <button onClick={() => navigate('/first?query=replaced', { replace: true })}>Replace query</button>
     <AppLink to="/first">First</AppLink><AppLink to="/second">Second</AppLink>
     <button onClick={() => guard.markClean(value)}>Save</button>
     <button onClick={() => { /* failed save intentionally leaves the baseline intact */ }}>Fail save</button>
@@ -30,6 +34,41 @@ function NativeEditor({ name }: { name: string }) {
 }
 
 describe('unsaved form navigation', () => {
+  it('publishes accepted query/hash changes without remounting and restores Back/Forward', async () => {
+    render(<RouterProvider><Editor /></RouterProvider>)
+    const input = screen.getByLabelText('Value')
+    fireEvent.click(screen.getByText('Query one'))
+    fireEvent.click(screen.getByText('Query two'))
+    expect(screen.getByTestId('query').textContent).toBe('?query=two#second')
+    const length = window.history.length
+    await act(async () => window.history.back())
+    await waitFor(() => expect(screen.getByTestId('query').textContent).toBe('?query=one#first'))
+    expect(screen.getByLabelText('Value')).toBe(input)
+    await act(async () => window.history.forward())
+    await waitFor(() => expect(screen.getByTestId('query').textContent).toBe('?query=two#second'))
+    fireEvent.click(screen.getByText('Replace query'))
+    expect(screen.getByTestId('query').textContent).toBe('?query=replaced')
+    expect(window.history.length).toBe(length)
+  })
+  it('never publishes a canceled query traversal or damages its Forward entry', async () => {
+    render(<RouterProvider><Editor /></RouterProvider>)
+    fireEvent.click(screen.getByText('Query one'))
+    fireEvent.click(screen.getByText('Query two'))
+    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'Unsaved' } })
+    const length = window.history.length
+    await act(async () => window.history.back())
+    await waitFor(() => expect(window.confirm).toHaveBeenCalledOnce())
+    await waitFor(() => expect(window.location.search).toBe('?query=two'))
+    expect(screen.getByTestId('query').textContent).toBe('?query=two#second')
+    expect((screen.getByLabelText('Value') as HTMLInputElement).value).toBe('Unsaved')
+    expect(window.history.length).toBe(length)
+    vi.mocked(window.confirm).mockReturnValue(true)
+    await act(async () => window.history.back())
+    await waitFor(() => expect(screen.getByTestId('query').textContent).toBe('?query=one#first'))
+    await act(async () => window.history.forward())
+    await waitFor(() => expect(screen.getByTestId('query').textContent).toBe('?query=two#second'))
+    expect(window.history.length).toBe(length)
+  })
   it('does not warn for untouched forms or navigation to the same URL', () => {
     render(<RouterProvider><Editor /></RouterProvider>)
     fireEvent.click(screen.getByText('First'))
