@@ -8,6 +8,8 @@ export interface NavigateOptions {
 
 export interface RouterContextValue {
   path: string
+  search: string
+  hash: string
   navigate: (path: string, options?: NavigateOptions) => boolean
   confirmNavigation: () => boolean
   registerNavigationGuard: (guard: NavigationGuard) => () => void

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useRef, type MouseEvent } from 'react'
 import { useAuth } from '../auth/useAuth'
 import { AppShell } from '../components/AppShell'
 import { HelpSectionNav } from '../components/HelpSectionNav'
@@ -12,32 +12,19 @@ import { useRouter } from '../routing/useRouter'
 export function HelpPage() {
   const { user } = useAuth()
   const { currentHousehold } = useHouseholds()
-  const { navigate } = useRouter()
-  const [hash, setHash] = useState(window.location.hash)
+  const { hash, navigate } = useRouter()
   const heading = useRef<HTMLHeadingElement>(null)
-  const shouldFocus = useRef(false)
+  const previousHash = useRef(hash)
   const selected = requestedHelpTopic(hash)
   useEffect(() => {
-    const sync = () => {
-      if (window.location.pathname !== '/help') return
-      shouldFocus.current = true
-      setHash(window.location.hash)
-    }
-    window.addEventListener('popstate', sync)
-    window.addEventListener('hashchange', sync)
-    return () => { window.removeEventListener('popstate', sync); window.removeEventListener('hashchange', sync) }
-  }, [])
-  useEffect(() => {
-    if (!shouldFocus.current || !heading.current) return
-    shouldFocus.current = false
+    if (previousHash.current === hash || !heading.current) return
+    previousHash.current = hash
     return focusPageElement(heading.current)
   }, [hash])
   const choose = (event: MouseEvent<HTMLAnchorElement>, topic?: HelpTopicId) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
-    if (!navigate(topic ? helpTopicUrl(topic) : '/help')) return
-    shouldFocus.current = true
-    setHash(window.location.hash)
+    navigate(topic ? helpTopicUrl(topic) : '/help')
   }
   const showNavigation = Boolean(user?.emailConfirmed && currentHousehold)
   const returnTo = !user ? '/login' : !user.emailConfirmed ? '/verify-email' : currentHousehold ? '/dashboard' : '/household/setup'

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getAccounts } from '../accounts/accountApi'
 import { getAnnualBudgetOverview, type AnnualBudgetOverview } from '../budgets/annualBudgetOverviewApi'
@@ -7,12 +7,14 @@ import { getCategories, type CategoryItem } from '../categories/categoryApi'
 import { HouseholdContext } from '../households/householdContext'
 import { RouterProvider } from '../routing/RouterProvider'
 import { useRouter } from '../routing/useRouter'
+import { AppLink } from '../routing/AppLink'
 import { household, householdsFixture, otherHousehold } from '../test/fixtures'
 import { downloadTransactionsCsv, getTransactions, updateTransaction, type TransactionItem } from '../transactions/transactionApi'
 import { AnnualBudgetOverviewPage } from './AnnualBudgetOverviewPage'
 import { TransactionManagementPage } from './TransactionManagementPage'
 import { checkSavedFilter, getSavedFilters, saveFilter } from '../transactions/savedFilterApi'
 import { createDefaultFilters, storedFilterIntent } from '../transactions/transactionFilters'
+import { deferred } from '../test/deferred'
 
 vi.mock('../accounts/accountApi', () => ({ getAccounts: vi.fn() }))
 vi.mock('../categories/categoryApi', () => ({ getCategories: vi.fn() }))
@@ -46,7 +48,9 @@ const row: TransactionItem = { id: 'transaction-a', accountId: 'account-a', acco
 
 function Routes() {
   const { path } = useRouter()
-  return path === '/budgeting/annual-overview' ? <AnnualBudgetOverviewPage /> : <TransactionManagementPage />
+  return <><AppLink to={transactionLink(2024, 'Household', 'USD', 'food', 2, household.id)}>Different report</AppLink>
+    <AppLink to="/budgeting/annual-overview?year=2023&scope=Household">Different annual view</AppLink>
+    {path === '/budgeting/annual-overview' ? <AnnualBudgetOverviewPage /> : <TransactionManagementPage />}</>
 }
 function show(path = transactionLink(2024, 'Personal', 'CAD', undefined, undefined, household.id), value = householdsFixture()) {
   window.history.replaceState(null, '', path)
@@ -75,6 +79,123 @@ beforeEach(() => {
 })
 
 describe('annual report to transactions', () => {
+  it('canceled same-page Back preserves the editor, URL, focus and history before accepted Back/Forward', async () => {
+    show()
+    await loaded()
+    fireEvent.click(screen.getByText('Different report'))
+    await loaded()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    const edit = screen.getByLabelText('Description') as HTMLInputElement
+    edit.focus()
+    fireEvent.change(edit, { target: { value: 'Keep this correction' } })
+    const length = window.history.length
+    const reads = vi.mocked(getTransactions).mock.calls.length
+    await act(async () => window.history.back())
+    await waitFor(() => expect(window.confirm).toHaveBeenCalledOnce())
+    await waitFor(() => expect(window.location.search).toContain('currency=USD'))
+    expect(screen.getByLabelText('Description')).toBe(edit)
+    expect(edit.value).toBe('Keep this correction')
+    expect(document.activeElement).toBe(edit)
+    expect(getTransactions).toHaveBeenCalledTimes(reads)
+    expect(window.history.length).toBe(length)
+    vi.mocked(window.confirm).mockReturnValue(true)
+    await act(async () => window.history.back())
+    await waitFor(() => expect(getTransactions).toHaveBeenLastCalledWith(household.id, expect.objectContaining({ currency: 'CAD' })))
+    await loaded()
+    expect(screen.queryByLabelText('Description')).toBeNull()
+    await act(async () => window.history.forward())
+    await waitFor(() => expect(getTransactions).toHaveBeenLastCalledWith(household.id, expect.objectContaining({ currency: 'USD' })))
+    expect(window.history.length).toBe(length)
+    expect(updateTransaction).not.toHaveBeenCalled()
+  })
+  it('ignores an earlier query response after a same-page query transition', async () => {
+    const oldRead = deferred<Awaited<ReturnType<typeof getTransactions>>>()
+    vi.mocked(getTransactions).mockReturnValueOnce(oldRead.promise)
+    show()
+    fireEvent.click(screen.getByText('Different report'))
+    await loaded()
+    await act(async () => oldRead.resolve({ items: [], hasMore: false, page: 1, pageSize: 100,
+      totalCount: 0, totalPages: 0, totalsByCurrency: { CAD: 99999 } }))
+    expect(screen.queryByText('No matching transactions')).toBeNull()
+    expect(screen.getAllByText('Grocery purchase').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/99,999/)).toBeNull()
+  })
+  it('invalid URL filters remain correctable and do not fetch/export unrestricted transactions', async () => {
+    show('/transactions?fromDate=invalid&toDate=2024-01-01')
+    await screen.findByRole('heading', { name: 'Could not load matching transactions' })
+    expect(getTransactions).not.toHaveBeenCalled()
+    expect((screen.getByRole('button', { name: 'Export matching transactions' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }))
+    await loaded()
+    expect(getTransactions).toHaveBeenCalledOnce()
+  })
+  it('a save refresh from the previous query cannot overwrite a newer query or editor', async () => {
+    show()
+    await loaded()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Saved first-query correction' } })
+    const refresh = deferred<Awaited<ReturnType<typeof getTransactions>>>()
+    vi.mocked(getTransactions).mockReturnValueOnce(refresh.promise)
+    fireEvent.submit(screen.getByLabelText('Description').closest('form')!)
+    await waitFor(() => expect(getTransactions).toHaveBeenCalledTimes(2))
+    fireEvent.click(screen.getByText('Different report'))
+    await loaded()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Keep newer-query correction' } })
+    await act(async () => refresh.resolve({ items: [{ ...row, description: 'Saved first-query correction' }], hasMore: false,
+      page: 1, pageSize: 100, totalCount: 1, totalPages: 1, totalsByCurrency: { CAD: 99999 } }))
+    expect((screen.getByLabelText('Description') as HTMLInputElement).value).toBe('Keep newer-query correction')
+    expect(screen.queryByText(/99,999/)).toBeNull()
+    expect(updateTransaction).toHaveBeenCalledOnce()
+  })
+  it('restores same-path report links and Back/Forward with current filters, exports and no remount', async () => {
+    show()
+    await loaded()
+    const account = screen.getByLabelText('Account')
+    fireEvent.click(screen.getByText('Different report'))
+    await waitFor(() => expect(getTransactions).toHaveBeenLastCalledWith(household.id, expect.objectContaining({
+      fromDate: '2024-02-01', toDate: '2024-02-29', budgetInclusion: 'Household', currency: 'USD', categoryId: 'food',
+    })))
+    expect(screen.getByLabelText('Account')).toBe(account)
+    await loaded()
+    fireEvent.click(screen.getByRole('button', { name: 'Export matching transactions' }))
+    expect(downloadTransactionsCsv).toHaveBeenLastCalledWith(household.id, expect.objectContaining({ currency: 'USD', categoryId: 'food' }))
+    await act(async () => window.history.back())
+    await waitFor(() => expect(getTransactions).toHaveBeenLastCalledWith(household.id, expect.objectContaining({
+      fromDate: '2024-01-01', toDate: '2024-12-31', budgetInclusion: 'Personal', currency: 'CAD', categoryId: undefined,
+    })))
+    await act(async () => window.history.forward())
+    await waitFor(() => expect(getTransactions).toHaveBeenLastCalledWith(household.id, expect.objectContaining({ currency: 'USD' })))
+  })
+  it('stores only applied filter choices in history and restores the original report meaning', async () => {
+    show()
+    await loaded()
+    const original = window.location.search
+    fireEvent.change(screen.getByLabelText('Description contains'), { target: { value: 'Refund' } })
+    expect(window.location.search).toBe(original)
+    fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }))
+    await waitFor(() => expect(window.location.search).toContain('description=Refund'))
+    await loaded()
+    expect(screen.getByText(/View changed — no longer matches/)).toBeTruthy()
+    await act(async () => window.history.back())
+    await waitFor(() => expect((screen.getByLabelText('Description contains') as HTMLInputElement).value).toBe(''))
+    await loaded()
+    expect(screen.getByText('Annual overview drill-down')).toBeTruthy()
+    await act(async () => window.history.forward())
+    await waitFor(() => expect((screen.getByLabelText('Description contains') as HTMLInputElement).value).toBe('Refund'))
+    fireEvent.click(screen.getByRole('button', { name: 'Restore report filters' }))
+    await loaded()
+    expect(screen.getByText('Annual overview drill-down')).toBeTruthy()
+    expect(updateTransaction).not.toHaveBeenCalled()
+  })
+  it('restores annual report year and scope on same-path links and history', async () => {
+    show('/budgeting/annual-overview?year=2024&scope=Personal')
+    await screen.findByRole('region', { name: 'Annual summary' })
+    fireEvent.click(screen.getByText('Different annual view'))
+    await waitFor(() => expect(getAnnualBudgetOverview).toHaveBeenLastCalledWith(household.id, 2023, 'Household'))
+    await act(async () => window.history.back())
+    await waitFor(() => expect(getAnnualBudgetOverview).toHaveBeenLastCalledWith(household.id, 2024, 'Personal'))
+  })
   it('applies a preset on page one, preserves export meaning, and marks different report context honestly', async () => {
     const filters = storedFilterIntent({ ...createDefaultFilters(), dateMode: 'specificMonth', specificMonth: '2024-02',
       categoryType: 'Expense', categoryId: 'food', subcategoryId: 'groceries', currency: 'CAD',

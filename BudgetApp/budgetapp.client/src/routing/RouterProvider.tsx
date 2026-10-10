@@ -20,13 +20,13 @@ function historyState(index: number) {
   return { ...(previous && typeof previous === 'object' ? previous : {}), [historyIndexKey]: index }
 }
 
-function currentPath(): string {
+function currentLocation() {
   const path = window.location.pathname.replace(/\/+$/, '')
-  return path || '/'
+  return { path: path || '/', search: window.location.search, hash: window.location.hash }
 }
 
 export function RouterProvider({ children }: { children: ReactNode }) {
-  const [path, setPath] = useState(currentPath)
+  const [location, setLocation] = useState(currentLocation)
   const guards = useMemo(createNavigationGuards, [])
   const indexRef = useRef(historyIndex() ?? 0)
   const restoringRef = useRef(false)
@@ -69,7 +69,7 @@ export function RouterProvider({ children }: { children: ReactNode }) {
       window.history.replaceState(historyState(indexRef.current), '')
       currentUrlRef.current =
         `${window.location.pathname}${window.location.search}${window.location.hash}`
-      setPath(currentPath())
+      setLocation(currentLocation())
     }
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
@@ -86,6 +86,9 @@ export function RouterProvider({ children }: { children: ReactNode }) {
   }, [guards])
 
   const navigate = useCallback((nextPath: string, options?: NavigateOptions) => {
+    // Even an automatic URL replacement must not overwrite a canceled history
+    // traversal while the browser is returning to the accepted entry.
+    if (restoringRef.current) return false
     const normalizedPath = nextPath.startsWith('/') ? nextPath : `/${nextPath}`
     const currentUrl =
       `${window.location.pathname}${window.location.search}${window.location.hash}`
@@ -106,14 +109,14 @@ export function RouterProvider({ children }: { children: ReactNode }) {
       window.history.pushState(historyState(indexRef.current), '', normalizedPath)
     }
 
-    currentUrlRef.current = normalizedPath
-    setPath(currentPath())
+    currentUrlRef.current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    setLocation(currentLocation())
     return true
   }, [confirmNavigation])
 
   const value = useMemo(
-    () => ({ path, navigate, confirmNavigation, registerNavigationGuard }),
-    [confirmNavigation, navigate, path, registerNavigationGuard],
+    () => ({ ...location, navigate, confirmNavigation, registerNavigationGuard }),
+    [confirmNavigation, navigate, location, registerNavigationGuard],
   )
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>
 }

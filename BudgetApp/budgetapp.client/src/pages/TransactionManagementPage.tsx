@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
+import { useReadOwner } from '../api/useReadOwner'
 import { getCategories, type CategoryItem, type CategoryType } from '../categories/categoryApi'
 import { PageFrame } from '../components/PageFrame'
 import { budgetInclusionLabel } from '../transactions/budgetInclusion'
@@ -13,9 +14,11 @@ import { ContextualHelp } from '../components/ContextualHelp'
 import { SavedTransactionFilters } from '../components/SavedTransactionFilters'
 import { buildTransactionQuery, createDefaultFilters, createInitialFilters, filterIntentKey,
   resolveFilterCategory, uncategorizedFilterValue, type DateFilterMode, type TransactionFilters } from '../transactions/transactionFilters'
+import { readTransactionLocation, transactionFilterLocation } from '../transactions/transactionLocation'
+import { buildTransactionParameters } from '../transactions/transactionQuery'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
-import { annualReportReturnLink, readAnnualReportContext, transactionFilterKey } from '../transactions/reportContext'
+import { annualReportReturnLink, transactionFilterKey } from '../transactions/reportContext'
 import {
   downloadTransactionsCsv,
   getTransactions,
@@ -70,22 +73,19 @@ function formatAmount(amount: number, currency: string) {
 }
 
 export function TransactionManagementPage() {
-  const { confirmNavigation } = useRouter()
+  const { search, navigate, confirmNavigation } = useRouter()
   const { currentHousehold } = useHouseholds()
-  const initialFilters = useMemo(createInitialFilters, [])
-  const reportContext = useMemo(() => readAnnualReportContext(
-    window.location.search, buildTransactionQuery(initialFilters, 1),
-  ), [initialFilters])
+  const location = useMemo(() => readTransactionLocation(search), [search])
+  const { reportContext } = location
+  const { captureContext } = useReadOwner(`${currentHousehold?.id}/${search}`)
   const [transactions, setTransactions] = useState<TransactionItem[]>([])
   const [totalsByCurrency, setTotalsByCurrency] = useState<Record<string, number>>({})
   const [accounts, setAccounts] = useState<AccountItem[]>([])
   const [categories, setCategories] = useState<CategoryItem[]>([])
-  const [filters, setFilters] = useState<TransactionFilters>(initialFilters)
-  const [appliedFilters, setAppliedFilters] = useState<TransactionFilters>(initialFilters)
+  const [filters, setFilters] = useState<TransactionFilters>(location.filters)
+  const appliedFilters = useMemo(() => resolveFilterCategory(location.filters, categories), [location, categories])
   const [presetNeedsCorrection, setPresetNeedsCorrection] = useState(false)
-  const [appliedQuery, setAppliedQuery] = useState<TransactionQuery>(
-    () => buildTransactionQuery(initialFilters, 1),
-  )
+  const appliedQuery = useMemo<TransactionQuery>(() => location.query ?? { page: 1 }, [location])
   const [pagination, setPagination] = useState<PaginationState>({
     page: 1,
     pageSize: 100,
@@ -104,6 +104,19 @@ export function TransactionManagementPage() {
   const [errors, setErrors] = useState<string[]>([])
 
   useEffect(() => {
+    // Only accepted URL changes reach this effect. Typing a draft filter never
+    // changes the URL, and a canceled traversal never discards the row editor.
+    setFilters(location.filters)
+    setPresetNeedsCorrection(false)
+    setEditingId(null)
+    setEditRequest(null)
+    setEditBaseline(null)
+    setIsSaving(false)
+    setIsExporting(false)
+  }, [location])
+  useEffect(() => { setFilters(current => resolveFilterCategory(current, categories)) }, [location, categories])
+
+  useEffect(() => {
     if (!currentHousehold) return
     let isCurrent = true
     void Promise.all([
@@ -114,7 +127,6 @@ export function TransactionManagementPage() {
       setAccounts(accountItems)
       setCategories(categoryItems)
       setFilters(current => resolveFilterCategory(current, categoryItems))
-      setAppliedFilters(current => resolveFilterCategory(current, categoryItems))
     }).catch(error => {
       if (isCurrent) setErrors(getErrorMessages(error))
     })
@@ -123,6 +135,12 @@ export function TransactionManagementPage() {
 
   useEffect(() => {
     if (!currentHousehold) return
+    if (location.error) {
+      setIsLoading(false)
+      setLoadFailed(true)
+      setErrors([location.error])
+      return
+    }
     let isCurrent = true
     setIsLoading(true)
     setLoadFailed(false)
@@ -150,7 +168,7 @@ export function TransactionManagementPage() {
         if (isCurrent) setIsLoading(false)
       })
     return () => { isCurrent = false }
-  }, [appliedQuery, currentHousehold, reloadGeneration])
+  }, [appliedQuery, currentHousehold, reloadGeneration, location.error])
 
   const isEditDirty = editRequest !== null && editBaseline !== null &&
     JSON.stringify(editRequest) !== JSON.stringify(editBaseline)
@@ -219,9 +237,8 @@ export function TransactionManagementPage() {
       if (!confirmNavigation()) return
       cancelEditing()
       setErrors([])
-      setAppliedFilters(filters)
       setPresetNeedsCorrection(false)
-      setAppliedQuery(query)
+      navigate(transactionFilterLocation(filters, 1, reportContext, query), { bypassBlocker: true })
     } catch (error) {
       setErrors(getErrorMessages(error))
     }
@@ -232,28 +249,25 @@ export function TransactionManagementPage() {
     cancelEditing()
     const defaults = createDefaultFilters()
     setFilters(defaults)
-    setAppliedFilters(defaults)
     setPresetNeedsCorrection(false)
-    setAppliedQuery(buildTransactionQuery(defaults, 1))
+    navigate(transactionFilterLocation(defaults, 1, reportContext), { bypassBlocker: true })
     setErrors([])
   }
 
   const changePage = (page: number) => {
     if (!confirmNavigation()) return
     cancelEditing()
-    setAppliedQuery(current => ({ ...current, page }))
+    navigate(transactionFilterLocation(appliedFilters, page, reportContext, { ...appliedQuery, page }), { bypassBlocker: true })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   const restoreReportFilters = () => {
     if (!reportContext || !confirmNavigation()) return
     cancelEditing()
-    const selection = findCategorySelection(categories, reportContext.query.categoryId ?? null)
-    const restored = { ...initialFilters, ...(selection.categoryId ? selection : {}) }
+    const restored = resolveFilterCategory(createInitialFilters(buildTransactionParameters(reportContext.query).toString()), categories)
     setFilters(restored)
-    setAppliedFilters(restored)
     setPresetNeedsCorrection(false)
-    setAppliedQuery(reportContext.query)
+    navigate(transactionFilterLocation(restored, 1, reportContext, reportContext.query), { bypassBlocker: true })
     setErrors([])
   }
 
@@ -272,8 +286,7 @@ export function TransactionManagementPage() {
       setPresetNeedsCorrection(!apply)
       setErrors([])
       if (apply) {
-        setAppliedFilters(saved)
-        setAppliedQuery(query)
+        navigate(transactionFilterLocation(saved, 1, reportContext, query), { bypassBlocker: true })
       }
       return true
     } catch (error) {
@@ -296,6 +309,7 @@ export function TransactionManagementPage() {
 
     setIsSaving(true)
     setErrors([])
+    const stillInContext = captureContext()
     const normalizedRequest = {
       ...editRequest,
       description: editRequest.description.trim(),
@@ -304,27 +318,31 @@ export function TransactionManagementPage() {
     }
     try {
       await updateTransaction(currentHousehold.id, editingId, normalizedRequest)
+      if (!stillInContext()) return
       cancelEditing()
       try { await refreshSavedTransaction(editingId) }
       catch {
-        setErrors(['Transaction saved, but the list could not be refreshed. Retry the search before comparing totals.'])
+        if (stillInContext()) setErrors(['Transaction saved, but the list could not be refreshed. Retry the search before comparing totals.'])
       }
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (stillInContext()) setErrors(getErrorMessages(error))
     } finally {
-      setIsSaving(false)
+      if (stillInContext()) setIsSaving(false)
     }
   }
 
   const refreshSavedTransaction = async (id: string) => {
+    const stillInContext = captureContext()
+    if (!stillInContext()) return
     let result
     try {
       result = await getTransactions(currentHousehold.id, appliedQuery)
     } catch (error) {
       // Do not unmount other unsaved row editors, but never present stale totals.
-      setTotalsUnavailable(true)
+      if (stillInContext()) setTotalsUnavailable(true)
       throw error
     }
+    if (!stillInContext()) return
     const saved = result.items.find(transaction => transaction.id === id)
     // Refresh only this row: never unmount another editor with unsaved choices.
     setTransactions(current => current.flatMap(transaction =>
@@ -343,12 +361,13 @@ export function TransactionManagementPage() {
 
     setIsExporting(true)
     setErrors([])
+    const stillInContext = captureContext()
     try {
       await downloadTransactionsCsv(currentHousehold.id, appliedQuery)
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (stillInContext()) setErrors(getErrorMessages(error))
     } finally {
-      setIsExporting(false)
+      if (stillInContext()) setIsExporting(false)
     }
   }
 
@@ -550,7 +569,7 @@ export function TransactionManagementPage() {
               Reset filters
             </button>
             <button className="secondary-button" type="button"
-              disabled={isLoading || isExporting} onClick={() => void handleExport()}>
+              disabled={isLoading || isExporting || Boolean(location.error)} onClick={() => void handleExport()}>
               {isExporting ? 'Preparing export...' : 'Export matching transactions'}
             </button>
           </div>

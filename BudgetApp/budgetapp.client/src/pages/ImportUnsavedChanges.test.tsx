@@ -462,6 +462,56 @@ describe('compact transaction review', () => {
 })
 
 describe('import file browsing', () => {
+  it('restores selected files and status filters with Back/Forward and no extra automatic entries', async () => {
+    const completed = { ...detail(), id: 'completed-b', originalFileName: 'completed.csv', status: 'Completed' }
+    vi.mocked(getImports).mockImplementation(async (_id, filter) => listPage(filter === 'completed' ? [{ ...listItem, ...completed }] : [listItem]))
+    vi.mocked(getImport).mockImplementation(async (_id, id) => id === 'completed-b' ? completed : detail())
+    show(<ImportReviewPage />)
+    await screen.findByRole('heading', { name: 'Review transactions in sample.csv' })
+    const status = screen.getByLabelText('File status')
+    status.focus()
+    const length = window.history.length
+    fireEvent.change(status, { target: { value: 'completed' } })
+    await screen.findByRole('heading', { name: 'Review transactions in completed.csv' })
+    expect(window.history.length).toBe(length + 1)
+    expect(document.activeElement).toBe(status)
+    await act(async () => window.history.back())
+    await screen.findByRole('heading', { name: 'Review transactions in sample.csv' })
+    expect((status as HTMLSelectElement).value).toBe('inProgress')
+    expect((screen.getByLabelText('Uploaded file') as HTMLSelectElement).value).toBe('import-a')
+    await act(async () => window.history.forward())
+    await screen.findByRole('heading', { name: 'Review transactions in completed.csv' })
+    expect((status as HTMLSelectElement).value).toBe('completed')
+    expect(document.activeElement).toBe(status)
+    expect(window.history.length).toBe(length + 1)
+  })
+  it('canceled file-query history preserves corrections and accepted Back/Forward restores the selected file', async () => {
+    const other = { ...detail(), id: 'import-b', originalFileName: 'other.csv' }
+    vi.mocked(getImport).mockImplementation(async (_id, id) => id === 'import-b' ? other : detail())
+    show(<ImportReviewPage />)
+    await screen.findByRole('heading', { name: 'Review transactions in sample.csv' })
+    fireEvent.change(screen.getByLabelText('Uploaded file'), { target: { value: 'import-b' } })
+    await screen.findByRole('heading', { name: 'Review transactions in other.csv' })
+    const input = screen.getByLabelText('Description') as HTMLInputElement
+    await waitFor(() => expect(input.disabled).toBe(false))
+    input.focus()
+    fireEvent.change(input, { target: { value: 'Keep correction' } })
+    const length = window.history.length
+    await act(async () => window.history.back())
+    await waitFor(() => expect(window.confirm).toHaveBeenCalledOnce())
+    await waitFor(() => expect(window.location.search).toContain('importId=import-b'))
+    expect(input.value).toBe('Keep correction')
+    expect(document.activeElement).toBe(input)
+    expect(window.history.length).toBe(length)
+    vi.mocked(window.confirm).mockReturnValue(true)
+    await act(async () => window.history.back())
+    await screen.findByRole('heading', { name: 'Review transactions in sample.csv' })
+    await act(async () => window.history.forward())
+    await screen.findByRole('heading', { name: 'Review transactions in other.csv' })
+    expect((screen.getByLabelText('Description') as HTMLInputElement).value).toBe('Original description')
+    expect(window.history.length).toBe(length)
+    expect(updateImportDraft).not.toHaveBeenCalled()
+  })
   it('separates uploaded-file choices from transaction filtering and hides single-page file controls', async () => {
     show(<ImportReviewPage />)
     const filePicker = await screen.findByRole('region', { name: 'Choose an uploaded file' })
@@ -563,6 +613,12 @@ describe('import file browsing', () => {
     expect(screen.getByRole('heading', { name: 'Review transactions in sample.csv' })).toBeTruthy()
     expect(new URLSearchParams(window.location.search).get('page')).toBe('2')
     expect(screen.getByRole('option', { name: /page-two.csv/ })).toBeTruthy()
+    await act(async () => window.history.back())
+    await screen.findByText(/File page 1 of 2/)
+    expect(new URLSearchParams(window.location.search).has('page')).toBe(false)
+    await act(async () => window.history.forward())
+    await screen.findByText(/File page 2 of 2/)
+    expect((screen.getByLabelText('Uploaded file') as HTMLSelectElement).value).toBe('import-a')
   })
 
   it('canceled file paging and selected-import refresh retain unsaved corrections', async () => {
