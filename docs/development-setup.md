@@ -16,7 +16,7 @@ The versions below match the current project and build workflow.
 | Git | Current supported release | Required to clone the repository. |
 | .NET SDK | .NET 10, SDK `10.0.300` or newer | `global.json` keeps the repository on .NET 10 while allowing newer .NET 10 feature bands. |
 | Visual Studio | Visual Studio 2026; 18.8 tested | Install the **ASP.NET and web development** workload. The CLI workflow also works without Visual Studio. |
-| Node.js | Node 22 LTS recommended | Vite supports Node `20.19+` or `22.12+`. Node 24 is also compatible. |
+| Node.js | Node 24 LTS, `24.15.0+`, recommended | Node `22.22.2+` on the 22.x line is also supported. The full engine range is `^22.22.2 \|\| ^24.15.0 \|\| >=26.0.0`. Node 20, Node 25, and older 22.x/24.x patches are unsupported. |
 | npm | npm 10 or newer | On Windows PowerShell, use `npm.cmd` if `npm.ps1` is blocked by execution policy. |
 | SQL Server | SQL Server Express or Developer edition; SQL Server 2022+ recommended | A local named instance such as `<computer>\SQLEXPRESS` is sufficient. |
 | SSMS | SQL Server Management Studio 22 recommended | Optional, but useful for creating and inspecting databases. |
@@ -53,6 +53,18 @@ npm.cmd --version
 ```
 
 The .NET command should report a compatible .NET 10 SDK. If `npm` reports that `npm.ps1` cannot run, do not change the machine execution policy just for BudgetApp; use `npm.cmd` as shown throughout this guide.
+
+Use a current Node 24 LTS patch for development; an existing Node 24.18 installation
+already meets the minimum. The jsdom test environment, not just Vite, determines
+the minimum Node version ([upstream requirements](https://github.com/jsdom/jsdom/blob/v30.1.2/package.json)).
+The client `.npmrc` enables `engine-strict`, so `npm.cmd ci` reports `EBADENGINE`
+for unsupported Node/npm versions. Install a supported Node version, restart the
+terminal/Visual Studio, and restore again; do not bypass the check with `--force`.
+
+CI uses the latest Node 24 patch for the main build, including the .NET solution's
+JavaScript restore, and separately builds/tests the client on Node 22. The engine
+range also permits Node 26+, but Node 24 remains the development default; no Node
+26 type-definition upgrade is required for the APIs currently used by the project.
 
 ## 3. Restore Dependencies
 

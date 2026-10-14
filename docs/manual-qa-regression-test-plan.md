@@ -141,6 +141,21 @@ ordinary QA fixtures.
       authorization boundaries. Dependency-only updates must not add migrations
       or change existing financial records.
 
+## Frontend dependency and Node compatibility
+
+- [ ] From a clean install on a supported Node 24 patch, run `npm.cmd ci`, client
+      lint/build, and all client tests. CI must also build/test on Node 22; both
+      lines must meet the client package's declared patch minimums.
+- [ ] Verify `package.json` and `package-lock.json` agree on the jsdom dependency
+      and Node engine range, and that setup documentation matches. Unsupported
+      Node versions must receive an engine error, not a misleading DOM/test error.
+- [ ] After a jsdom upgrade, keep keyboard/focus, tutorials, MFA entry, navigation,
+      and import-review regression tests enabled. Fix actual compatibility issues
+      without weakening assertions or granting browser-like layout to jsdom.
+- [ ] Confirm a normal Development start still works on the developer's supported
+      Node installation. These tool/test updates must not alter financial data,
+      require database migrations, or change the published app's configuration.
+
 ## Critical regression checklist
 
 Run this shorter section before every merge, even when the change appears isolated.

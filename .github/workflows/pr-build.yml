@@ -17,6 +17,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Select Node before the .NET build's JavaScript project restores packages.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: BudgetApp/budgetapp.client/package-lock.json
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -45,13 +53,6 @@ jobs:
       - name: Test .NET
         run: dotnet test BudgetApp/BudgetApp.Tests/BudgetApp.Tests.csproj --configuration Release --no-build
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: BudgetApp/budgetapp.client/package-lock.json
-
       - name: Install client dependencies
         working-directory: BudgetApp/budgetapp.client
         run: npm ci
@@ -63,6 +64,32 @@ jobs:
       - name: Lint client
         working-directory: BudgetApp/budgetapp.client
         run: npm run lint
+
+      - name: Build client
+        working-directory: BudgetApp/budgetapp.client
+        run: npm run build
+
+      - name: Test client navigation and forms
+        working-directory: BudgetApp/budgetapp.client
+        run: npm test
+
+  node22-compatibility:
+    name: Client compatibility (Node 22)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: BudgetApp/budgetapp.client/package-lock.json
+
+      - name: Install client dependencies
+        working-directory: BudgetApp/budgetapp.client
+        run: npm ci
 
       - name: Build client
         working-directory: BudgetApp/budgetapp.client
