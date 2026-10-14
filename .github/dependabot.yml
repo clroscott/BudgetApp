@@ -5,6 +5,13 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # EF runtime, providers, Identity integration, and tooling must move together.
+    groups:
+      entity-framework:
+        patterns:
+          - "Microsoft.EntityFrameworkCore.*"
+          - "Microsoft.AspNetCore.Identity.EntityFrameworkCore"
+          - "dotnet-ef"
 
   - package-ecosystem: npm
     directory: /BudgetApp/budgetapp.client

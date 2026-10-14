@@ -124,6 +124,23 @@ ordinary QA fixtures.
 - [ ] Automated tests pass, or every existing failure is recorded and understood.
 - [ ] Browser developer tools show no unexpected errors on initial load.
 
+## Backend dependency maintenance
+
+- [ ] Update EF Core providers, Design references, Identity integration, and the
+      local `dotnet-ef` manifest together. Restore without downgrade warnings or
+      conflicting EF assemblies; check transitive/native SQLite dependencies.
+- [ ] Restore local tools and verify the pinned EF version. Discover migrations
+      with `--no-connect` in Testing configuration with disabled email and a dummy
+      connection string. Do not apply migrations or use a real database for this
+      dependency-only check. CI runs the same offline discovery.
+- [ ] Run backend tests, frontend tests, lint, and client/solution builds. Include
+      transitive dependencies when checking NuGet advisories; investigate rather
+      than suppress warnings. Record any remaining warnings or skipped checks.
+- [ ] In Development/Scratch, smoke-test sign-in, loading household budgets and
+      transactions, and saving/reloading one disposable edit. Recheck ordinary
+      authorization boundaries. Dependency-only updates must not add migrations
+      or change existing financial records.
+
 ## Critical regression checklist
 
 Run this shorter section before every merge, even when the change appears isolated.
