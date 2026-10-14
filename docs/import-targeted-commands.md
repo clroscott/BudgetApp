@@ -1,8 +1,8 @@
 # Targeted staged-import commands (#212, outcome 2)
 
 The second independently verified chunk remains on the #212 branch, per the
-owner's 2026-10-14 decision. The first chunk is committed. This chunk is not
-committed automatically. No schema migration or production operation is required.
+owner's 2026-10-14 decision. Outcomes 1 and 2 are committed; client outcome 3 is
+left uncommitted for owner review. No schema migration or production operation is required.
 
 ## What changes
 
@@ -90,9 +90,9 @@ test evidence is generated under ignored `artifacts/import-draft-read-qa`.
 
 ## Remaining for #212
 
-Connect the review screen to paged reads and returned row/summary patches, retain
-dirty edits/explicit clearing across pages and rules, use server-wide matching
-bulk actions, preserve #214/#215 read/history ownership, and reduce redundant
-list/detail/rule-preview calls. Repeated raw-label parsing is bounded, not fully
-eliminated; resolve it safely as part of completing the read/refresh path. Do not
-close #212 on the strength of this second backend-only outcome.
+The [third outcome](import-review-paging.md) now connects the review screen to these
+contracts, preserves dirty edits/explicit clearing and existing read/history
+ownership, provides read-only server-wide budget-choice previews, and reduces
+redundant list/page/rule reads. Label parsing remains bounded for compatibility;
+rule preview uses a minimal projection without RawData. Focused manual sign-off
+is still needed before merge; the full owner #197 sweep remains deferred.

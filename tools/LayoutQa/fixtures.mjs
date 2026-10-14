@@ -11,6 +11,36 @@ const transactions = drafts.slice(0, 8).map(draft => ({ id: draft.id, accountId:
 const profile = { id: 'layout-profile', name: 'Standard sample', headers: ['Date', 'Description', 'Amount'], dateColumn: 'Date', descriptionColumn: 'Description', amountColumn: 'Amount', debitColumn: null, creditColumn: null, categoryColumn: null, subcategoryColumn: null, amountConvention: 'SpendingPositive', defaultAccountId: null, isActive: true, dateFormat: null, numberCulture: null }
 const budgetCategories = Array.from({ length: 12 }, (_, index) => ({ id: `budget-category-${index}`, name: `Sample category ${index + 1}`, isActive: true, budgetedAmount: 100, actualAmount: 0, directActualAmount: 0, monthlyTargetAmount: null, averageMonthlyActualAmount: 0, lastMonthBudgetedAmount: null, lastMonthActualAmount: 0, children: [] }))
 
+export function draftPageFor(detail, parameters = new URLSearchParams()) {
+  const filter = parameters.get('filter') ?? 'All'
+  const matching = detail.drafts.filter(row => {
+    switch (filter) {
+      case 'Pending': return row.reviewDecision === 'Pending'
+      case 'Uncategorized': return !row.selectedCategoryId
+      case 'Categorized': return Boolean(row.selectedCategoryId)
+      case 'ParentOnly': return false // Fixture Housing is a root leaf.
+      case 'PossibleDuplicates': return row.duplicateStatus === 'PossibleDuplicate'
+      case 'Invalid': return row.validationStatus === 'Invalid'
+      case 'Approved': return row.reviewDecision === 'Approved'
+      case 'Excluded': return row.reviewDecision === 'Excluded'
+      default: return true
+    }
+  })
+  const page = Math.min(Number(parameters.get('page')) || 1, Math.max(1, Math.ceil(matching.length / 100)))
+  const { drafts: allRows, ...summary } = detail
+  return { summary: { ...summary, updatedAtUtc: detail.updatedAtUtc ?? '2026-10-14T12:00:00.0000000+00:00', counts: {
+    totalRows: allRows.length, validRows: allRows.filter(row => row.validationStatus === 'Valid').length,
+    invalidRows: allRows.filter(row => row.validationStatus === 'Invalid').length,
+    approvedRows: allRows.filter(row => row.reviewDecision === 'Approved').length,
+    excludedRows: allRows.filter(row => row.reviewDecision === 'Excluded').length,
+    duplicateRows: allRows.filter(row => row.duplicateStatus === 'PossibleDuplicate').length,
+    pendingRows: allRows.filter(row => row.reviewDecision === 'Pending').length,
+    validPendingRows: allRows.filter(row => row.reviewDecision === 'Pending' && row.validationStatus === 'Valid').length,
+    uncheckedDuplicateRows: allRows.filter(row => row.duplicateStatus === 'NotChecked').length,
+  } }, items: matching.slice((page - 1) * 100, page * 100), filter, page, pageSize: 100,
+  totalCount: matching.length, totalPages: Math.ceil(matching.length / 100) }
+}
+
 export function responseFor(path, { noHousehold = false, viewer = false, emptyBudget = false, multipleHouseholds = false, anonymous = false, administrator = false, owner = false, mfa = false } = {}) {
   const accountUser = { ...user, isApplicationAdministrator: administrator || owner, isApplicationOwner: owner, loginVerificationEnabled: mfa }
   if (path === '/api/auth/me') return anonymous ? null : accountUser
@@ -38,6 +68,7 @@ export function responseFor(path, { noHousehold = false, viewer = false, emptyBu
   if (path.endsWith('/saved-filters') || path.endsWith('/transaction-filters')) return []
   if (path.endsWith('/imports')) return { items: [importFile], page: 1, pageSize: 25, totalCount: 1, totalPages: 1, totalVisibleCount: 1 }
   if (path.endsWith(`/imports/${importId}`)) return { ...importFile, currency: 'CAD', drafts }
+  if (path.endsWith(`/imports/${importId}/drafts`)) return draftPageFor({ ...importFile, currency: 'CAD', drafts })
   if (path.endsWith('/categorization-rule-application-preview')) return { fillChangedRows: 0, reapplyChangedRows: 0, reapplyUnchangedRows: 0 }
   if (path.endsWith('/recurring-expenses')) return [{ id: 'layout-recurring', name: 'Sample rent', amount: 100, currency: 'CAD', scope: 'Household', ownerUserId: null, budgetMode: 'Overall', subcategoryId: 'housing', categoryName: 'Housing', subcategoryName: 'Rent', accountId: null, accountName: null, expectedDayOfMonth: 1, startsOn: '2026-01-01', endsOn: null, isActive: true }]
   if (/\/yearly-plans\/\d{4}$/.test(path)) return {

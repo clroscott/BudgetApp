@@ -133,6 +133,16 @@ internal sealed class ImportReviewFixture : IImportRepository, IHouseholdAuthori
 
     public Task<ImportListQueryResult> ListVisibleAsync(Guid householdId, Guid userId, ImportListFilter filter,
         int page, int pageSize, CancellationToken ct) => throw new NotSupportedException();
+    public Task<IReadOnlyList<ImportRuleMatchingDraft>> ListRuleMatchingDraftsAsync(Guid importFileId, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult<IReadOnlyList<ImportRuleMatchingDraft>>(Drafts.Where(draft =>
+            draft.ReviewDecision is ImportDraftReviewDecision.Pending or ImportDraftReviewDecision.Approved)
+            .Select(draft => new ImportRuleMatchingDraft(draft.Description, draft.SelectedCategoryId)).ToArray());
+    }
+    public Task<ImportBudgetChoicePreview> PreviewBudgetChoicesAsync(Guid importFileId, Guid householdId, Guid userId,
+        ImportDraftFilter filter, bool personal, bool household, bool isPersonalAccount, bool canChangeHousehold,
+        IReadOnlyCollection<Guid> editedDraftIds, CancellationToken ct) => throw new NotSupportedException();
     public Task<ImportSummary> GetSummaryAsync(Guid householdId, Guid userId, CancellationToken ct) => throw new NotSupportedException();
     public Task<bool> ExistsByAccountAndHashAsync(Guid accountId, string hash, CancellationToken ct, string? sourceWorksheetId = null) => throw new NotSupportedException();
     public Task AddAsync(ImportFile file, IReadOnlyCollection<ImportTransactionDraft> drafts, CancellationToken ct) => throw new NotSupportedException();

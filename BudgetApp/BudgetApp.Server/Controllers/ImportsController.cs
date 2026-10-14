@@ -97,6 +97,27 @@ public sealed class ImportsController(
         catch (Exception exception) when (IsExpected(exception)) { return MapException(exception); }
     }
 
+    [HttpPost("{importFileId:guid}/budget-choice-preview")]
+    public async Task<ActionResult<ImportBudgetChoicePreview>> BudgetChoicePreview(
+        Guid householdId, Guid importFileId, BudgetChoicePreviewRequest request, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        if (!Enum.TryParse<ImportDraftFilter>(request.Filter, ignoreCase: true, out var filter) || !Enum.IsDefined(filter))
+            return BadRequestProblem("Choose a supported row filter.");
+        try
+        {
+            return Ok(await importReviewService.PreviewBudgetChoicesAsync(householdId, userId, importFileId,
+                filter, request.Personal, request.Household, request.EditedDraftIds,
+                request.ExpectedImportUpdatedAtUtc, cancellationToken));
+        }
+        catch (Exception exception) when (IsExpected(exception)) { return MapException(exception); }
+    }
+
+    public sealed record BudgetChoicePreviewRequest(
+        [param: Required] string Filter, bool Personal, bool Household,
+        [param: Required, MaxLength(TransactionImportLimits.MaxRows)] Guid[] EditedDraftIds,
+        DateTimeOffset ExpectedImportUpdatedAtUtc);
+
     [HttpPost]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(TransactionImportLimits.MaxRequestSizeBytes)]

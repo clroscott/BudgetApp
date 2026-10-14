@@ -97,6 +97,22 @@ public sealed class ImportReviewService(
             (int)Math.Ceiling((double)result.TotalCount / DraftPageSize));
     }
 
+    public async Task<ImportBudgetChoicePreview> PreviewBudgetChoicesAsync(
+        Guid householdId, Guid userId, Guid importFileId, ImportDraftFilter filter,
+        bool personal, bool household, IReadOnlyCollection<Guid> editedDraftIds,
+        DateTimeOffset expectedImportUpdatedAtUtc, CancellationToken cancellationToken)
+    {
+        if (!Enum.IsDefined(filter)) throw new ArgumentException("Choose a supported row filter.");
+        if (editedDraftIds.Count > TransactionImportLimits.MaxRows) throw new ArgumentException("Too many edited rows.");
+        var (access, role) = await GetAuthorized(householdId, userId, importFileId, forUpdate: false, cancellationToken);
+        RequireEdit(access, role, userId);
+        RequireReviewable(access.ImportFile);
+        RequireCurrentVersion(access.ImportFile, expectedImportUpdatedAtUtc);
+        var result = await importRepository.PreviewBudgetChoicesAsync(importFileId, householdId, userId, filter,
+            personal, household, access.IsPersonalAccount, role != HouseholdRole.Viewer, editedDraftIds, cancellationToken);
+        return result with { UpdatedAtUtc = access.ImportFile.UpdatedAtUtc };
+    }
+
     public async Task CheckDuplicatesAsync(
         Guid householdId,
         Guid userId,
@@ -245,17 +261,12 @@ public sealed class ImportReviewService(
                 cancellationToken))
             .Where(category => category.IsActive)
             .ToDictionary(category => category.Id);
-        var drafts = await importRepository.ListDraftsAsync(
-            importFileId,
-            forUpdate: false,
-            cancellationToken);
+        var drafts = await importRepository.ListRuleMatchingDraftsAsync(importFileId, cancellationToken);
         var fillChangedRows = 0;
         var reapplyChangedRows = 0;
         var reapplyUnchangedRows = 0;
 
-        foreach (var draft in drafts.Where(draft =>
-                     draft.ReviewDecision is ImportDraftReviewDecision.Pending or
-                         ImportDraftReviewDecision.Approved))
+        foreach (var draft in drafts)
         {
             var targetCategoryId = rules
                 .FirstOrDefault(rule =>

@@ -124,6 +124,11 @@ internal sealed class ImportRepository(BudgetAppDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ImportRuleMatchingDraft>> ListRuleMatchingDraftsAsync(Guid importFileId, CancellationToken cancellationToken) =>
+        await dbContext.ImportTransactionDrafts.AsNoTracking().Where(draft => draft.ImportFileId == importFileId &&
+            (draft.ReviewDecision == ImportDraftReviewDecision.Pending || draft.ReviewDecision == ImportDraftReviewDecision.Approved))
+            .Select(draft => new ImportRuleMatchingDraft(draft.Description, draft.SelectedCategoryId)).ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<ImportTransactionDraft>> GetDraftsForUpdateAsync(
         Guid importFileId, IReadOnlyCollection<Guid> draftIds, CancellationToken cancellationToken)
     {
@@ -160,22 +165,7 @@ internal sealed class ImportRepository(BudgetAppDbContext dbContext)
         if (!Enum.IsDefined(filter)) throw new ArgumentException("Choose a supported row filter.", nameof(filter));
         if (page < 1) throw new ArgumentOutOfRangeException(nameof(page));
         if (pageSize < 1 || pageSize > ImportReviewService.DraftPageSize) throw new ArgumentOutOfRangeException(nameof(pageSize));
-        var query = dbContext.ImportTransactionDrafts.AsNoTracking()
-            .Where(draft => draft.ImportFileId == importFileId);
-        query = filter switch
-        {
-            ImportDraftFilter.Pending => query.Where(draft => draft.ReviewDecision == ImportDraftReviewDecision.Pending),
-            ImportDraftFilter.Uncategorized => query.Where(draft => draft.SelectedCategoryId == null),
-            ImportDraftFilter.ParentOnly => query.Where(draft => dbContext.Categories.Any(parent =>
-                parent.Id == draft.SelectedCategoryId && parent.HouseholdId == householdId &&
-                dbContext.Categories.Any(child => child.HouseholdId == householdId && child.ParentCategoryId == parent.Id))),
-            ImportDraftFilter.Categorized => query.Where(draft => draft.SelectedCategoryId != null),
-            ImportDraftFilter.PossibleDuplicates => query.Where(draft => draft.DuplicateStatus == ImportDraftDuplicateStatus.PossibleDuplicate),
-            ImportDraftFilter.Invalid => query.Where(draft => draft.ValidationStatus == ImportDraftValidationStatus.Invalid),
-            ImportDraftFilter.Approved => query.Where(draft => draft.ReviewDecision == ImportDraftReviewDecision.Approved),
-            ImportDraftFilter.Excluded => query.Where(draft => draft.ReviewDecision == ImportDraftReviewDecision.Excluded),
-            _ => query
-        };
+        var query = FilterDrafts(importFileId, householdId, filter);
         var total = await query.CountAsync(cancellationToken);
         var lastPage = Math.Max(1, (int)Math.Ceiling((double)total / pageSize));
         var actualPage = Math.Min(page, lastPage);
@@ -190,6 +180,59 @@ internal sealed class ImportRepository(BudgetAppDbContext dbContext)
             .ToListAsync(cancellationToken);
         return new ImportDraftPageQueryResult(items, actualPage, total);
     }
+
+    private IQueryable<ImportTransactionDraft> FilterDrafts(Guid importFileId, Guid householdId, ImportDraftFilter filter)
+    {
+        var query = dbContext.ImportTransactionDrafts.AsNoTracking()
+            .Where(draft => draft.ImportFileId == importFileId);
+        return filter switch
+        {
+            ImportDraftFilter.Pending => query.Where(draft => draft.ReviewDecision == ImportDraftReviewDecision.Pending),
+            ImportDraftFilter.Uncategorized => query.Where(draft => draft.SelectedCategoryId == null),
+            ImportDraftFilter.ParentOnly => query.Where(draft => dbContext.Categories.Any(parent =>
+                parent.Id == draft.SelectedCategoryId && parent.HouseholdId == householdId &&
+                dbContext.Categories.Any(child => child.HouseholdId == householdId && child.ParentCategoryId == parent.Id))),
+            ImportDraftFilter.Categorized => query.Where(draft => draft.SelectedCategoryId != null),
+            ImportDraftFilter.PossibleDuplicates => query.Where(draft => draft.DuplicateStatus == ImportDraftDuplicateStatus.PossibleDuplicate),
+            ImportDraftFilter.Invalid => query.Where(draft => draft.ValidationStatus == ImportDraftValidationStatus.Invalid),
+            ImportDraftFilter.Approved => query.Where(draft => draft.ReviewDecision == ImportDraftReviewDecision.Approved),
+            ImportDraftFilter.Excluded => query.Where(draft => draft.ReviewDecision == ImportDraftReviewDecision.Excluded),
+            _ => query
+        };
+    }
+
+    public async Task<ImportBudgetChoicePreview> PreviewBudgetChoicesAsync(
+        Guid importFileId, Guid householdId, Guid userId, ImportDraftFilter filter,
+        bool personal, bool household, bool isPersonalAccount, bool canChangeHousehold,
+        IReadOnlyCollection<Guid> editedDraftIds, CancellationToken cancellationToken)
+    {
+        var matching = FilterDrafts(importFileId, householdId, filter);
+        var eligible = matching.Where(draft => draft.ApprovedTransactionId == null &&
+            draft.ReviewDecision != ImportDraftReviewDecision.Excluded &&
+            (draft.PersonalBudgetUserId == null || draft.PersonalBudgetUserId == userId) &&
+            (canChangeHousehold || (draft.IncludeInHouseholdBudget ?? !isPersonalAccount) == household));
+        var skipped = await matching.CountAsync(cancellationToken) - await eligible.CountAsync(cancellationToken);
+        var changed = eligible.Where(draft =>
+            (draft.IncludeInHouseholdBudget ?? !isPersonalAccount) != household ||
+            (draft.IncludeInHouseholdBudget.HasValue ? draft.PersonalBudgetUserId == userId : isPersonalAccount) != personal);
+        // Keep parameter lists bounded. A local edit must also be returned when
+        // saved flags already match, so a second bulk choice can undo the first.
+        var ids = editedDraftIds.Distinct().ToArray();
+        var items = await BudgetCandidates(changed, userId, isPersonalAccount).ToListAsync(cancellationToken);
+        var seen = items.Select(item => item.Id).ToHashSet();
+        foreach (var chunk in ids.Chunk(500))
+            items.AddRange((await BudgetCandidates(eligible.Where(draft => chunk.Contains(draft.Id)), userId, isPersonalAccount)
+                .ToListAsync(cancellationToken)).Where(item => seen.Add(item.Id)));
+        var unchanged = await eligible.CountAsync(cancellationToken) - items.Count;
+        return new ImportBudgetChoicePreview(items, skipped, unchanged, default);
+    }
+
+    private static IQueryable<ImportBudgetChoiceCandidate> BudgetCandidates(
+        IQueryable<ImportTransactionDraft> query, Guid userId, bool isPersonalAccount) =>
+        query.OrderBy(draft => draft.SourceRowNumber).ThenBy(draft => draft.Id).Select(draft =>
+            new ImportBudgetChoiceCandidate(draft.Id, draft.TransactionDate, draft.Amount, draft.Description,
+                draft.SelectedCategoryId, draft.IncludeInHouseholdBudget ?? !isPersonalAccount,
+                draft.IncludeInHouseholdBudget.HasValue ? draft.PersonalBudgetUserId == userId : isPersonalAccount));
 
     public async Task<IReadOnlyList<DuplicateCandidate>> ListDuplicateCandidatesAsync(
         Guid accountId,

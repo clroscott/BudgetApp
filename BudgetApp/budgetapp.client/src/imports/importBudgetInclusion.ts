@@ -1,4 +1,7 @@
-import type { ImportDraftItem } from './importApi'
+import type { ImportDraftItem, ImportBudgetChoiceCandidate } from './importApi'
+
+type BudgetChoiceDraft = ImportBudgetChoiceCandidate & Partial<Pick<ImportDraftItem,
+  'approvedTransactionId' | 'reviewDecision' | 'canChangePersonalInclusion' | 'canChangeHouseholdInclusion'>>
 
 export interface PendingDraftUpdate {
   transactionDate: string
@@ -11,7 +14,7 @@ export interface PendingDraftUpdate {
 
 export type BudgetInclusionPreset = 'Personal' | 'Household' | 'PersonalAndHousehold' | 'Neither'
 
-export function draftUpdate(draft: ImportDraftItem): PendingDraftUpdate {
+export function draftUpdate(draft: BudgetChoiceDraft): PendingDraftUpdate {
   return {
     transactionDate: draft.transactionDate ?? '', amount: draft.amount?.toString() ?? '',
     description: draft.description ?? '', selectedCategoryId: draft.selectedCategoryId,
@@ -21,7 +24,7 @@ export function draftUpdate(draft: ImportDraftItem): PendingDraftUpdate {
 }
 
 export function previewBulkBudgetInclusion(
-  drafts: ImportDraftItem[], pending: ReadonlyMap<string, PendingDraftUpdate>, preset: BudgetInclusionPreset | '',
+  drafts: BudgetChoiceDraft[], pending: ReadonlyMap<string, PendingDraftUpdate>, preset: BudgetInclusionPreset | '',
 ) {
   const changes = new Map<string, PendingDraftUpdate | null>()
   let skipped = 0

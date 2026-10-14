@@ -210,6 +210,19 @@ public sealed class ImportDraftPagingTests(BudgetAppWebApplicationFactory factor
         Assert.True(ownPage.Summary.CanEdit);
         Assert.True(ownPage.Items[0].IncludeInPersonalBudget);
         Assert.False(ownPage.Items[0].CanChangeHouseholdInclusion);
+        async Task<HttpResponseMessage> Preview(SeedData seed, bool personal, bool household) =>
+            await TestIdentity.Post(viewer, $"{Path(seed)}/budget-choice-preview", new {
+                filter = "All", personal, household, editedDraftIds = Array.Empty<Guid>(), expectedImportUpdatedAtUtc = Now });
+        Assert.Equal(HttpStatusCode.Forbidden, (await Preview(shared, true, true)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Preview(secret, true, true)).StatusCode);
+        var ownPreview = await Preview(own, false, false);
+        Assert.Equal(HttpStatusCode.OK, ownPreview.StatusCode);
+        Assert.Single((await ownPreview.Content.ReadFromJsonAsync<ImportBudgetChoicePreview>())!.Items);
+        var protectedPreview = await Preview(own, true, true);
+        Assert.Equal(HttpStatusCode.OK, protectedPreview.StatusCode);
+        var protectedChoices = (await protectedPreview.Content.ReadFromJsonAsync<ImportBudgetChoicePreview>())!;
+        Assert.Empty(protectedChoices.Items);
+        Assert.Equal(1, protectedChoices.Skipped);
         foreach (var suffix in new[] { "drafts", "summary" })
         {
             Assert.Equal(HttpStatusCode.NotFound, (await viewer.GetAsync($"{Path(secret)}/{suffix}")).StatusCode);
@@ -254,6 +267,74 @@ public sealed class ImportDraftPagingTests(BudgetAppWebApplicationFactory factor
         Assert.Equal(1, completed.Summary.Counts.ExcludedRows);
         Assert.Equal(0, completed.Summary.Counts.PendingRows);
         Assert.Equal((await client.GetFromJsonAsync<ImportReviewDetail>(Path(seed)))!.Drafts, completed.Items);
+    }
+
+    [Theory]
+    [InlineData(100)]
+    [InlineData(1000)]
+    [InlineData(10000)]
+    public async Task BudgetChoicePreviewCoversAllMatchingRowsWithoutWritingOrReturningUnchangedUploads(int rowCount)
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        var seed = await Seed(client, rowCount);
+        var before = (await Page(client, seed)).Summary;
+        async Task<HttpResponseMessage> Preview(bool personal, Guid[] editedIds, string filter = "All", DateTimeOffset? version = null) =>
+            await TestIdentity.Post(client, $"{Path(seed)}/budget-choice-preview", new {
+                filter, personal, household = true, editedDraftIds = editedIds,
+                expectedImportUpdatedAtUtc = version ?? before.UpdatedAtUtc });
+        var unchangedResponse = await Preview(false, []);
+        Assert.Equal(HttpStatusCode.OK, unchangedResponse.StatusCode);
+        var unchanged = (await unchangedResponse.Content.ReadFromJsonAsync<ImportBudgetChoicePreview>())!;
+        Assert.Empty(unchanged.Items);
+        Assert.Equal(rowCount, unchanged.Unchanged);
+        Assert.Equal(0, unchanged.Skipped);
+        Assert.True((await unchangedResponse.Content.ReadAsByteArrayAsync()).Length < 250);
+        var changeResponse = await Preview(true, []);
+        Assert.Equal(HttpStatusCode.OK, changeResponse.StatusCode);
+        var changes = (await changeResponse.Content.ReadFromJsonAsync<ImportBudgetChoicePreview>())!;
+        Assert.Equal(rowCount, changes.Items.Count); // Includes every off-page row.
+        Assert.Equal(rowCount, changes.Items.Select(item => item.Id).Distinct().Count());
+        Assert.All(changes.Items, item => { Assert.True(item.IncludeInHouseholdBudget); Assert.False(item.IncludeInPersonalBudget); });
+        Assert.DoesNotContain("RawData", await changeResponse.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("unused-private-column", await changeResponse.Content.ReadAsStringAsync());
+        var locallyEdited = changes.Items[^1].Id;
+        var revertResponse = await Preview(false, [locallyEdited, Guid.NewGuid()]);
+        var revert = (await revertResponse.Content.ReadFromJsonAsync<ImportBudgetChoicePreview>())!;
+        Assert.Equal(locallyEdited, Assert.Single(revert.Items).Id);
+        Assert.Equal(rowCount - 1, revert.Unchanged);
+        var noMatch = await Preview(true, [], "Categorized");
+        Assert.Empty((await noMatch.Content.ReadFromJsonAsync<ImportBudgetChoicePreview>())!.Items);
+        Assert.Equal(HttpStatusCode.Conflict, (await Preview(true, [], version: before.UpdatedAtUtc.AddTicks(-1))).StatusCode);
+        Assert.Equal(before, await client.GetFromJsonAsync<ImportReviewSummary>($"{Path(seed)}/summary"));
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        Assert.False(await db.AuditEvents.AnyAsync(item => item.EntityId == seed.ImportId));
+        Assert.False(await db.Transactions.AnyAsync(item => item.HouseholdId == seed.HouseholdId));
+        output.WriteLine($"BUDGET_PREVIEW_ROWS={rowCount}; UNCHANGED_BYTES={(await unchangedResponse.Content.ReadAsByteArrayAsync()).Length}; CHANGED_BYTES={(await changeResponse.Content.ReadAsByteArrayAsync()).Length}; RETURNED_CHANGED_ROWS={changes.Items.Count}");
+    }
+
+    [Fact]
+    public async Task BudgetChoicePreviewSkipsExcludedAndOtherPersonalInclusions()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        var seed = await Seed(client, 4);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+            var rows = await db.ImportTransactionDrafts.Where(row => row.ImportFileId == seed.ImportId).OrderBy(row => row.SourceRowNumber).ToListAsync();
+            rows[0].Exclude(seed.UserId, Now);
+            rows[1].SetBudgetInclusion(true, Guid.NewGuid(), Now);
+            rows[2].SetBudgetInclusion(true, seed.UserId, Now);
+            await db.SaveChangesAsync();
+        }
+        var summary = (await Page(client, seed)).Summary;
+        var response = await TestIdentity.Post(client, $"{Path(seed)}/budget-choice-preview", new {
+            filter = "All", personal = true, household = true, editedDraftIds = Array.Empty<Guid>(), expectedImportUpdatedAtUtc = summary.UpdatedAtUtc });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = (await response.Content.ReadFromJsonAsync<ImportBudgetChoicePreview>())!;
+        Assert.Single(result.Items);
+        Assert.Equal(2, result.Skipped);
+        Assert.Equal(1, result.Unchanged);
     }
 
     private async Task<SeedData> Seed(HttpClient client, int rowCount)

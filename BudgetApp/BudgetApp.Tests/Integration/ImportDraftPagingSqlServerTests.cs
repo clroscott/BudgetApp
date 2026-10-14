@@ -32,6 +32,31 @@ public sealed class ImportDraftPagingSqlServerTests
     }
     [Theory]
     [InlineData(ImportDraftFilter.All)]
+    [InlineData(ImportDraftFilter.ParentOnly)]
+    public async Task BulkPreviewAndRulePreviewUseMinimalSqlProjections(ImportDraftFilter filter)
+    {
+        var capture = new CaptureQueries();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddInfrastructure("Server=unused;Database=unused;Integrated Security=True;", new EmailOptions(), new ApplicationUrlOptions(), false);
+        services.AddDbContext<BudgetAppDbContext>(options => options.AddInterceptors(new NoConnection(), capture));
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var repo = scope.ServiceProvider.GetRequiredService<IImportRepository>();
+        await repo.PreviewBudgetChoicesAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), filter,
+            true, false, true, false, Enumerable.Range(0, 1001).Select(_ => Guid.NewGuid()).ToArray(), CancellationToken.None);
+        await repo.ListRuleMatchingDraftsAsync(Guid.NewGuid(), CancellationToken.None);
+        Assert.All(capture.Commands, sql => {
+            Assert.Contains("[ImportFileId]", sql);
+            Assert.DoesNotContain("[RawData]", sql);
+            Assert.DoesNotContain("[OriginalDescription]", sql);
+        });
+        Assert.All(capture.ParameterCounts, count => Assert.InRange(count, 1, 510));
+        Assert.Empty(scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>().ChangeTracker.Entries());
+    }
+
+    [Theory]
+    [InlineData(ImportDraftFilter.All)]
     [InlineData(ImportDraftFilter.Pending)]
     [InlineData(ImportDraftFilter.Uncategorized)]
     [InlineData(ImportDraftFilter.ParentOnly)]

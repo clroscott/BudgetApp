@@ -1,9 +1,10 @@
 # Bounded staged-import reads (#212, outcome 1)
 
-This documents the first of three independently reviewable outcomes, not completion
-of #212. [Targeted commands](import-targeted-commands.md) are now implemented as the
-second outcome, with optional richer responses and existing response compatibility.
-The review screen still uses its existing read/refresh contracts.
+This documents the first of three independently reviewable outcomes.
+[Targeted commands](import-targeted-commands.md) and
+[client integration](import-review-paging.md) are now implemented on the same #212
+branch. The review screen uses paged reads and targeted responses; the compatibility
+full-detail endpoint remains available for older callers and parity tests.
 No schema migration, production database or email configuration change is needed.
 
 ## New read-only endpoints
@@ -50,8 +51,8 @@ The projection excludes original parsed values and review-audit columns. For
 label compatibility, RawData is read and parsed only for the requested page, and
 is never included in the response. Complete removal of repeated label parsing
 (for example, persisted normalized labels with a safe legacy transition) is not
-claimed here. The existing full-detail endpoint remains unchanged for compatibility
-until the later client transition; the current UI does **not** gain bounded reads yet.
+claimed here. The existing full-detail endpoint remains unchanged for compatibility;
+the current review UI uses bounded reads and targeted responses through outcome 3.
 
 These are ordinary database reads, not a new point-in-time snapshot or ETag
 protocol. Concurrent commands can change data between count/page queries or
@@ -94,18 +95,20 @@ to the permanent manual QA plan, but not marked passed from automated evidence.
 
 Final checks on 2026-10-13: 659 backend tests and 615 frontend tests passed;
 client lint/build and diff whitespace checks passed. No production database or
-real email was used. This first outcome is uncommitted and needs no migration.
+real email was used. These are the historical outcome-1 checkpoint results;
+outcomes 1 and 2 were subsequently committed. No migration is needed.
 
-## Remaining separate outcomes
+## Related outcomes and sign-off
 
 1. Target row commands and return changed rows/summary information without
    full-batch tracking: implemented, independently verified in outcome 2.
-2. Integrate server paging/targeted refreshes into the client, preserve dirty
-   corrections and explicit clearing across pages/filters, preserve #214/#215
-   ownership/history behavior, and make all-matching bulk actions operate on the
-   full server-side matching set. Do not substitute only the fetched page.
+2. Client paging/targeted refreshes, dirty-cache preservation, #214/#215 ownership
+   and history behavior, and server-wide all-matching bulk choices are implemented
+   in outcome 3; see its contract, evidence and focused manual sign-off guidance.
 
 User decision (2026-10-14): keep these outcomes on the same #212 branch, with
 independent verification and commit checkpoints. Do not close #212 or remove the
-compatibility endpoint before client integration is complete. Repeated label
-parsing is currently bounded to read pages/changed rows, not eliminated entirely.
+compatibility endpoint without auditing remaining callers. Repeated label parsing
+is bounded to requested pages/changed rows; the client avoids full-batch refreshes
+and rule preview no longer selects raw upload JSON. The owner manual sweep remains
+deferred; no board status is changed automatically.

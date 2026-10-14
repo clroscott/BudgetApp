@@ -29,6 +29,18 @@ public sealed record ImportDraftPageResult(
 public sealed record ImportDraftPageQueryResult(
     IReadOnlyList<ImportDraftReadRecord> Items, int Page, int TotalCount);
 
+public sealed record ImportBudgetChoiceCandidate(
+    Guid Id, DateOnly? TransactionDate, decimal? Amount, string? Description,
+    Guid? SelectedCategoryId, bool IncludeInHouseholdBudget, bool IncludeInPersonalBudget);
+
+public sealed record ImportRuleMatchingDraft(string? Description, Guid? SelectedCategoryId);
+
+// Explicit bulk preview only: return correction baselines for changed/locally edited
+// rows, never raw uploads or every unchanged row in a large import.
+public sealed record ImportBudgetChoicePreview(
+    IReadOnlyList<ImportBudgetChoiceCandidate> Items, int Skipped, int Unchanged,
+    DateTimeOffset UpdatedAtUtc);
+
 // Read projection: original parsed values, review audit columns and tracked
 // entities are unnecessary. RawData is retained internally for legacy label
 // parity, but only for the bounded page; it never enters the response contract.
