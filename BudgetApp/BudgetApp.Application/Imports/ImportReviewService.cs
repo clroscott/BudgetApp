@@ -110,7 +110,7 @@ public sealed class ImportReviewService(
         var drafts = await importRepository.ListDraftsAsync(
             importFileId, forUpdate: true, cancellationToken);
         await ApplyDuplicateResults(access.ImportFile.AccountId, drafts, cancellationToken);
-        access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), timeProvider.GetUtcNow());
+        access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), WriteTimestamp(access.ImportFile));
         await importRepository.SaveChangesAsync(cancellationToken);
     }
 
@@ -151,7 +151,7 @@ public sealed class ImportReviewService(
             importFileId,
             forUpdate: true,
             cancellationToken);
-        var now = timeProvider.GetUtcNow();
+        var now = WriteTimestamp(access.ImportFile);
         var changedRows = 0;
         var unchangedRows = 0;
 
@@ -288,7 +288,7 @@ public sealed class ImportReviewService(
             reapplyUnchangedRows);
     }
 
-    public async Task UpdateDraftAsync(
+    public async Task<ImportDraftMutationResult> UpdateDraftAsync(
         Guid householdId,
         Guid userId,
         Guid importFileId,
@@ -298,16 +298,19 @@ public sealed class ImportReviewService(
         string? description,
         Guid? selectedCategoryId,
         CancellationToken cancellationToken,
-        bool? includeHousehold = null, bool? includePersonal = null)
+        bool? includeHousehold = null, bool? includePersonal = null,
+        DateTimeOffset? expectedImportUpdatedAtUtc = null)
     {
         var (access, role) = await GetAuthorized(
             householdId, userId, importFileId, forUpdate: true, cancellationToken);
         RequireEdit(access, role, userId);
         RequireReviewable(access.ImportFile);
-        var drafts = await importRepository.ListDraftsAsync(
-            importFileId, forUpdate: true, cancellationToken);
+        RequireCurrentVersion(access.ImportFile, expectedImportUpdatedAtUtc);
+        var drafts = await importRepository.GetDraftsForUpdateAsync(importFileId, [draftId], cancellationToken);
         var draft = drafts.SingleOrDefault(candidate => candidate.Id == draftId)
             ?? throw new ImportDraftNotFoundException();
+        var counts = await importRepository.GetDraftCountsAsync(importFileId, cancellationToken);
+        var before = CountDrafts(drafts);
 
         if (selectedCategoryId.HasValue)
         {
@@ -320,12 +323,13 @@ public sealed class ImportReviewService(
             }
         }
 
-        var now = timeProvider.GetUtcNow();
+        var now = WriteTimestamp(access.ImportFile);
         draft.CorrectParsedValues(
             transactionDate, amount, description, selectedCategoryId, now);
         ApplyBudgetInclusion(draft, access, role, userId, includeHousehold, includePersonal, now);
-        await ApplyDuplicateResults(access.ImportFile.AccountId, [draft], cancellationToken);
-        access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), now);
+        await ApplyDuplicateResults(access.ImportFile.AccountId, [draft], cancellationToken, now);
+        var updated = ChangedCounts(counts, before, CountDrafts(drafts));
+        access.ImportFile.RefreshStatistics(ToStatistics(updated), now);
         RecordImportEvent(
             access,
             userId,
@@ -335,7 +339,9 @@ public sealed class ImportReviewService(
             {
                 ["Import row"] = draft.SourceRowNumber.ToString()
             });
+        var result = MutationResult(access, updated, drafts, [], role, userId);
         await importRepository.SaveChangesAsync(cancellationToken);
+        return result;
     }
 
     public async Task<int> BulkUpdateDraftsAsync(
@@ -343,9 +349,15 @@ public sealed class ImportReviewService(
         Guid userId,
         Guid importFileId,
         IReadOnlyList<ImportDraftUpdateInput> updates,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        (await BulkUpdateDraftsWithResultAsync(householdId, userId, importFileId, updates, cancellationToken)).SavedRows;
+
+    public async Task<ImportDraftMutationResult> BulkUpdateDraftsWithResultAsync(
+        Guid householdId, Guid userId, Guid importFileId,
+        IReadOnlyList<ImportDraftUpdateInput> updates, CancellationToken cancellationToken,
+        DateTimeOffset? expectedImportUpdatedAtUtc = null)
     {
-        if (updates.Count == 0 ||
+        if (updates.Count == 0 || updates.Count > TransactionImportLimits.MaxRows ||
             updates.Select(update => update.DraftId).Distinct().Count() != updates.Count)
         {
             throw new ArgumentException(
@@ -362,21 +374,24 @@ public sealed class ImportReviewService(
         RequireEdit(access, role, userId);
         RequireReviewable(access.ImportFile);
 
-        var drafts = await importRepository.ListDraftsAsync(
-            importFileId,
-            forUpdate: true,
-            cancellationToken);
+        RequireCurrentVersion(access.ImportFile, expectedImportUpdatedAtUtc);
+        var drafts = await importRepository.GetDraftsForUpdateAsync(
+            importFileId, updates.Select(update => update.DraftId).ToArray(), cancellationToken);
         var draftsById = drafts.ToDictionary(draft => draft.Id);
         if (updates.Any(update => !draftsById.ContainsKey(update.DraftId)))
         {
             throw new ImportDraftNotFoundException();
         }
+        var counts = await importRepository.GetDraftCountsAsync(importFileId, cancellationToken);
+        var before = CountDrafts(drafts);
 
-        var categories = (await categoryRepository.ListAsync(
+        var categories = updates.Any(update => update.SelectedCategoryId.HasValue)
+            ? (await categoryRepository.ListAsync(
                 householdId,
                 cancellationToken))
-            .ToDictionary(category => category.Id);
-        var now = timeProvider.GetUtcNow();
+                .ToDictionary(category => category.Id)
+            : [];
+        var now = WriteTimestamp(access.ImportFile);
         var updatedDrafts = new List<ImportTransactionDraft>(updates.Count);
 
         foreach (var update in updates)
@@ -413,8 +428,9 @@ public sealed class ImportReviewService(
         await ApplyDuplicateResults(
             access.ImportFile.AccountId,
             updatedDrafts,
-            cancellationToken);
-        access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), now);
+            cancellationToken, now);
+        var updated = ChangedCounts(counts, before, CountDrafts(updatedDrafts));
+        access.ImportFile.RefreshStatistics(ToStatistics(updated), now);
         RecordImportEvent(
             access,
             userId,
@@ -425,28 +441,31 @@ public sealed class ImportReviewService(
             {
                 ["Rows corrected"] = updatedDrafts.Count.ToString()
             });
+        var result = MutationResult(access, updated, updatedDrafts, [], role, userId);
         await importRepository.SaveChangesAsync(cancellationToken);
-        return updatedDrafts.Count;
+        return result;
     }
 
-    public async Task SetDecisionAsync(
+    public async Task<ImportDraftMutationResult> SetDecisionAsync(
         Guid householdId,
         Guid userId,
         Guid importFileId,
         Guid draftId,
         string decision,
         bool acknowledgePossibleDuplicate,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, DateTimeOffset? expectedImportUpdatedAtUtc = null)
     {
         var (access, role) = await GetAuthorized(
             householdId, userId, importFileId, forUpdate: true, cancellationToken);
         RequireEdit(access, role, userId);
         RequireReviewable(access.ImportFile);
-        var drafts = await importRepository.ListDraftsAsync(
-            importFileId, forUpdate: true, cancellationToken);
+        RequireCurrentVersion(access.ImportFile, expectedImportUpdatedAtUtc);
+        var drafts = await importRepository.GetDraftsForUpdateAsync(importFileId, [draftId], cancellationToken);
         var draft = drafts.SingleOrDefault(candidate => candidate.Id == draftId)
             ?? throw new ImportDraftNotFoundException();
-        var now = timeProvider.GetUtcNow();
+        var counts = await importRepository.GetDraftCountsAsync(importFileId, cancellationToken);
+        var before = CountDrafts(drafts);
+        var now = WriteTimestamp(access.ImportFile);
 
         switch (decision.Trim().ToLowerInvariant())
         {
@@ -463,7 +482,8 @@ public sealed class ImportReviewService(
                 throw new ArgumentException("Review decision is not supported.", nameof(decision));
         }
 
-        access.ImportFile.RefreshStatistics(CalculateStatistics(drafts), now);
+        var updated = ChangedCounts(counts, before, CountDrafts(drafts));
+        access.ImportFile.RefreshStatistics(ToStatistics(updated), now);
         var action = decision.Trim().Equals(
             "approved",
             StringComparison.OrdinalIgnoreCase)
@@ -479,7 +499,9 @@ public sealed class ImportReviewService(
             action,
             $"{action} import row {draft.SourceRowNumber} in " +
             $"'{access.ImportFile.OriginalFileName}'.");
+        var result = MutationResult(access, updated, drafts, [], role, userId);
         await importRepository.SaveChangesAsync(cancellationToken);
+        return result;
     }
 
     public async Task BulkSetDecisionAsync(
@@ -498,7 +520,7 @@ public sealed class ImportReviewService(
         var pendingDrafts = drafts.Where(draft =>
             draft.ReviewDecision == ImportDraftReviewDecision.Pending).ToList();
         var normalizedDecision = decision.Trim().ToLowerInvariant();
-        var now = timeProvider.GetUtcNow();
+        var now = WriteTimestamp(access.ImportFile);
         var affectedRows = 0;
 
         switch (normalizedDecision)
@@ -563,39 +585,41 @@ public sealed class ImportReviewService(
         await importRepository.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task RemoveDraftAsync(
+    public async Task<ImportDraftMutationResult> RemoveDraftAsync(
         Guid householdId,
         Guid userId,
         Guid importFileId,
         Guid draftId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, DateTimeOffset? expectedImportUpdatedAtUtc = null)
     {
         var (access, role) = await GetAuthorized(
             householdId, userId, importFileId, forUpdate: true, cancellationToken);
         RequireEdit(access, role, userId);
         RequireReviewable(access.ImportFile);
-        var drafts = await importRepository.ListDraftsAsync(
-            importFileId, forUpdate: true, cancellationToken);
+        RequireCurrentVersion(access.ImportFile, expectedImportUpdatedAtUtc);
+        var drafts = await importRepository.GetDraftsForUpdateAsync(importFileId, [draftId], cancellationToken);
         var draft = drafts.SingleOrDefault(candidate => candidate.Id == draftId)
             ?? throw new ImportDraftNotFoundException();
-        if (drafts.Count == 1)
+        var counts = await importRepository.GetDraftCountsAsync(importFileId, cancellationToken);
+        if (counts.TotalRows <= 1)
         {
             throw new InvalidOperationException(
                 "The final staged row cannot be removed. Discard the staged import instead.");
         }
 
-        var remainingDrafts = drafts.Where(candidate => candidate.Id != draftId).ToList();
+        var updated = ChangedCounts(counts, CountDrafts(drafts), ImportDraftCounts.Empty);
         importRepository.RemoveDraft(draft);
         access.ImportFile.RefreshStatisticsAfterRowRemoval(
-            CalculateStatistics(remainingDrafts),
-            timeProvider.GetUtcNow());
+            ToStatistics(updated), WriteTimestamp(access.ImportFile));
         RecordImportEvent(
             access,
             userId,
             AuditActions.Deleted,
             $"Removed import row {draft.SourceRowNumber} from " +
             $"'{access.ImportFile.OriginalFileName}'.");
+        var result = MutationResult(access, updated, [], [draftId], role, userId);
         await importRepository.SaveChangesAsync(cancellationToken);
+        return result;
     }
 
     public async Task<CompleteImportResult> CompleteAsync(
@@ -627,7 +651,7 @@ public sealed class ImportReviewService(
                 "Every row must be approved or excluded before completing the import.");
         }
 
-        var now = timeProvider.GetUtcNow();
+        var now = WriteTimestamp(importFile);
         var transactions = new List<Transaction>();
         foreach (var draft in drafts.Where(draft =>
                      draft.ReviewDecision == ImportDraftReviewDecision.Approved &&
@@ -732,14 +756,14 @@ public sealed class ImportReviewService(
     public async Task ApplyDuplicateResults(
         Guid accountId,
         IReadOnlyCollection<ImportTransactionDraft> drafts,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, DateTimeOffset? updatedAtUtc = null)
     {
         var dated = drafts.Where(draft => draft.TransactionDate.HasValue).ToList();
         if (dated.Count == 0)
         {
             foreach (var draft in drafts)
             {
-                draft.SetDuplicateResult(ImportDraftDuplicateStatus.NoMatch, null, timeProvider.GetUtcNow());
+                draft.SetDuplicateResult(ImportDraftDuplicateStatus.NoMatch, null, updatedAtUtc ?? timeProvider.GetUtcNow());
             }
             return;
         }
@@ -757,7 +781,7 @@ public sealed class ImportReviewService(
                 candidate.TransactionDate, candidate.Amount, candidate.Description.Trim()), candidate.TransactionId);
         }
 
-        var now = timeProvider.GetUtcNow();
+        var now = updatedAtUtc ?? timeProvider.GetUtcNow();
         foreach (var draft in drafts)
         {
             Guid? matchingId = null;
@@ -838,6 +862,50 @@ public sealed class ImportReviewService(
         }
     }
 
+    private static void RequireCurrentVersion(ImportFile file, DateTimeOffset? expected)
+    {
+        if (expected.HasValue && expected.Value != file.UpdatedAtUtc) throw new ImportReviewConflictException();
+    }
+
+    // Each command must advance the file token even with a fixed/coarse clock.
+    // The tracked file token serializes statistics updates with other writers;
+    // SaveChanges commits rows, counters and audit together or rolls all back.
+    private DateTimeOffset WriteTimestamp(ImportFile file)
+    {
+        var now = timeProvider.GetUtcNow();
+        return now > file.UpdatedAtUtc ? now : file.UpdatedAtUtc.AddTicks(1);
+    }
+
+    private static ImportDraftCounts CountDrafts(IReadOnlyCollection<ImportTransactionDraft> drafts) => new(
+        drafts.Count,
+        drafts.Count(draft => draft.ValidationStatus == ImportDraftValidationStatus.Valid),
+        drafts.Count(draft => draft.ValidationStatus == ImportDraftValidationStatus.Invalid),
+        drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Approved),
+        drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Excluded),
+        drafts.Count(draft => draft.DuplicateStatus == ImportDraftDuplicateStatus.PossibleDuplicate),
+        drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Pending),
+        drafts.Count(draft => draft.DuplicateStatus == ImportDraftDuplicateStatus.NotChecked),
+        drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Pending && draft.ValidationStatus == ImportDraftValidationStatus.Valid));
+
+    private static ImportDraftCounts ChangedCounts(ImportDraftCounts total, ImportDraftCounts before, ImportDraftCounts after) => new(
+        total.TotalRows - before.TotalRows + after.TotalRows,
+        total.ValidRows - before.ValidRows + after.ValidRows,
+        total.InvalidRows - before.InvalidRows + after.InvalidRows,
+        total.ApprovedRows - before.ApprovedRows + after.ApprovedRows,
+        total.ExcludedRows - before.ExcludedRows + after.ExcludedRows,
+        total.DuplicateRows - before.DuplicateRows + after.DuplicateRows,
+        total.PendingRows - before.PendingRows + after.PendingRows,
+        total.UncheckedDuplicateRows - before.UncheckedDuplicateRows + after.UncheckedDuplicateRows,
+        total.ValidPendingRows - before.ValidPendingRows + after.ValidPendingRows);
+
+    private static ImportStatistics ToStatistics(ImportDraftCounts counts) => new(
+        counts.TotalRows, counts.ValidRows, counts.InvalidRows, counts.ApprovedRows, counts.ExcludedRows, counts.DuplicateRows);
+
+    private static ImportDraftMutationResult MutationResult(ImportAccessRecord access, ImportDraftCounts counts,
+        IReadOnlyCollection<ImportTransactionDraft> drafts, IReadOnlyList<Guid> removedIds, HouseholdRole role, Guid userId) =>
+        new(ToSummary(access, counts, role, userId), drafts.Select(draft => ToDraftItem(draft, access, role, userId)).ToList(),
+            removedIds, drafts.Count + removedIds.Count);
+
     private static ImportStatistics CalculateStatistics(
         IReadOnlyCollection<ImportTransactionDraft> drafts) =>
         new(
@@ -912,6 +980,7 @@ public sealed class ImportReviewService(
         try
         {
             using var document = JsonDocument.Parse(rawData);
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return (null, null);
             string? categoryName = null;
             string? subcategoryName = null;
             foreach (var property in document.RootElement.EnumerateObject())

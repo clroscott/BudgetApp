@@ -1,7 +1,9 @@
 # Bounded staged-import reads (#212, outcome 1)
 
-This is the first of three independently reviewable outcomes, not completion of
-#212. The review screen and all write commands still use their existing contracts.
+This documents the first of three independently reviewable outcomes, not completion
+of #212. [Targeted commands](import-targeted-commands.md) are now implemented as the
+second outcome, with optional richer responses and existing response compatibility.
+The review screen still uses its existing read/refresh contracts.
 No schema migration, production database or email configuration change is needed.
 
 ## New read-only endpoints
@@ -54,9 +56,10 @@ until the later client transition; the current UI does **not** gain bounded read
 These are ordinary database reads, not a new point-in-time snapshot or ETag
 protocol. Concurrent commands can change data between count/page queries or
 separate requests. UpdatedAtUtc is file metadata, not a new row-write token.
-Existing write concurrency, atomic completion, uniqueness and audit behavior are
-unchanged. The later command/refresh outcome must handle invalidated counts/pages
-and ownership deliberately rather than claim a read timestamp prevents conflicts.
+Existing atomic completion, uniqueness and audit rules are retained. The targeted
+command outcome adds optional expected-version checks and advances write timestamps
+monotonically; see its contract for 409 handling. Client integration must still
+handle invalidated counts/pages and ownership deliberately.
 
 ## Verification and disposable profiling
 
@@ -96,12 +99,13 @@ real email was used. This first outcome is uncommitted and needs no migration.
 ## Remaining separate outcomes
 
 1. Target row commands and return changed rows/summary information without
-   full-batch tracking; retain existing authorization, approval, audit, atomicity,
-   concurrency and completion uniqueness. Resolve label-read repetition safely.
+   full-batch tracking: implemented, independently verified in outcome 2.
 2. Integrate server paging/targeted refreshes into the client, preserve dirty
    corrections and explicit clearing across pages/filters, preserve #214/#215
    ownership/history behavior, and make all-matching bulk actions operate on the
    full server-side matching set. Do not substitute only the fetched page.
 
-Those require separate focused branches/PRs per the board item. Do not close #212
-or remove the compatibility endpoint on the strength of this first outcome.
+User decision (2026-10-14): keep these outcomes on the same #212 branch, with
+independent verification and commit checkpoints. Do not close #212 or remove the
+compatibility endpoint before client integration is complete. Repeated label
+parsing is currently bounded to read pages/changed rows, not eliminated entirely.

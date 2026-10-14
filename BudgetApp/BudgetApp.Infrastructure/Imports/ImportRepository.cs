@@ -124,6 +124,19 @@ internal sealed class ImportRepository(BudgetAppDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ImportTransactionDraft>> GetDraftsForUpdateAsync(
+        Guid importFileId, IReadOnlyCollection<Guid> draftIds, CancellationToken cancellationToken)
+    {
+        var result = new List<ImportTransactionDraft>(draftIds.Count);
+        // Bound SQL parameter lists as well as returned rows, including providers
+        // that expand Contains into individual parameters (SQL Server has a cap).
+        foreach (var ids in draftIds.Distinct().Chunk(500))
+            result.AddRange(await dbContext.ImportTransactionDrafts
+                .Where(draft => draft.ImportFileId == importFileId && ids.Contains(draft.Id))
+                .ToListAsync(cancellationToken));
+        return result;
+    }
+
     public async Task<ImportDraftCounts> GetDraftCountsAsync(Guid importFileId, CancellationToken cancellationToken) =>
         await dbContext.ImportTransactionDrafts.AsNoTracking()
             .Where(draft => draft.ImportFileId == importFileId).GroupBy(_ => 1)

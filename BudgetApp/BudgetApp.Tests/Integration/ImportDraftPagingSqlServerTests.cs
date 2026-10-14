@@ -12,6 +12,24 @@ namespace BudgetApp.Tests.Integration;
 
 public sealed class ImportDraftPagingSqlServerTests
 {
+    [Fact]
+    public async Task TargetedReadsKeepImportBoundaryAndChunkSqlParameterLists()
+    {
+        var capture = new CaptureQueries();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddInfrastructure("Server=unused;Database=unused;Integrated Security=True;",
+            new EmailOptions(), new ApplicationUrlOptions(), false);
+        services.AddDbContext<BudgetAppDbContext>(options => options.AddInterceptors(new NoConnection(), capture));
+        using var provider = services.BuildServiceProvider();
+        using var scope = provider.CreateScope();
+        var repo = scope.ServiceProvider.GetRequiredService<IImportRepository>();
+        var ids = Enumerable.Range(0, 1200).Select(_ => Guid.NewGuid()).ToArray();
+        await repo.GetDraftsForUpdateAsync(Guid.NewGuid(), ids, CancellationToken.None);
+        Assert.Equal(3, capture.Commands.Count);
+        Assert.All(capture.Commands, sql => { Assert.Contains("[ImportFileId]", sql); Assert.Contains(" IN ", sql); });
+        Assert.All(capture.ParameterCounts, count => Assert.InRange(count, 1, 501));
+    }
     [Theory]
     [InlineData(ImportDraftFilter.All)]
     [InlineData(ImportDraftFilter.Pending)]
@@ -75,10 +93,12 @@ public sealed class ImportDraftPagingSqlServerTests
     {
         internal List<string> Commands { get; } = [];
         internal List<int> PageParameters { get; } = [];
+        internal List<int> ParameterCounts { get; } = [];
         public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
             CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
         {
             Commands.Add(command.CommandText);
+            ParameterCounts.Add(command.Parameters.Count);
             var table = new DataTable();
             if (command.CommandText.Contains("GROUP BY", StringComparison.Ordinal))
             {
@@ -91,7 +111,7 @@ public sealed class ImportDraftPagingSqlServerTests
                 foreach (DbParameter parameter in command.Parameters)
                     if (parameter.Value is int value) PageParameters.Add(value);
             }
-            else
+            else if (command.CommandText.Contains("COUNT(", StringComparison.Ordinal))
             {
                 table.Columns.Add("Count", typeof(int));
                 table.Rows.Add(101);

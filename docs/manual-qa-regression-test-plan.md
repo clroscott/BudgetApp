@@ -933,6 +933,33 @@ The owner's full manual sweep remains deferred; these boxes are not marked from 
   canceled navigation, whole-matching bulk actions and idempotent completion.
   Do not treat this backend-only slice as completion of all #212 acceptance criteria.
 
+### Targeted staged-import commands (#212, outcome 2)
+
+See [command contract and verification](import-targeted-commands.md). The screen
+still uses compatible responses until client integration. Use disposable staging
+data; the full owner manual sweep remains deferred.
+
+- [ ] Save/correct, Approve, Exclude, return to Pending and Remove individual rows
+  in the existing review screen. Counts, duplicate warnings, category restrictions
+  and permissions match previous behavior. Removing the final row is still blocked.
+- [ ] Through the API, opt into `returnChanges=true`. Single-row replies contain
+  only that row (or removed ID), accurate whole-import counts and a new timestamp,
+  even with 10,000 staged rows. Old callers retain their prior response shapes.
+- [ ] Save multiple corrections spanning different pages, including an explicitly
+  cleared category and invalid values. All requested changes commit together;
+  an invalid/foreign row ID or protected choice must not partially save other rows.
+- [ ] Supply an obsolete `expectedImportUpdatedAtUtc`: get 409 and retain edits.
+  Use two editors concurrently; a losing save must not overwrite the winner or
+  corrupt global counters. Refresh/reconcile before a deliberate retry; do not
+  replay writes automatically or assume a missing response means no write occurred.
+- [ ] Interrupt/fail a save: row values, file counts and audit must roll back
+  together. Retrying explicitly saves once. Approval/correction/removal creates
+  no official transaction; final completion keeps its existing atomic/idempotent rules.
+- [ ] Repeat as shared-account Viewer, personal-account owner with Viewer role,
+  another member and outsider. Neither richer responses nor supplied timestamps
+  bypass privacy, Household inclusion restrictions, completed-import read-only
+  rules, confirmation or antiforgery protections.
+
 ### Query-only navigation and filter history (#215)
 
 Use Development/Scratch data only. The owner's full manual sweep remains deferred;

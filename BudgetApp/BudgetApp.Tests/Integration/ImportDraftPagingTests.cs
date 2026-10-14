@@ -259,6 +259,11 @@ public sealed class ImportDraftPagingTests(BudgetAppWebApplicationFactory factor
     private async Task<SeedData> Seed(HttpClient client, int rowCount)
     {
         var userId = await TestIdentity.RegisterAndSignIn(client, $"draft-paging-{Guid.NewGuid():N}@example.test", confirmationHost: factory);
+        return await SeedForUser(userId, rowCount);
+    }
+
+    private async Task<SeedData> SeedForUser(Guid userId, int rowCount)
+    {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
         var household = Household.Create("Draft paging", "CAD", "America/Vancouver", userId, Now);
@@ -293,4 +298,93 @@ public sealed class ImportDraftPagingTests(BudgetAppWebApplicationFactory factor
         return (await response.Content.ReadFromJsonAsync<ImportDraftPageResult>())!;
     }
     private sealed record SeedData(Guid UserId, Guid HouseholdId, Guid AccountId, Guid ImportId);
+
+    [Theory]
+    [InlineData(100)]
+    [InlineData(1000)]
+    [InlineData(10000)]
+    public async Task TargetedHttpChangesReturnOnlyAffectedRowsAndExactSummary(int rowCount)
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        var seed = await Seed(client, rowCount);
+        var original = await Page(client, seed, page: int.MaxValue);
+        var row = original.Items[^1];
+        var save = await Send(client, HttpMethod.Put, Versioned($"{Path(seed)}/drafts/{row.Id}", original.Summary), new {
+            transactionDate = row.TransactionDate, amount = -7.1234m, description = "Target correction", selectedCategoryId = (Guid?)null });
+        Assert.Equal(HttpStatusCode.OK, save.StatusCode);
+        var changed = (await save.Content.ReadFromJsonAsync<ImportDraftMutationResult>())!;
+        Assert.Equal(row.Id, Assert.Single(changed.Items).Id);
+        Assert.Equal("Target correction", changed.Items[0].Description);
+        Assert.Equal(rowCount, changed.Summary.Counts.TotalRows);
+        Assert.Equal(rowCount - 1, changed.Summary.Counts.UncheckedDuplicateRows);
+        Assert.Equal(1, changed.SavedRows);
+        var bytes = (await save.Content.ReadAsByteArrayAsync()).Length;
+        Assert.True(bytes < 3000);
+        var approve = await TestIdentity.Post(client, Versioned($"{Path(seed)}/drafts/{row.Id}/decision", changed.Summary),
+            new { decision = "Approved", acknowledgePossibleDuplicate = false });
+        Assert.Equal(HttpStatusCode.OK, approve.StatusCode);
+        var approved = (await approve.Content.ReadFromJsonAsync<ImportDraftMutationResult>())!;
+        Assert.Equal(1, approved.Summary.Counts.ApprovedRows);
+        Assert.Equal("Approved", Assert.Single(approved.Items).ReviewDecision);
+        var stale = await TestIdentity.Post(client, Versioned($"{Path(seed)}/drafts/{row.Id}/decision", original.Summary),
+            new { decision = "Excluded", acknowledgePossibleDuplicate = false });
+        Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
+        var remove = await Send(client, HttpMethod.Delete, Versioned($"{Path(seed)}/drafts/{row.Id}", approved.Summary));
+        Assert.Equal(HttpStatusCode.OK, remove.StatusCode);
+        var removed = (await remove.Content.ReadFromJsonAsync<ImportDraftMutationResult>())!;
+        Assert.Empty(removed.Items);
+        Assert.Equal([row.Id], removed.RemovedDraftIds);
+        Assert.Equal(rowCount - 1, removed.Summary.Counts.TotalRows);
+        Assert.Equal(0, removed.Summary.Counts.ApprovedRows);
+        Assert.Equal(removed.Summary, await client.GetFromJsonAsync<ImportReviewSummary>($"{Path(seed)}/summary"));
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        Assert.Equal(rowCount - 1, await db.ImportTransactionDrafts.CountAsync(item => item.ImportFileId == seed.ImportId));
+        Assert.False(await db.ImportTransactionDrafts.AnyAsync(item => item.ImportFileId == seed.ImportId && item.UpdatedAtUtc != Now));
+        Assert.Equal(3, await db.AuditEvents.CountAsync(item => item.EntityId == seed.ImportId));
+        Assert.False(await db.Transactions.AnyAsync(item => item.HouseholdId == seed.HouseholdId));
+        output.WriteLine($"TARGET_ROWS={rowCount}; CHANGE_RESPONSE_BYTES={bytes}; RETURNED_ITEMS=1");
+    }
+
+    [Fact]
+    public async Task BulkCorrectionsRemainAtomicAndReturnOnlyChangedRows()
+    {
+        using var client = factory.CreateAuthenticatedTestClient();
+        var seed = await Seed(client, 250);
+        var first = await Page(client, seed);
+        var last = await Page(client, seed, page: 3);
+        var ids = new[] { first.Items[0].Id, first.Items[99].Id, last.Items[^1].Id };
+        var updates = ids.Select((id, i) => new ImportDraftUpdateInput(id, new DateOnly(2026, 10, 1),
+            i == 1 ? 0m : -2.3456m, $"Bulk correction {i}", null)).ToArray();
+        var rejected = await Send(client, HttpMethod.Put, Versioned($"{Path(seed)}/drafts", first.Summary),
+            new { drafts = updates.Concat([new(Guid.NewGuid(), new DateOnly(2026, 10, 1), 1m, "Foreign row", null)]) });
+        Assert.Equal(HttpStatusCode.NotFound, rejected.StatusCode);
+        Assert.Equal(first.Summary, await client.GetFromJsonAsync<ImportReviewSummary>($"{Path(seed)}/summary"));
+        var response = await Send(client, HttpMethod.Put, Versioned($"{Path(seed)}/drafts", first.Summary), new { drafts = updates });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var changed = (await response.Content.ReadFromJsonAsync<ImportDraftMutationResult>())!;
+        Assert.Equal(ids, changed.Items.Select(item => item.Id));
+        Assert.Equal(3, changed.SavedRows);
+        Assert.Equal(250, changed.Summary.Counts.TotalRows);
+        Assert.Equal(249, changed.Summary.Counts.ValidRows);
+        Assert.Equal(1, changed.Summary.Counts.InvalidRows);
+        Assert.Equal(247, changed.Summary.Counts.UncheckedDuplicateRows);
+        Assert.Equal(changed.Summary, await client.GetFromJsonAsync<ImportReviewSummary>($"{Path(seed)}/summary"));
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<BudgetAppDbContext>();
+        Assert.Equal(247, await db.ImportTransactionDrafts.CountAsync(item => item.ImportFileId == seed.ImportId && item.UpdatedAtUtc == Now));
+        Assert.Equal(1, await db.AuditEvents.CountAsync(item => item.EntityId == seed.ImportId));
+        Assert.False(await db.Transactions.AnyAsync(item => item.HouseholdId == seed.HouseholdId));
+    }
+
+    private static string Versioned(string path, ImportReviewSummary summary) =>
+        $"{path}?returnChanges=true&expectedImportUpdatedAtUtc={Uri.EscapeDataString(summary.UpdatedAtUtc.ToString("O"))}";
+    private static async Task<HttpResponseMessage> Send(HttpClient client, HttpMethod method, string path, object? body = null)
+    {
+        var csrf = (await client.GetFromJsonAsync<AntiforgeryResponse>("/api/auth/antiforgery"))!;
+        using var request = new HttpRequestMessage(method, path) { Content = body is null ? null : JsonContent.Create(body) };
+        request.Headers.Add("X-XSRF-TOKEN", csrf.Token);
+        return await client.SendAsync(request);
+    }
+    private sealed record AntiforgeryResponse(string Token);
 }

@@ -6,6 +6,7 @@ using BudgetApp.Application.Households;
 using BudgetApp.Application.Imports;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace BudgetApp.Server.Controllers;
 
@@ -234,13 +235,14 @@ public sealed class ImportsController(
         Guid importFileId,
         Guid draftId,
         UpdateImportDraftRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, [FromQuery] bool returnChanges = false,
+        [FromQuery] DateTimeOffset? expectedImportUpdatedAtUtc = null)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
         try
         {
-            await importReviewService.UpdateDraftAsync(
+            var result = await importReviewService.UpdateDraftAsync(
                 householdId,
                 userId,
                 importFileId,
@@ -249,8 +251,8 @@ public sealed class ImportsController(
                 request.Amount,
                 request.Description,
                 request.SelectedCategoryId,
-                cancellationToken, request.IncludeInHouseholdBudget, request.IncludeInPersonalBudget);
-            return NoContent();
+                cancellationToken, request.IncludeInHouseholdBudget, request.IncludeInPersonalBudget, expectedImportUpdatedAtUtc);
+            return returnChanges ? Ok(result) : NoContent();
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -259,17 +261,18 @@ public sealed class ImportsController(
     }
 
     [HttpPut("{importFileId:guid}/drafts")]
-    public async Task<ActionResult<BulkUpdateImportDraftsResponse>> BulkUpdateDrafts(
+    public async Task<IActionResult> BulkUpdateDrafts(
         Guid householdId,
         Guid importFileId,
         BulkUpdateImportDraftsRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, [FromQuery] bool returnChanges = false,
+        [FromQuery] DateTimeOffset? expectedImportUpdatedAtUtc = null)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
         try
         {
-            var savedRows = await importReviewService.BulkUpdateDraftsAsync(
+            var result = await importReviewService.BulkUpdateDraftsWithResultAsync(
                 householdId,
                 userId,
                 importFileId,
@@ -279,8 +282,8 @@ public sealed class ImportsController(
                     draft.Amount,
                     draft.Description,
                     draft.SelectedCategoryId, draft.IncludeInHouseholdBudget, draft.IncludeInPersonalBudget)).ToList(),
-                cancellationToken);
-            return Ok(new BulkUpdateImportDraftsResponse(savedRows));
+                cancellationToken, expectedImportUpdatedAtUtc);
+            return returnChanges ? Ok(result) : Ok(new BulkUpdateImportDraftsResponse(result.SavedRows));
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -294,21 +297,22 @@ public sealed class ImportsController(
         Guid importFileId,
         Guid draftId,
         ReviewImportDraftRequest request,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, [FromQuery] bool returnChanges = false,
+        [FromQuery] DateTimeOffset? expectedImportUpdatedAtUtc = null)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
         try
         {
-            await importReviewService.SetDecisionAsync(
+            var result = await importReviewService.SetDecisionAsync(
                 householdId,
                 userId,
                 importFileId,
                 draftId,
                 request.Decision,
                 request.AcknowledgePossibleDuplicate,
-                cancellationToken);
-            return NoContent();
+                cancellationToken, expectedImportUpdatedAtUtc);
+            return returnChanges ? Ok(result) : NoContent();
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -346,20 +350,21 @@ public sealed class ImportsController(
         Guid householdId,
         Guid importFileId,
         Guid draftId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, [FromQuery] bool returnChanges = false,
+        [FromQuery] DateTimeOffset? expectedImportUpdatedAtUtc = null)
     {
         if (!TryGetUserId(out var userId)) return Unauthorized();
 
         try
         {
-            await importReviewService.RemoveDraftAsync(
-                householdId, userId, importFileId, draftId, cancellationToken);
+            var result = await importReviewService.RemoveDraftAsync(
+                householdId, userId, importFileId, draftId, cancellationToken, expectedImportUpdatedAtUtc);
             logger.LogInformation(
                 "User {UserId} removed staged row {DraftId} from import {ImportFileId}",
                 userId,
                 draftId,
                 importFileId);
-            return NoContent();
+            return returnChanges ? Ok(result) : NoContent();
         }
         catch (Exception exception) when (IsExpected(exception))
         {
@@ -428,6 +433,7 @@ public sealed class ImportsController(
             CategoryNotFoundException or
             DuplicateImportFileException or
             TransactionImportRejectedException or
+            DbUpdateConcurrencyException or
             ArgumentException or
             InvalidOperationException;
 
@@ -435,6 +441,8 @@ public sealed class ImportsController(
     {
         var (status, title) = exception switch
         {
+            DbUpdateConcurrencyException or ImportReviewConflictException =>
+                (StatusCodes.Status409Conflict, "Import changed elsewhere"),
             HouseholdAccessDeniedException =>
                 (StatusCodes.Status403Forbidden, "Household access denied"),
             AccountNotFoundException =>
@@ -454,7 +462,9 @@ public sealed class ImportsController(
         {
             Status = status,
             Title = title,
-            Detail = exception.Message
+            Detail = exception is DbUpdateConcurrencyException
+                ? "This import changed while saving. Reload the affected rows before trying again."
+                : exception.Message
         });
     }
 

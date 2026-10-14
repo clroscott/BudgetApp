@@ -26,6 +26,7 @@ internal sealed class ImportReviewFixture : IImportRepository, IHouseholdAuthori
     internal int FullDraftReads { get; private set; }
     internal int DraftPageReads { get; private set; }
     internal int CountReads { get; private set; }
+    internal List<Guid> TargetedDraftReads { get; } = [];
     internal (DateOnly From, DateOnly To)? CandidateRange { get; private set; }
 
     internal ImportReviewFixture(int approvedRows = 0)
@@ -70,6 +71,13 @@ internal sealed class ImportReviewFixture : IImportRepository, IHouseholdAuthori
         ct.ThrowIfCancellationRequested();
         FullDraftReads++;
         return Task.FromResult(Drafts);
+    }
+
+    public Task<IReadOnlyList<ImportTransactionDraft>> GetDraftsForUpdateAsync(Guid importId, IReadOnlyCollection<Guid> ids, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        TargetedDraftReads.AddRange(ids);
+        return Task.FromResult<IReadOnlyList<ImportTransactionDraft>>(Drafts.Where(draft => ids.Contains(draft.Id) && draft.ImportFileId == importId).ToArray());
     }
 
     public Task<ImportDraftCounts> GetDraftCountsAsync(Guid importId, CancellationToken ct)
@@ -129,7 +137,7 @@ internal sealed class ImportReviewFixture : IImportRepository, IHouseholdAuthori
     public Task<bool> ExistsByAccountAndHashAsync(Guid accountId, string hash, CancellationToken ct, string? sourceWorksheetId = null) => throw new NotSupportedException();
     public Task AddAsync(ImportFile file, IReadOnlyCollection<ImportTransactionDraft> drafts, CancellationToken ct) => throw new NotSupportedException();
     public void Remove(ImportFile file) => throw new NotSupportedException();
-    public void RemoveDraft(ImportTransactionDraft draft) => throw new NotSupportedException();
+    public void RemoveDraft(ImportTransactionDraft draft) => Drafts = Drafts.Where(item => item.Id != draft.Id).ToArray();
 
     private sealed class FixedTimeProvider : TimeProvider
     {

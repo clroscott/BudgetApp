@@ -30,6 +30,9 @@ public interface IImportRepository
 
     Task<ImportDraftCounts> GetDraftCountsAsync(Guid importFileId, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<ImportTransactionDraft>> GetDraftsForUpdateAsync(
+        Guid importFileId, IReadOnlyCollection<Guid> draftIds, CancellationToken cancellationToken);
+
     Task<ImportDraftPageQueryResult> ListDraftPageAsync(
         Guid importFileId, Guid householdId, ImportDraftFilter filter,
         int page, int pageSize, CancellationToken cancellationToken);
