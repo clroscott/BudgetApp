@@ -5,7 +5,7 @@ import { HouseholdContext } from '../households/householdContext'
 import { RouterProvider } from '../routing/RouterProvider'
 import { AppLink } from '../routing/AppLink'
 import { useRouter } from '../routing/useRouter'
-import { householdsFixture } from '../test/fixtures'
+import { householdsFixture, otherHousehold } from '../test/fixtures'
 import { getCategories } from '../categories/categoryApi'
 import { getAccounts } from '../accounts/accountApi'
 import { getImportProfiles, inspectImportFile } from '../imports/importProfileApi'
@@ -14,6 +14,10 @@ import { getImports, getImport, getImportCategorizationRulePreview, bulkUpdateIm
 import { ImportReviewPage } from './ImportReviewPage'
 import { CsvImportPage } from './CsvImportPage'
 import { deferred } from '../test/deferred'
+import { draftPageFixture, mutationFixture } from '../test/importReviewResponses'
+import { getImportDraftPage, getBudgetChoicePreview, saveImportDrafts, saveImportDraft } from '../imports/importApi'
+import { decideImportDraft, deleteImportDraft } from '../imports/importApi'
+import { ApiError } from '../api/apiClient'
 
 vi.mock('../categories/categoryApi', async original => ({
   ...await original<typeof import('../categories/categoryApi')>(), getCategories: vi.fn(),
@@ -27,6 +31,8 @@ vi.mock('../imports/importProfileApi', async original => ({
 vi.mock('../imports/importApi', async original => ({
   ...await original<typeof import('../imports/importApi')>(), getImports: vi.fn(), getImport: vi.fn(),
   getImportCategorizationRulePreview: vi.fn(), bulkUpdateImportDrafts: vi.fn(), updateImportDraft: vi.fn(), uploadCsvImport: vi.fn(), completeImport: vi.fn(),
+  getImportDraftPage: vi.fn(), getBudgetChoicePreview: vi.fn(), saveImportDrafts: vi.fn(), saveImportDraft: vi.fn(),
+  decideImportDraft: vi.fn(), deleteImportDraft: vi.fn(),
 }))
 
 const listItem: ImportListItem = {
@@ -66,12 +72,177 @@ beforeEach(() => {
   vi.mocked(getImportProfiles).mockResolvedValue([])
   vi.mocked(getImports).mockResolvedValue(listPage([listItem, { ...listItem, id: 'import-b', originalFileName: 'other.csv' }]))
   vi.mocked(getImport).mockResolvedValue(detail())
+  let loadedBatch = detail()
+  // getImport is a full-batch fixture supplier here, not a production request.
+  vi.mocked(getImportDraftPage).mockImplementation(async (hh, id, filter, page, signal) => {
+    loadedBatch = await getImport(hh, id, signal)
+    return draftPageFixture(loadedBatch, filter, page)
+  })
+  vi.mocked(getBudgetChoicePreview).mockImplementation(async (_hh, _id, filter, personal, household, editedIds, version) => {
+    const filtered = draftPageFixture(loadedBatch, filter).totalCount
+    const candidates = loadedBatch.drafts.filter(draft => draftPageFixture({ ...loadedBatch, drafts: [draft] }, filter).totalCount > 0)
+    const eligible = candidates.filter(draft => !draft.approvedTransactionId && draft.reviewDecision !== 'Excluded' &&
+      draft.canChangePersonalInclusion !== false && (draft.canChangeHouseholdInclusion !== false || (draft.includeInHouseholdBudget ?? true) === household))
+    const items = eligible.filter(draft => editedIds.includes(draft.id) ||
+      (draft.includeInHouseholdBudget ?? true) !== household || (draft.includeInPersonalBudget ?? false) !== personal)
+    return { items, skipped: filtered - eligible.length, unchanged: eligible.length - items.length, updatedAtUtc: version }
+  })
+  vi.mocked(saveImportDrafts).mockImplementation(async (hh, id, updates) => {
+    await bulkUpdateImportDrafts(hh, id, updates)
+    return mutationFixture(loadedBatch, updates)
+  })
+  vi.mocked(saveImportDraft).mockImplementation(async (hh, id, draftId, update) => {
+    await updateImportDraft(hh, id, draftId, update)
+    return mutationFixture(loadedBatch, [{ ...update, draftId }])
+  })
   vi.mocked(getImportCategorizationRulePreview).mockResolvedValue({
     fillChangedRows: 0, reapplyChangedRows: 0, reapplyUnchangedRows: 0,
   })
 })
 
 describe('staged import edit protection', () => {
+  it('does not present an old empty filter as an empty new filter while its page is loading', async () => {
+    show(<ImportReviewPage />)
+    const filter = await screen.findByLabelText('Show transactions') as HTMLSelectElement
+    await waitFor(() => expect((screen.getByLabelText('Description') as HTMLInputElement).disabled).toBe(false))
+    fireEvent.change(filter, { target: { value: 'uncategorized' } })
+    await screen.findByText('No rows match this filter.')
+    const pending = deferred<Awaited<ReturnType<typeof getImportDraftPage>>>()
+    vi.mocked(getImportDraftPage).mockReturnValueOnce(pending.promise)
+    fireEvent.change(filter, { target: { value: 'all' } })
+    expect(screen.queryByText('No rows match this filter.')).toBeNull()
+    expect(screen.getByText('Refreshing matching rows; the previous count is not current.')).toBeTruthy()
+    await act(async () => pending.resolve(draftPageFixture(detail())))
+    await screen.findByLabelText('Description')
+    expect(screen.queryByText('No rows match this filter.')).toBeNull()
+  })
+
+  it('does not retain the previous household summary while loading the same URL in another household', async () => {
+    const view = show(<ImportReviewPage />)
+    await screen.findByRole('heading', { name: 'Review transactions in sample.csv' })
+    const pending = deferred<Awaited<ReturnType<typeof getImportDraftPage>>>()
+    vi.mocked(getImportDraftPage).mockReturnValueOnce(pending.promise)
+    vi.mocked(getImports).mockResolvedValue(listPage([]))
+    view.rerender(<RouterProvider><HouseholdContext.Provider value={{ ...householdsFixture(), currentHousehold: otherHousehold }}>
+      <Routes><ImportReviewPage /></Routes>
+    </HouseholdContext.Provider></RouterProvider>)
+    expect(screen.queryByRole('heading', { name: 'Review transactions in sample.csv' })).toBeNull()
+    expect(screen.queryByText('Sample account · CAD')).toBeNull()
+    await act(async () => pending.resolve(draftPageFixture({ ...detail(), originalFileName: 'other-household.csv' })))
+    await screen.findByRole('heading', { name: 'Review transactions in other-household.csv' })
+    expect(screen.queryByRole('heading', { name: 'Review transactions in sample.csv' })).toBeNull()
+  })
+
+  it('saves a single correction directly from the change response without rereading pages or the file list', async () => {
+    show(<ImportReviewPage />)
+    const input = await screen.findByLabelText('Description') as HTMLInputElement
+    await waitFor(() => expect(input.disabled).toBe(false))
+    fireEvent.change(input, { target: { value: 'Direct correction' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save corrections' }))
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Save all corrections (0)' }) as HTMLButtonElement).disabled).toBe(true))
+    expect(input.value).toBe('Direct correction')
+    expect(getImportDraftPage).toHaveBeenCalledOnce()
+    expect(getImports).toHaveBeenCalledOnce()
+    expect(saveImportDraft).toHaveBeenCalledWith('household-a', 'import-a', 'row-a',
+      expect.objectContaining({ description: 'Direct correction' }), '2026-10-14T12:00:00.0000000+00:00')
+  })
+
+  it('save-and-approve uses the corrected duplicate state and new version, without an intermediate page refresh', async () => {
+    const original = { ...detail(), drafts: [{ ...detail().drafts[0], duplicateStatus: 'PossibleDuplicate' }] }
+    vi.mocked(getImport).mockResolvedValue(original)
+    const corrected = mutationFixture(detail(), [{ draftId: 'row-a', transactionDate: '2026-01-01', amount: 100,
+      description: 'Changed duplicate', selectedCategoryId: 'housing' }])
+    vi.mocked(saveImportDraft).mockResolvedValue(corrected)
+    vi.mocked(decideImportDraft).mockResolvedValue({ ...corrected,
+      summary: { ...corrected.summary, counts: { ...corrected.summary.counts, approvedRows: 1, pendingRows: 0, validPendingRows: 0 } },
+      items: [{ ...corrected.items[0], reviewDecision: 'Approved' }] })
+    show(<ImportReviewPage />)
+    const input = await screen.findByLabelText('Description') as HTMLInputElement
+    await waitFor(() => expect(input.disabled).toBe(false))
+    fireEvent.change(input, { target: { value: 'Changed duplicate' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save and approve' }))
+    await waitFor(() => expect(decideImportDraft).toHaveBeenCalledExactlyOnceWith('household-a', 'import-a', 'row-a',
+      'Approved', false, corrected.summary.updatedAtUtc))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Save all corrections (1)' })).toBeNull())
+    expect(getImportDraftPage).toHaveBeenCalledOnce()
+    expect(getImports).toHaveBeenCalledOnce()
+  })
+
+  it('does not silently acknowledge a new possible duplicate revealed by saving a correction', async () => {
+    const corrected = mutationFixture(detail(), [{ draftId: 'row-a', transactionDate: '2026-01-01', amount: 100,
+      description: 'New match', selectedCategoryId: 'housing' }])
+    corrected.items[0].duplicateStatus = 'PossibleDuplicate'
+    vi.mocked(saveImportDraft).mockResolvedValue(corrected)
+    show(<ImportReviewPage />)
+    const input = await screen.findByLabelText('Description') as HTMLInputElement
+    await waitFor(() => expect(input.disabled).toBe(false))
+    fireEvent.change(input, { target: { value: 'New match' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save and approve' }))
+    await screen.findByText('Your correction was saved and now matches an existing transaction. Review the possible duplicate before approving it.')
+    expect(decideImportDraft).not.toHaveBeenCalled()
+    expect(input.value).toBe('New match')
+    expect(screen.getByText('Possible duplicate transaction')).toBeTruthy()
+    expect(getImportDraftPage).toHaveBeenCalledOnce()
+  })
+
+  it('keeps corrections after a conflict and requires a read-only reload before another save', async () => {
+    vi.mocked(saveImportDrafts).mockRejectedValueOnce(new ApiError('Import changed elsewhere', 409))
+    show(<ImportReviewPage />)
+    const input = await screen.findByLabelText('Description') as HTMLInputElement
+    await waitFor(() => expect(input.disabled).toBe(false))
+    fireEvent.change(input, { target: { value: 'Keep conflict correction' } })
+    fireEvent.click(await screen.findByRole('button', { name: 'Save all corrections (1)' }))
+    const reload = await screen.findByRole('button', { name: 'Reload rows without discarding corrections' })
+    expect(input.value).toBe('Keep conflict correction')
+    expect((screen.getByRole('button', { name: 'Save all corrections (1)' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(reload)
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Save all corrections (1)' }) as HTMLButtonElement).disabled).toBe(false))
+    expect(input.value).toBe('Keep conflict correction')
+    expect(saveImportDrafts).toHaveBeenCalledOnce()
+    expect(getImportDraftPage).toHaveBeenCalledTimes(2)
+    expect(window.confirm).not.toHaveBeenCalled()
+  })
+
+  it('refreshes rule counts after exclusion without reloading the file list or unchanged page', async () => {
+    vi.mocked(getImportCategorizationRulePreview).mockResolvedValue({ fillChangedRows: 1, reapplyChangedRows: 1, reapplyUnchangedRows: 0 })
+    const excluded = mutationFixture(detail(), [])
+    excluded.summary.counts = { ...excluded.summary.counts, pendingRows: 0, validPendingRows: 0, excludedRows: 1 }
+    excluded.items = [{ ...detail().drafts[0], reviewDecision: 'Excluded' }]
+    vi.mocked(decideImportDraft).mockResolvedValue(excluded)
+    show(<ImportReviewPage />)
+    await screen.findByRole('button', { name: 'Fill uncategorized (1)' })
+    const exclude = screen.getByRole('button', { name: 'Exclude' }) as HTMLButtonElement
+    await waitFor(() => expect(exclude.disabled).toBe(false))
+    vi.mocked(getImportCategorizationRulePreview).mockResolvedValue({ fillChangedRows: 0, reapplyChangedRows: 0, reapplyUnchangedRows: 0 })
+    fireEvent.click(exclude)
+    await screen.findByRole('button', { name: 'Fill uncategorized (0)' })
+    expect(getImportCategorizationRulePreview).toHaveBeenCalledTimes(2)
+    expect(getImportDraftPage).toHaveBeenCalledOnce()
+    expect(getImports).toHaveBeenCalledOnce()
+  })
+
+  it('removing the final row on page two clamps the page and leaves the controls usable', async () => {
+    const batch = detail()
+    batch.totalRows = 101
+    batch.drafts = Array.from({ length: 101 }, (_, index) => ({ ...batch.drafts[0], id: `row-${index}`, sourceRowNumber: index + 2 }))
+    vi.mocked(getImport).mockResolvedValue(batch)
+    show(<ImportReviewPage />)
+    const next = await screen.findByRole('button', { name: 'Next rows' }) as HTMLButtonElement
+    await waitFor(() => expect(next.disabled).toBe(false))
+    fireEvent.click(next)
+    const row = await screen.findByRole('article', { name: 'CSV row 102' })
+    fireEvent.click(within(row).getByRole('button', { name: 'Details' }))
+    const reduced = { ...batch, totalRows: 100, drafts: batch.drafts.slice(0, 100) }
+    vi.mocked(getImport).mockResolvedValue(reduced)
+    vi.mocked(deleteImportDraft).mockResolvedValue({ summary: draftPageFixture(reduced).summary, items: [], removedDraftIds: ['row-100'], savedRows: 0 })
+    vi.mocked(window.confirm).mockReturnValue(true)
+    fireEvent.click(within(row).getByRole('button', { name: 'Remove' }))
+    await screen.findByRole('article', { name: 'CSV row 2' })
+    await waitFor(() => expect((screen.getByLabelText('Bulk budget inclusion') as HTMLSelectElement).disabled).toBe(false))
+    expect(screen.queryByRole('navigation', { name: 'Import rows' })).toBeNull()
+  }, 15_000)
+
   it('keeps row controls unavailable through the full selected-refresh chain', async () => {
     show(<ImportReviewPage />)
     const input = await screen.findByLabelText('Description') as HTMLInputElement
@@ -182,7 +353,9 @@ describe('staged import edit protection', () => {
     fireEvent.change(input, { target: { value: 'My correction' } })
     await screen.findByRole('button', { name: 'Save all corrections (1)' })
     fireEvent.change(screen.getByLabelText('Bulk budget inclusion'), { target: { value: 'PersonalAndHousehold' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (1)' }))
+    const apply = await screen.findByRole('button', { name: 'Apply budget choices (1)' }) as HTMLButtonElement
+    await waitFor(() => expect(apply.disabled).toBe(false))
+    fireEvent.click(apply)
     expect((screen.getByLabelText('My personal budget') as HTMLInputElement).checked).toBe(false)
     vi.mocked(window.confirm).mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (1)' }))
@@ -217,7 +390,9 @@ describe('staged import edit protection', () => {
     fireEvent.change(screen.getByLabelText('Show transactions'), { target: { value: 'pending' } })
     fireEvent.change(screen.getByLabelText('Bulk budget inclusion'), { target: { value: 'Personal' } })
     vi.mocked(window.confirm).mockReturnValue(true)
-    fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (1)' }))
+    const apply = await screen.findByRole('button', { name: 'Apply budget choices (1)' }) as HTMLButtonElement
+    await waitFor(() => expect(apply.disabled).toBe(false))
+    fireEvent.click(apply)
     await screen.findByRole('button', { name: 'Save all corrections (1)' })
     vi.mocked(bulkUpdateImportDrafts).mockResolvedValue({ savedRows: 1 })
     fireEvent.click(screen.getByRole('button', { name: 'Save all corrections (1)' }))
@@ -244,10 +419,14 @@ describe('staged import edit protection', () => {
     vi.mocked(window.confirm).mockReturnValue(true)
     fireEvent.click(bulkTools.getByRole('button', { name: 'Apply budget choices (100)' }))
     await prepareTools.findByRole('button', { name: 'Save all corrections (100)' })
+    const confirmationsBeforePaging = vi.mocked(window.confirm).mock.calls.length
     fireEvent.click(pagination.getByRole('button', { name: 'Next rows' }))
     expect((await screen.findByLabelText('My personal budget') as HTMLInputElement).checked).toBe(false)
+    expect(window.confirm).toHaveBeenCalledTimes(confirmationsBeforePaging)
     fireEvent.change(bulkTools.getByLabelText('Apply to'), { target: { value: 'matching' } })
-    fireEvent.click(bulkTools.getByRole('button', { name: 'Apply budget choices (1)' }))
+    const matching = await bulkTools.findByRole('button', { name: 'Apply budget choices (1)' }) as HTMLButtonElement
+    await waitFor(() => expect(matching.disabled).toBe(false))
+    fireEvent.click(matching)
     await prepareTools.findByRole('button', { name: 'Save all corrections (101)' })
     const saved = { ...batch, drafts: batch.drafts.map(draft => ({ ...draft,
       includeInPersonalBudget: true, includeInHouseholdBudget: true })) }
@@ -294,7 +473,7 @@ describe('staged import edit protection', () => {
       expect.objectContaining({ draftId: 'row-a', includeInHouseholdBudget: true, includeInPersonalBudget: true }),
     ])
   })
-  it('canceled route/import/filter changes keep corrections and the selected import', async () => {
+  it('canceled route/import changes keep corrections, while safe row filters do not prompt', async () => {
     show(<ImportReviewPage />)
     const input = await screen.findByLabelText('Description') as HTMLInputElement
     await waitFor(() => expect(input.disabled).toBe(false))
@@ -307,9 +486,11 @@ describe('staged import edit protection', () => {
     fireEvent.change(screen.getByLabelText('File status'), { target: { value: 'completed' } })
     expect((screen.getByLabelText('File status') as HTMLSelectElement).value).toBe('inProgress')
     fireEvent.change(screen.getByLabelText('Show transactions'), { target: { value: 'uncategorized' } })
-    expect((screen.getByLabelText('Show transactions') as HTMLSelectElement).value).toBe('all')
-    expect(input.value).toBe('Unsaved correction')
-    expect(window.confirm).toHaveBeenCalledTimes(4)
+    await screen.findByText('No rows match this filter.')
+    expect((screen.getByLabelText('Show transactions') as HTMLSelectElement).value).toBe('uncategorized')
+    fireEvent.change(screen.getByLabelText('Show transactions'), { target: { value: 'all' } })
+    expect((await screen.findByLabelText('Description') as HTMLInputElement).value).toBe('Unsaved correction')
+    expect(window.confirm).toHaveBeenCalledTimes(3)
   })
   it('failed bulk saving retains corrections and protection; successful saving clears it', async () => {
     show(<ImportReviewPage />)
@@ -332,7 +513,7 @@ describe('staged import edit protection', () => {
     expect(window.confirm).toHaveBeenCalledTimes(1)
     expect(screen.getByText('Destination')).toBeTruthy()
   })
-  it.each(['bulk', 'row'])('preserves corrections after a successful %s save followed by a failed read; retry only reloads', async mode => {
+  it.each(['bulk'])('preserves corrections after a successful %s save followed by a failed read; retry only reloads', async mode => {
     show(<ImportReviewPage />)
     const input = await screen.findByLabelText('Description') as HTMLInputElement
     await waitFor(() => expect(input.disabled).toBe(false))
@@ -386,6 +567,40 @@ describe('staged import edit protection', () => {
     expect(match.value).toBe('Changed match text')
     expect(window.confirm).toHaveBeenCalledTimes(2)
   })
+  it('only prompts for unsaved rule-editor changes when switching row filters or pages', async () => {
+    const batch = detail()
+    batch.totalRows = 101
+    batch.drafts = Array.from({ length: 101 }, (_, index) => ({ ...batch.drafts[0], id: `row-${index}`, sourceRowNumber: index + 2 }))
+    vi.mocked(getImport).mockResolvedValue(batch)
+    show(<ImportReviewPage />)
+    const firstRow = await screen.findByRole('article', { name: 'CSV row 2' })
+    await waitFor(() => expect((within(firstRow).getByLabelText('Description') as HTMLInputElement).disabled).toBe(false))
+    fireEvent.click(within(firstRow).getByRole('button', { name: 'Details' }))
+    fireEvent.click(within(firstRow).getByRole('button', { name: 'Create rule' }))
+    const match = await screen.findByLabelText('Match text') as HTMLInputElement
+    fireEvent.change(match, { target: { value: 'Unsaved rule pattern' } })
+    const next = screen.getByRole('button', { name: 'Next rows' }) as HTMLButtonElement
+    await waitFor(() => expect(next.disabled).toBe(false))
+    fireEvent.change(screen.getByLabelText('Show transactions'), { target: { value: 'uncategorized' } })
+    expect((screen.getByLabelText('Show transactions') as HTMLSelectElement).value).toBe('all')
+    expect(match.value).toBe('Unsaved rule pattern')
+    fireEvent.click(next)
+    expect(window.confirm).toHaveBeenCalledTimes(2)
+    expect(window.confirm).toHaveBeenLastCalledWith(
+      'Discard your unsaved categorization-rule changes before changing rows? Transaction corrections will be kept.')
+    expect(getImportDraftPage).toHaveBeenCalledOnce()
+    vi.mocked(window.confirm).mockReturnValue(true)
+    fireEvent.click(next)
+    await screen.findByRole('article', { name: 'CSV row 102' })
+    expect(screen.queryByLabelText('Match text')).toBeNull()
+    const previous = screen.getByRole('button', { name: 'Previous rows' }) as HTMLButtonElement
+    await waitFor(() => expect(previous.disabled).toBe(false))
+    fireEvent.click(previous)
+    await screen.findByRole('article', { name: 'CSV row 2' })
+    expect(window.confirm).toHaveBeenCalledTimes(3)
+    expect(saveImportDraft).not.toHaveBeenCalled()
+    expect(saveImportDrafts).not.toHaveBeenCalled()
+  }, 15_000)
   it('does not silently refresh away a dirty row', async () => {
     show(<ImportReviewPage />)
     const input = await screen.findByLabelText('Description') as HTMLInputElement

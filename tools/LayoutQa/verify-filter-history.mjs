@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { household, importId, responseFor } from './fixtures.mjs'
+import { household, importId, responseFor, draftPageFor } from './fixtures.mjs'
 
 // Actual React app with disposable browser profiles and intercepted fictional
 // GETs. No application server, database, real email, or mutation is permitted.
@@ -56,7 +56,7 @@ try {
         let body
         if (url.pathname.endsWith('/imports')) body = { ...firstList,
           items: url.searchParams.get('filter') === 'Completed' ? [otherDetail] : [firstList.items[0]], totalCount: 1 }
-        else if (url.pathname.endsWith(`/imports/${otherId}`)) body = otherDetail
+        else if (url.pathname.endsWith(`/imports/${otherId}/drafts`)) body = draftPageFor(otherDetail, url.searchParams)
         else {
           try { body = responseFor(url.pathname) }
           catch (error) { errors.push(error.message); return route.abort() }

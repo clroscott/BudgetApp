@@ -194,6 +194,141 @@ public sealed class ImportStagingPersistenceTests
             inclusion => inclusion.UserId == data.UserId);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task TargetedSaveFailureRollsBackRowCountsAndAuditAndCanRetry(bool cancel)
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var fault = new InterruptDraftUpdate(cancel);
+        var options = new DbContextOptionsBuilder<BudgetAppDbContext>().UseSqlite(connection).AddInterceptors(fault).Options;
+        await using var context = new BudgetAppDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        var data = await AddDependencies(context);
+        var file = await AddImportFile(context, data);
+        var rows = new[] { CreateDraft(file.Id, 2, "First"), CreateDraft(file.Id, 3, "Second") };
+        file.StartProcessing(DateTimeOffset.UtcNow);
+        file.MarkReadyForReview(new ImportStatistics(2, 2, 0, 0, 0, 0), DateTimeOffset.UtcNow);
+        context.ImportTransactionDrafts.AddRange(rows);
+        await context.SaveChangesAsync();
+        var originalVersion = file.UpdatedAtUtc;
+        context.ChangeTracker.Clear();
+        using var provider = TargetedProvider(context);
+        using var scope = provider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<ImportReviewService>();
+        fault.Enabled = true;
+        var save = () => service.UpdateDraftAsync(data.Household.Id, data.UserId, file.Id, rows[0].Id,
+            rows[0].TransactionDate, 0m, "Unsaved correction", null, CancellationToken.None,
+            expectedImportUpdatedAtUtc: originalVersion);
+        if (cancel) await Assert.ThrowsAnyAsync<OperationCanceledException>(save);
+        else await Assert.ThrowsAsync<DbUpdateException>(save);
+        fault.Enabled = false;
+        context.ChangeTracker.Clear();
+        Assert.Empty(await context.AuditEvents.ToListAsync());
+        Assert.Empty(await context.Transactions.ToListAsync());
+        var storedFile = await context.ImportFiles.AsNoTracking().SingleAsync(item => item.Id == file.Id);
+        Assert.Equal(2, storedFile.ValidRowCount);
+        Assert.Equal(0, storedFile.InvalidRowCount);
+        Assert.Equal(originalVersion, storedFile.UpdatedAtUtc);
+        Assert.Equal("First", (await context.ImportTransactionDrafts.AsNoTracking().SingleAsync(item => item.Id == rows[0].Id)).Description);
+        var result = await save();
+        Assert.Equal(1, result.Summary.Counts.InvalidRows);
+        Assert.Single(context.ChangeTracker.Entries<ImportTransactionDraft>());
+        context.ChangeTracker.Clear();
+        Assert.Single(await context.AuditEvents.ToListAsync());
+        Assert.Empty(await context.Transactions.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ConcurrentDifferentRowChangeCannotLoseGlobalCountsOrPartiallySave()
+    {
+        await using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var race = new BeforeTargetedSave();
+        var options = new DbContextOptionsBuilder<BudgetAppDbContext>().UseSqlite(connection).AddInterceptors(race).Options;
+        await using var context = new BudgetAppDbContext(options);
+        await context.Database.EnsureCreatedAsync();
+        var data = await AddDependencies(context);
+        var file = await AddImportFile(context, data);
+        var rows = new[] { CreateDraft(file.Id, 2, "First"), CreateDraft(file.Id, 3, "Second"), CreateDraft(file.Id, 4, "Third") };
+        rows[0].SetDuplicateResult(ImportDraftDuplicateStatus.NoMatch, null, DateTimeOffset.UtcNow);
+        rows[0].Approve(data.UserId, false, DateTimeOffset.UtcNow);
+        file.StartProcessing(DateTimeOffset.UtcNow);
+        file.MarkReadyForReview(new ImportStatistics(3, 3, 0, 1, 0, 0), DateTimeOffset.UtcNow);
+        context.ImportTransactionDrafts.AddRange(rows);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        var winnerVersion = DateTimeOffset.UtcNow.AddMinutes(1);
+        race.Callback = async () =>
+        {
+            await using var winner = CreateContext(connection);
+            var winnerFile = await winner.ImportFiles.SingleAsync(item => item.Id == file.Id);
+            var otherRow = await winner.ImportTransactionDrafts.SingleAsync(item => item.Id == rows[1].Id);
+            otherRow.Exclude(data.UserId, winnerVersion);
+            winnerFile.RefreshStatistics(new ImportStatistics(3, 3, 0, 1, 1, 0), winnerVersion);
+            await winner.SaveChangesAsync();
+        };
+        using var provider = TargetedProvider(context);
+        using var scope = provider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<ImportReviewService>();
+        var save = () => service.UpdateDraftAsync(data.Household.Id, data.UserId, file.Id, rows[0].Id,
+            rows[0].TransactionDate, -11.2345m, "First correction", null, CancellationToken.None);
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(save);
+        context.ChangeTracker.Clear();
+        var storedFile = await context.ImportFiles.AsNoTracking().SingleAsync(item => item.Id == file.Id);
+        Assert.Equal(1, storedFile.ApprovedRowCount);
+        Assert.Equal(1, storedFile.ExcludedRowCount);
+        var storedRows = await context.ImportTransactionDrafts.AsNoTracking().Where(item => item.ImportFileId == file.Id).ToListAsync();
+        Assert.Equal("First", storedRows.Single(item => item.Id == rows[0].Id).Description);
+        Assert.Equal(ImportDraftReviewDecision.Excluded, storedRows.Single(item => item.Id == rows[1].Id).ReviewDecision);
+        Assert.Empty(await context.AuditEvents.ToListAsync());
+        Assert.Empty(await context.Transactions.ToListAsync());
+        var result = await save();
+        Assert.Equal(0, result.Summary.Counts.ApprovedRows);
+        Assert.Equal(1, result.Summary.Counts.ExcludedRows);
+        Assert.Equal(2, result.Summary.Counts.PendingRows);
+        Assert.True(result.Summary.UpdatedAtUtc > winnerVersion);
+        Assert.Single(context.ChangeTracker.Entries<ImportTransactionDraft>());
+        context.ChangeTracker.Clear();
+        Assert.Single(await context.AuditEvents.ToListAsync());
+    }
+
+    private static ServiceProvider TargetedProvider(BudgetAppDbContext context)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddInfrastructure("Server=unused;Database=unused;Integrated Security=True;", new EmailOptions(), new ApplicationUrlOptions(), false);
+        services.AddSingleton(context);
+        return services.BuildServiceProvider();
+    }
+    private sealed class BeforeTargetedSave : SaveChangesInterceptor
+    {
+        internal Func<Task>? Callback { get; set; }
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
+            InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            var action = Callback;
+            Callback = null;
+            if (action is not null) await action();
+            return result;
+        }
+    }
+    private sealed class InterruptDraftUpdate(bool cancel) : DbCommandInterceptor
+    {
+        internal bool Enabled { get; set; }
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(DbCommand command,
+            CommandEventData eventData, InterceptionResult<DbDataReader> result, CancellationToken cancellationToken = default)
+        {
+            if (Enabled && command.CommandText.Contains("UPDATE \"ImportTransactionDrafts\"", StringComparison.Ordinal))
+            {
+                if (cancel) throw new OperationCanceledException(new CancellationToken(true));
+                throw new InvalidOperationException("Synthetic targeted-row save failure.");
+            }
+            return ValueTask.FromResult(result);
+        }
+    }
+
     private sealed class InterruptSecondTransactionInsert(bool cancel) : DbCommandInterceptor
     {
         internal bool Enabled { get; set; }

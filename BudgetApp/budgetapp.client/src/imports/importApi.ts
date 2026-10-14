@@ -89,6 +89,78 @@ export interface ImportDraftUpdate {
   includeInPersonalBudget?: boolean
 }
 
+export type ImportDraftFilter = 'all' | 'pending' | 'uncategorized' | 'parentOnly' |
+  'categorized' | 'possibleDuplicates' | 'invalid' | 'approved' | 'excluded'
+const draftFilters: Record<ImportDraftFilter, string> = {
+  all: 'All', pending: 'Pending', uncategorized: 'Uncategorized', parentOnly: 'ParentOnly',
+  categorized: 'Categorized', possibleDuplicates: 'PossibleDuplicates', invalid: 'Invalid',
+  approved: 'Approved', excluded: 'Excluded',
+}
+export interface ImportDraftCounts {
+  totalRows: number; validRows: number; invalidRows: number; approvedRows: number
+  excludedRows: number; duplicateRows: number; pendingRows: number
+  uncheckedDuplicateRows: number; validPendingRows: number
+}
+export interface ImportReviewSummary {
+  id: string; originalFileName: string; accountName: string; currency: string; status: string
+  canEdit: boolean; counts: ImportDraftCounts; sourceWorksheetName?: string | null; updatedAtUtc: string
+}
+export interface ImportDraftPageResult {
+  summary: ImportReviewSummary; items: ImportDraftItem[]; filter: string
+  page: number; pageSize: number; totalCount: number; totalPages: number
+}
+export interface ImportDraftMutationResult {
+  summary: ImportReviewSummary; items: ImportDraftItem[]; removedDraftIds: string[]; savedRows: number
+}
+export type ImportBudgetChoiceCandidate = Pick<ImportDraftItem, 'id' | 'transactionDate' | 'amount' |
+  'description' | 'selectedCategoryId' | 'includeInHouseholdBudget' | 'includeInPersonalBudget'>
+export interface ImportBudgetChoicePreview {
+  items: ImportBudgetChoiceCandidate[]; skipped: number; unchanged: number; updatedAtUtc: string
+}
+
+function importPath(householdId: string, importFileId: string) {
+  if (!/^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})$/i.test(importFileId)) {
+    throw new Error('This import link is invalid. Choose an import from the list.')
+  }
+  return `/api/households/${householdId}/imports/${encodeURIComponent(importFileId)}`
+}
+
+export async function getImportDraftPage(householdId: string, importFileId: string,
+  filter: ImportDraftFilter, page: number, signal?: AbortSignal): Promise<ImportDraftPageResult> {
+  const query = new URLSearchParams({ filter: draftFilters[filter], page: String(page) })
+  return apiGet(`${importPath(householdId, importFileId)}/drafts?${query}`, signal)
+}
+
+export function getBudgetChoicePreview(householdId: string, importFileId: string,
+  filter: ImportDraftFilter, personal: boolean, household: boolean, editedDraftIds: string[],
+  expectedImportUpdatedAtUtc: string): Promise<ImportBudgetChoicePreview> {
+  // POST is a read-only preview; no draft or official transaction is written.
+  return apiPost(`${importPath(householdId, importFileId)}/budget-choice-preview`,
+    { filter: draftFilters[filter], personal, household, editedDraftIds, expectedImportUpdatedAtUtc })
+}
+
+function changeQuery(version: string) {
+  return new URLSearchParams({ returnChanges: 'true', expectedImportUpdatedAtUtc: version })
+}
+export function saveImportDraft(householdId: string, importFileId: string, draftId: string,
+  request: Omit<ImportDraftUpdate, 'draftId'>, version: string): Promise<ImportDraftMutationResult> {
+  return apiPut(`${importPath(householdId, importFileId)}/drafts/${draftId}?${changeQuery(version)}`, request)
+}
+export function saveImportDrafts(householdId: string, importFileId: string,
+  drafts: ImportDraftUpdate[], version: string): Promise<ImportDraftMutationResult> {
+  return apiPut(`${importPath(householdId, importFileId)}/drafts?${changeQuery(version)}`, { drafts })
+}
+export function decideImportDraft(householdId: string, importFileId: string, draftId: string,
+  decision: 'Approved' | 'Excluded' | 'Pending', acknowledgePossibleDuplicate: boolean,
+  version: string): Promise<ImportDraftMutationResult> {
+  return apiPost(`${importPath(householdId, importFileId)}/drafts/${draftId}/decision?${changeQuery(version)}`,
+    { decision, acknowledgePossibleDuplicate })
+}
+export function deleteImportDraft(householdId: string, importFileId: string,
+  draftId: string, version: string): Promise<ImportDraftMutationResult> {
+  return apiDelete<ImportDraftMutationResult>(`${importPath(householdId, importFileId)}/drafts/${draftId}?${changeQuery(version)}`)
+}
+
 export function uploadCsvImport(
   householdId: string,
   accountId: string,

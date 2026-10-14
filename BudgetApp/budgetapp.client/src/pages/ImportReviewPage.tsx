@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
+import { ApiError } from '../api/apiClient'
+import { useReadOwner } from '../api/useReadOwner'
 import { getCategories, type CategoryItem } from '../categories/categoryApi'
 import {
   createCategorizationRule,
@@ -15,31 +17,33 @@ import { helpWarnings } from '../help/helpTopics'
 import { useHouseholds } from '../households/useHouseholds'
 import {
   applyImportCategorizationRules,
-  bulkUpdateImportDrafts,
+  saveImportDrafts,
   bulkReviewImportDrafts,
   checkImportDuplicates,
   completeImport,
   discardImport,
-  getImport,
+  getImportDraftPage,
+  getBudgetChoicePreview,
   getImportCategorizationRulePreview,
   getImports,
-  removeImportDraft,
-  reviewImportDraft,
-  updateImportDraft,
+  deleteImportDraft,
+  decideImportDraft,
+  saveImportDraft,
   type ImportDraftItem,
   type ImportDraftUpdate,
   type ImportListResult,
   type ImportListFilter,
-  type ImportReviewDetail,
+  type ImportDraftMutationResult,
+  type ImportBudgetChoicePreview,
+  type ImportDraftFilter,
   type CategorizationRuleApplicationPreview,
 } from '../imports/importApi'
+import { reviewPageData, mergeDraftChanges, matchesDraftFilter, type ImportReviewPageData } from '../imports/importReviewState'
 import { AppLink } from '../routing/AppLink'
 import { useRouter } from '../routing/useRouter'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 import { previewBulkBudgetInclusion, type BudgetInclusionPreset, type PendingDraftUpdate } from '../imports/importBudgetInclusion'
 import { importReviewLocation, readImportReviewLocation, type ImportReviewSelection } from '../imports/importReviewLocation'
-
-const rowsPerPage = 100
 
 function findCategorySelection(categories: CategoryItem[], selectedCategoryId: string | null) {
   if (!selectedCategoryId) return { categoryId: '', subcategoryId: '' }
@@ -80,24 +84,18 @@ interface DraftRowProps {
   canEdit: boolean
   isCompleted: boolean
   onChanged: () => Promise<boolean>
+  onMutation: (result: ImportDraftMutationResult, holdRow?: boolean) => Promise<boolean>
+  getVersion: () => string
   onRuleCreated: () => Promise<number | null>
   onFillRemaining: () => Promise<boolean>
   onDirtyChange: (draftId: string, update: PendingDraftUpdate | null) => void
+  onRuleDirtyChange: (draftId: string, dirty: boolean) => void
   onRemove: (draftId: string, sourceRowNumber: number) => Promise<void>
   onError: (error: unknown) => void
   onBusyChange: (draftId: string, busy: boolean) => void
 }
 
-type DraftRowFilter =
-  | 'all'
-  | 'pending'
-  | 'uncategorized'
-  | 'parentOnly'
-  | 'categorized'
-  | 'possibleDuplicates'
-  | 'invalid'
-  | 'approved'
-  | 'excluded'
+type DraftRowFilter = ImportDraftFilter
 
 type RuleApplicationMode = 'fill' | 'reapply'
 
@@ -111,9 +109,12 @@ function DraftRow({
   canEdit,
   isCompleted,
   onChanged,
+  onMutation,
+  getVersion,
   onRuleCreated,
   onFillRemaining,
   onDirtyChange,
+  onRuleDirtyChange,
   onRemove,
   onError,
   onBusyChange,
@@ -145,10 +146,15 @@ function DraftRow({
     useState<CategorizationRuleMatchOperator>('Contains')
   const [ruleMatchValue, setRuleMatchValue] = useState('')
   const [savedRuleSnapshot, setSavedRuleSnapshot] = useState('')
+  const isRuleDirty = isRuleEditorOpen && JSON.stringify([ruleMatchOperator, ruleMatchValue]) !== savedRuleSnapshot
   const confirmRuleDiscard = useUnsavedChangesGuard(
-    isRuleEditorOpen && JSON.stringify([ruleMatchOperator, ruleMatchValue]) !== savedRuleSnapshot,
+    isRuleDirty,
     'Discard your unsaved rule changes for this import row?',
   )
+  useLayoutEffect(() => {
+    onRuleDirtyChange(draft.id, isRuleDirty)
+    return () => onRuleDirtyChange(draft.id, false)
+  }, [draft.id, isRuleDirty, onRuleDirtyChange])
   const editable = canEdit && !isCompleted && !draft.approvedTransactionId
   const selectedCategoryId = subcategoryId || categoryId || null
   useEffect(() => {
@@ -230,7 +236,7 @@ function DraftRow({
     setIsBusy(true)
     try {
       if (isDirty) {
-        await persistVisibleValues()
+        await persistVisibleValues(true)
         // Keep this row mounted while its rule is being created. Refreshing here
         // would immediately remove it from uncategorized/parent-only filters.
       }
@@ -297,19 +303,21 @@ function DraftRow({
     }
   }
 
-  const persistVisibleValues = async () => {
+  const persistVisibleValues = async (holdRow = false) => {
     const parsedAmount = amount.trim() === '' ? null : Number(amount)
     if (parsedAmount !== null && !Number.isFinite(parsedAmount)) {
       throw new Error('Amount must be a number.')
     }
 
-    await updateImportDraft(householdId, importFileId, draft.id, {
+    const result = await saveImportDraft(householdId, importFileId, draft.id, {
       transactionDate: transactionDate || null,
       amount: parsedAmount,
       description: description.trim() || null,
       selectedCategoryId,
       includeInHouseholdBudget: includeHousehold, includeInPersonalBudget: includePersonal,
-    })
+    }, getVersion())
+    await onMutation(result, holdRow)
+    return result
   }
 
   const save = async (event: FormEvent<HTMLFormElement>) => {
@@ -317,8 +325,7 @@ function DraftRow({
     setIsBusy(true)
     try {
       await persistVisibleValues()
-      if (await onChanged()) onDirtyChange(draft.id, null)
-      else onError(new Error('Your correction was saved, but could not be refreshed. Retry refreshing the selected import before making more changes.'))
+      onDirtyChange(draft.id, null)
     } catch (error) {
       onError(error)
     } finally {
@@ -331,19 +338,27 @@ function DraftRow({
   ) => {
     setIsBusy(true)
     try {
-      if (decision === 'Approved' && isDirty) {
-        await persistVisibleValues()
+      // Persist first, but keep the row mounted through its decision. Use the
+      // returned version/duplicate state, not the pre-correction snapshot.
+      const corrected = decision === 'Approved' && isDirty ? await persistVisibleValues(true) : null
+      const savedDraft = corrected?.items.find(item => item.id === draft.id) ?? draft
+      if (corrected && savedDraft.duplicateStatus === 'PossibleDuplicate' && draft.duplicateStatus !== 'PossibleDuplicate') {
+        await onMutation(corrected)
+        onDirtyChange(draft.id, null)
+        onError(new Error('Your correction was saved and now matches an existing transaction. Review the possible duplicate before approving it.'))
+        return
       }
-      await reviewImportDraft(
+      const result = await decideImportDraft(
         householdId,
         importFileId,
         draft.id,
         decision,
-        decision === 'Approved' && draft.duplicateStatus === 'PossibleDuplicate'
+        decision === 'Approved' && savedDraft.duplicateStatus === 'PossibleDuplicate'
           ? true
-          : draft.isDuplicateAcknowledged,
+          : savedDraft.isDuplicateAcknowledged,
+        getVersion(),
       )
-      if (await onChanged()) {
+      if (await onMutation(result)) {
         if (decision === 'Approved') onDirtyChange(draft.id, null)
       } else onError(new Error('Your review decision was saved, but could not be refreshed. Retry refreshing the selected import before making more changes.'))
     } catch (error) {
@@ -580,7 +595,8 @@ export function ImportReviewPage() {
   const setSelectedImportId = (importId: string) => changeSelection(current => ({ ...current, importId }))
   const setImportPage = (update: (current: number) => number) => changeSelection(current => ({ ...current, page: update(current.page) }))
   const [importList, setImportList] = useState<ImportListResult | null>(null)
-  const [detail, setDetail] = useState<ImportReviewDetail | null>(null)
+  const [detail, setDetail] = useState<ImportReviewPageData | null>(null)
+  const versionRef = useRef('')
   const [categories, setCategories] = useState<CategoryItem[]>([])
   const [rowFilter, setRowFilter] = useState<DraftRowFilter>('all')
   const [draftPage, setDraftPage] = useState(1)
@@ -593,31 +609,42 @@ export function ImportReviewPage() {
   const [ruleApplicationMessage, setRuleApplicationMessage] = useState('')
   const [isSavingAll, setIsSavingAll] = useState(false)
   const [isRefreshingSelected, setIsRefreshingSelected] = useState(false)
+  const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false)
+  const [isRemovingDraft, setIsRemovingDraft] = useState(false)
   const [bulkSaveMessage, setBulkSaveMessage] = useState('')
   const [completionMessage, setCompletionMessage] = useState('')
   const [bulkBudgetPreset, setBulkBudgetPreset] = useState<BudgetInclusionPreset | ''>('')
   const [bulkBudgetScope, setBulkBudgetScope] = useState<'matching' | 'page'>('matching')
   const [bulkBudgetMessage, setBulkBudgetMessage] = useState('')
+  const [matchingBudgetPreview, setMatchingBudgetPreview] = useState<ImportBudgetChoicePreview | null>(null)
+  const budgetPreviewCache = useRef<{ key: string; data: ImportBudgetChoicePreview; consideredIds: Set<string> } | null>(null)
   const [bulkDecision, setBulkDecision] = useState<
     'Approved' | 'Excluded' | 'Pending' | null
   >(null)
   const [dirtyDraftUpdates, setDirtyDraftUpdates] =
     useState<Map<string, PendingDraftUpdate>>(new Map())
   const [busyDraftIds, setBusyDraftIds] = useState<Set<string>>(new Set())
+  const dirtyRuleDraftIds = useRef(new Set<string>())
   const [errors, setErrors] = useState<string[]>([])
-  useUnsavedChangesGuard(dirtyDraftUpdates.size > 0, 'Discard your unsaved staged import corrections?')
+  const [writeNeedsReload, setWriteNeedsReload] = useState(false)
+  useUnsavedChangesGuard(dirtyDraftUpdates.size > 0,
+    'Discard your unsaved staged import corrections?')
 
   const listLoad = usePageLoad(`${currentHousehold?.id}/${importFilter}/${importPage}`)
-  const detailLoad = usePageLoad(`${currentHousehold?.id}/${selectedImportId}`)
+  const detailLoad = usePageLoad(`${currentHousehold?.id}/${selectedImportId}/${rowFilter}/${draftPage}`)
+  const selectedOwner = useReadOwner(`${currentHousehold?.id}/${selectedImportId}`)
   const categoryLoad = usePageLoad(`${currentHousehold?.id}/import-categories`)
   const rulePreviewLoad = usePageLoad(`${currentHousehold?.id}/${selectedImportId}/rule-preview`)
+  const editedDraftIdsKey = [...dirtyDraftUpdates.keys()].sort().join(',')
+  const budgetPreviewLoad = usePageLoad(`${currentHousehold?.id}/${selectedImportId}/${rowFilter}/${bulkBudgetPreset}/${detail?.updatedAtUtc}/${editedDraftIdsKey}`)
   const householdId = currentHousehold?.id
   const { run: runList } = listLoad
   const { run: runDetail } = detailLoad
   const { run: runCategories } = categoryLoad
   const { run: runPreview, markReady: markPreviewReady } = rulePreviewLoad
+  const { run: runBudgetPreview } = budgetPreviewLoad
   const isLoadingRulePreview = rulePreviewLoad.isPending
-  const isSelectedContextCurrent = detailLoad.captureContext()
+  const isSelectedContextCurrent = selectedOwner.captureContext()
   const isLoading = isRefreshingSelected || categoryLoad.isPending || (Boolean(selectedImportId) && detailLoad.isPending)
   const filteredImports = listLoad.hasData ? importList?.items ?? [] : []
   const selectedNotListed = selectedImportId && !filteredImports.some(item => item.id === selectedImportId)
@@ -637,6 +664,13 @@ export function ImportReviewPage() {
       return updated
     })
   }, [])
+  const handleRuleDirtyChange = useCallback((id: string, dirty: boolean) => {
+    if (dirty) dirtyRuleDraftIds.current.add(id)
+    else dirtyRuleDraftIds.current.delete(id)
+  }, [])
+  const confirmRowNavigation = () => dirtyRuleDraftIds.current.size === 0 || window.confirm(
+    'Discard your unsaved categorization-rule changes before changing rows? Transaction corrections will be kept.',
+  )
   const handleBusyChange = useCallback((id: string, busy: boolean) => {
     setBusyDraftIds(current => {
       if (current.has(id) === busy) return current
@@ -656,13 +690,53 @@ export function ImportReviewPage() {
     })
   }, [runList, importFilter, importPage, changeSelection])
 
-  const refreshDetail = async () => {
+  const refreshDetail = async (reloadList = true) => {
     if (!currentHousehold || !selectedImportId) return false
-    const stillSelected = detailLoad.captureContext()
-    const refreshed = await runDetail(signal => getImport(currentHousehold.id, selectedImportId, signal), setDetail)
+    const stillSelected = selectedOwner.captureContext()
+    const refreshed = await runDetail(signal => getImportDraftPage(currentHousehold.id, selectedImportId, rowFilter, draftPage, signal), applyPage)
     if (!stillSelected()) return false
-    await refreshList(currentHousehold.id)
+    if (reloadList) await refreshList(currentHousehold.id)
     return refreshed && stillSelected()
+  }
+
+  function applyPage(result: Awaited<ReturnType<typeof getImportDraftPage>>) {
+    versionRef.current = result.summary.updatedAtUtc
+    setDetail({ ...reviewPageData(result), loadedHouseholdId: householdId })
+    setDraftPage(result.page)
+  }
+
+  const refreshRows = async () => {
+    if (!householdId || !selectedImportId) return false
+    return runDetail(signal => getImportDraftPage(householdId, selectedImportId, rowFilter, draftPage, signal), applyPage)
+  }
+
+  const handleMutation = async (result: ImportDraftMutationResult, holdRow = false) => {
+    if (!isSelectedContextCurrent()) return false
+    versionRef.current = result.summary.updatedAtUtc
+    const previousRows = new Map(detail?.drafts.map(item => [item.id, item]) ?? [])
+    const membershipChanged = result.removedDraftIds.length > 0 || result.items.some(item => {
+      const previous = previousRows.get(item.id)
+      return !previous || matchesDraftFilter(previous, rowFilter, parentCategoryIds) !== matchesDraftFilter(item, rowFilter, parentCategoryIds)
+    })
+    setDetail(current => {
+      if (!current) return current
+      const merged = mergeDraftChanges(current, result)
+      // A rule editor / save-and-approve sequence must not disappear mid-action.
+      if (holdRow) merged.drafts = current.drafts
+      if (rowFilter === 'all') merged.totalCount = result.summary.counts.totalRows
+      return merged
+    })
+    setImportList(current => current ? { ...current, items: current.items.map(item => item.id === result.summary.id
+      ? { ...item, ...result.summary.counts, status: result.summary.status } : item) } : current)
+    // Pending <-> Approved does not change the rule matching set. Exclusion,
+    // removal, description and category changes do; no file-list reload is needed.
+    if (result.removedDraftIds.length > 0 || result.items.some(item => {
+      const previous = previousRows.get(item.id)
+      return !previous || previous.description !== item.description || previous.selectedCategoryId !== item.selectedCategoryId ||
+        (previous.reviewDecision === 'Excluded') !== (item.reviewDecision === 'Excluded')
+    })) void reloadRulePreview()
+    if (!holdRow && membershipChanged) return refreshRows()
+    return result.items.length > 0 || result.removedDraftIds.length > 0
   }
 
   const handleRefreshSelected = async () => {
@@ -672,6 +746,7 @@ export function ImportReviewPage() {
       if (await refreshDetail()) {
         setDirtyDraftUpdates(new Map())
         setErrors([])
+        setWriteNeedsReload(false)
         setCompletionMessage(current => current ? 'Import completed. Approved transactions were created.' : '')
       }
     } finally { if (isSelectedContextCurrent()) setIsRefreshingSelected(false) }
@@ -688,7 +763,7 @@ export function ImportReviewPage() {
   }, [householdId, selectedImportId, runPreview])
 
   const handleRuleCreated = async () => {
-    if (!isSelectedContextCurrent() || !await refreshDetail()) return null
+    if (!isSelectedContextCurrent() || !await refreshDetail(false)) return null
     return reloadRulePreview()
   }
 
@@ -714,20 +789,35 @@ export function ImportReviewPage() {
     setBulkBudgetPreset('')
     setBulkBudgetScope('matching')
     setBulkBudgetMessage('')
+    budgetPreviewCache.current = null
     setErrors([])
+    setWriteNeedsReload(false)
     setIsCompleting(false)
     setIsDiscarding(false)
     setIsSavingAll(false)
     setIsRefreshingSelected(false)
+    setIsCheckingDuplicates(false)
+    setIsRemovingDraft(false)
     setApplyingRuleMode(null)
     setBulkDecision(null)
     setRuleApplicationMessage('')
     setBusyDraftIds(new Set())
-    void runDetail(signal => getImport(householdId, selectedImportId, signal), setDetail)
-  }, [householdId, selectedImportId, runDetail])
+    versionRef.current = ''
+    setRowFilter('all')
+    setDraftPage(1)
+  }, [householdId, selectedImportId])
 
   useEffect(() => {
-    if (!currentHousehold || !detail?.canEdit ||
+    if (!householdId || !selectedImportId) return
+    void runDetail(signal => getImportDraftPage(householdId, selectedImportId, rowFilter, draftPage, signal), result => {
+      versionRef.current = result.summary.updatedAtUtc
+      setDetail({ ...reviewPageData(result), loadedHouseholdId: householdId })
+      setDraftPage(result.page)
+    })
+  }, [householdId, selectedImportId, rowFilter, draftPage, runDetail])
+
+  useEffect(() => {
+    if (!householdId || !detail?.canEdit ||
         detail.status !== 'ReadyForReview') {
       setRulePreview(null)
       markPreviewReady()
@@ -736,18 +826,12 @@ export function ImportReviewPage() {
 
     setRulePreview(null)
     void reloadRulePreview()
-  }, [currentHousehold, detail, markPreviewReady, reloadRulePreview])
+  }, [householdId, detail?.id, detail?.canEdit, detail?.status, markPreviewReady, reloadRulePreview])
 
   const pendingRows = useMemo(() => detail
     ? detail.totalRows - detail.approvedRows - detail.excludedRows
     : 0, [detail])
-  const pendingDrafts = detail?.drafts.filter(
-    draft => draft.reviewDecision === 'Pending') ?? []
-  const validPendingRows = pendingDrafts.filter(
-    draft => draft.validationStatus === 'Valid').length
-  const pendingPossibleDuplicates = pendingDrafts.filter(draft =>
-    draft.validationStatus === 'Valid' &&
-    draft.duplicateStatus === 'PossibleDuplicate').length
+  const validPendingRows = detail?.counts.validPendingRows ?? 0
   const reviewedRows = detail
     ? detail.approvedRows + detail.excludedRows
     : 0
@@ -760,58 +844,53 @@ export function ImportReviewPage() {
   const fillRulePotentialCount = rulePreview?.fillChangedRows ?? 0
   const reapplyRulePotentialCount = rulePreview?.reapplyChangedRows ?? 0
   const hasUnsavedRows = dirtyDraftUpdates.size > 0
-  const hasUncheckedDuplicates = detail?.drafts.some(
-    draft => draft.duplicateStatus === 'NotChecked') ?? false
-  const filteredDrafts = useMemo(() => {
-    const drafts = detail?.drafts ?? []
-    return drafts.filter(draft => {
-      switch (rowFilter) {
-        case 'pending':
-          return draft.reviewDecision === 'Pending'
-        case 'uncategorized':
-          return !draft.selectedCategoryId
-        case 'parentOnly':
-          return Boolean(
-            draft.selectedCategoryId &&
-            parentCategoryIds.has(draft.selectedCategoryId),
-          )
-        case 'categorized':
-          return Boolean(draft.selectedCategoryId)
-        case 'possibleDuplicates':
-          return draft.duplicateStatus === 'PossibleDuplicate'
-        case 'invalid':
-          return draft.validationStatus === 'Invalid'
-        case 'approved':
-          return draft.reviewDecision === 'Approved'
-        case 'excluded':
-          return draft.reviewDecision === 'Excluded'
-        default:
-          return true
-      }
-    })
-  }, [detail, parentCategoryIds, rowFilter])
-  const draftPageCount = Math.max(
-    1,
-    Math.ceil(filteredDrafts.length / rowsPerPage),
-  )
-  const visibleDrafts = filteredDrafts.slice(
-    (draftPage - 1) * rowsPerPage,
-    draftPage * rowsPerPage,
-  )
-  const bulkBudgetDrafts = bulkBudgetScope === 'page' ? visibleDrafts : filteredDrafts
+  const hasUncheckedDuplicates = (detail?.counts.uncheckedDuplicateRows ?? 0) > 0
+  const draftPageCount = Math.max(1, detail?.totalPages ?? 1)
+  const visibleDrafts = detailLoad.hasData ? detail?.drafts ?? [] : []
+  const matchingRowCount = detail?.totalCount ?? 0
+  const bulkBudgetDrafts = bulkBudgetScope === 'page' ? visibleDrafts : matchingBudgetPreview?.items ?? []
   const bulkBudgetPreview = previewBulkBudgetInclusion(bulkBudgetDrafts, dirtyDraftUpdates, bulkBudgetPreset)
-  const mutationBusy = isSavingAll || isCompleting || isDiscarding ||
+  if (bulkBudgetScope === 'matching' && matchingBudgetPreview) {
+    bulkBudgetPreview.skipped += matchingBudgetPreview.skipped
+    bulkBudgetPreview.unchanged += matchingBudgetPreview.unchanged
+  }
+  const mutationBusy = isSavingAll || isCompleting || isDiscarding || isCheckingDuplicates || isRemovingDraft ||
     bulkDecision !== null || applyingRuleMode !== null || busyDraftIds.size > 0
-  const bulkActionsBusy = isLoading || !categoryLoad.isFresh || (Boolean(selectedImportId) && !detailLoad.isFresh) || mutationBusy
+  const bulkActionsBusy = isLoading || writeNeedsReload || !categoryLoad.isFresh || (Boolean(selectedImportId) && !detailLoad.isFresh) || mutationBusy
 
+  const handleWriteError = (error: unknown) => {
+    if (!isSelectedContextCurrent()) return
+    setErrors(getErrorMessages(error))
+    if (error instanceof ApiError && (error.status === 0 || error.status === 409 || error.status >= 500)) setWriteNeedsReload(true)
+  }
+
+  const reloadBudgetPreview = useCallback(async () => {
+    if (!householdId || !selectedImportId || !bulkBudgetPreset || !detail?.updatedAtUtc ||
+      !detail.canEdit || detail.status !== 'ReadyForReview') return
+    const key = `${householdId}/${selectedImportId}/${rowFilter}/${bulkBudgetPreset}/${detail.updatedAtUtc}`
+    const editedIds = editedDraftIdsKey ? editedDraftIdsKey.split(',') : []
+    const cached = budgetPreviewCache.current
+    // Staging a preview's choices changes local flags, not their saved baseline.
+    // Don't download those same off-page baselines again. A new edited ID, saved
+    // version, filter, preset, household or import still requires a fresh read.
+    const canReuse = cached?.key === key && editedIds.every(id => cached.consideredIds.has(id))
+    await runBudgetPreview(() => canReuse ? Promise.resolve(cached.data) : getBudgetChoicePreview(householdId, selectedImportId, rowFilter,
+      bulkBudgetPreset === 'Personal' || bulkBudgetPreset === 'PersonalAndHousehold',
+      bulkBudgetPreset === 'Household' || bulkBudgetPreset === 'PersonalAndHousehold', editedIds, detail.updatedAtUtc), result => {
+        budgetPreviewCache.current = { key, data: result, consideredIds: new Set([...editedIds, ...result.items.map(item => item.id)]) }
+        setMatchingBudgetPreview(result)
+      })
+  }, [householdId, selectedImportId, rowFilter, bulkBudgetPreset, editedDraftIdsKey, detail?.updatedAtUtc,
+    detail?.canEdit, detail?.status, runBudgetPreview])
   useEffect(() => {
-    setDraftPage(current => Math.min(current, draftPageCount))
-  }, [draftPageCount])
+    if (bulkBudgetScope === 'matching' && detailLoad.isFresh && !mutationBusy) void reloadBudgetPreview()
+  }, [bulkBudgetScope, detailLoad.isFresh, mutationBusy, reloadBudgetPreview])
 
   if (!currentHousehold) return null
 
   const handleBulkBudgetInclusion = () => {
     if (!detail?.canEdit || detail.status !== 'ReadyForReview' || bulkActionsBusy ||
+      (bulkBudgetScope === 'matching' && !budgetPreviewLoad.isFresh) ||
       bulkBudgetPreview.changes.size === 0) return
     const label = { Personal: 'My personal budget only', Household: 'Household budget only',
       PersonalAndHousehold: 'Personal + Household', Neither: 'Neither budget' }[bulkBudgetPreset as BudgetInclusionPreset]
@@ -834,14 +913,15 @@ export function ImportReviewPage() {
 
   const handleDuplicates = async () => {
     if (!detail) return
+    setIsCheckingDuplicates(true)
     setErrors([])
     try {
       await checkImportDuplicates(currentHousehold.id, detail.id)
       if (!isSelectedContextCurrent()) return
-      await refreshDetail()
+      await refreshDetail(false)
     } catch (error) {
-      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
-    }
+      handleWriteError(error)
+    } finally { if (isSelectedContextCurrent()) setIsCheckingDuplicates(false) }
   }
 
   const handleApplyCategorizationRules = async (
@@ -864,7 +944,8 @@ export function ImportReviewPage() {
         mode === 'reapply',
       )
       if (!isSelectedContextCurrent()) return false
-      await refreshDetail()
+      await refreshDetail(false)
+      await reloadRulePreview()
       if (!isSelectedContextCurrent()) return false
       setRuleApplicationMessage(result.matchedRows === 0
         ? mode === 'fill'
@@ -879,7 +960,7 @@ export function ImportReviewPage() {
           } changed; ${result.unchangedRows} stayed the same.`)
       return true
     } catch (error) {
-      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
+      handleWriteError(error)
       return false
     } finally {
       if (isSelectedContextCurrent()) setApplyingRuleMode(null)
@@ -917,20 +998,23 @@ export function ImportReviewPage() {
     setErrors([])
     setBulkSaveMessage('')
     try {
-      const result = await bulkUpdateImportDrafts(
+      const result = await saveImportDrafts(
         currentHousehold.id,
         detail.id,
         updates,
+        versionRef.current,
       )
       if (!isSelectedContextCurrent()) return
-      const refreshed = await refreshDetail()
+      await handleMutation(result, true)
+      // A bulk command can add/remove matches outside the visible page.
+      const refreshed = await refreshRows()
       if (!isSelectedContextCurrent()) return
       if (refreshed) setDirtyDraftUpdates(new Map())
       setBulkSaveMessage(
         `${result.savedRows} ${result.savedRows === 1 ? 'correction was' : 'corrections were'} saved.${refreshed ? '' : ' Retry refreshing the selected import before making more changes.'}`,
       )
     } catch (error) {
-      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
+      handleWriteError(error)
     } finally {
       if (isSelectedContextCurrent()) setIsSavingAll(false)
     }
@@ -948,7 +1032,7 @@ export function ImportReviewPage() {
       if (isSelectedContextCurrent()) setCompletionMessage('Import completed. Approved transactions were created.' +
         (refreshed ? '' : ' Retry refreshing the selected import to see the updated result; do not create the transactions again.'))
     } catch (error) {
-      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
+      handleWriteError(error)
     } finally {
       if (isSelectedContextCurrent()) setIsCompleting(false)
     }
@@ -962,9 +1046,8 @@ export function ImportReviewPage() {
     const affectedRows = decision === 'Pending'
       ? reviewedRows
       : decision === 'Approved' ? validPendingRows : pendingRows
-    const duplicateNote = decision === 'Approved' && pendingPossibleDuplicates > 0
-      ? `, including ${pendingPossibleDuplicates} possible duplicate${
-        pendingPossibleDuplicates === 1 ? '' : 's'}`
+    const duplicateNote = decision === 'Approved' && (detail.duplicateRows > 0)
+      ? ', including any possible duplicates among these rows'
       : ''
     const confirmation = decision === 'Pending'
       ? `Reset ${affectedRows} reviewed row${affectedRows === 1 ? '' : 's'} to pending? Saved corrections and categories will be preserved.`
@@ -983,32 +1066,34 @@ export function ImportReviewPage() {
         decision,
       )
       if (!isSelectedContextCurrent()) return
-      await refreshDetail()
+      await refreshDetail(false)
+      if (decision !== 'Approved') await reloadRulePreview()
     } catch (error) {
-      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
+      handleWriteError(error)
     } finally {
       if (isSelectedContextCurrent()) setBulkDecision(null)
     }
   }
 
   const handleRemoveDraft = async (draftId: string, sourceRowNumber: number) => {
-    if (!detail || !window.confirm(
+    if (!detail || isRemovingDraft || !window.confirm(
       `Remove ${detail?.sourceWorksheetName ? 'Excel' : 'CSV'} row ${sourceRowNumber} from this staged import? This cannot be undone.`,
     )) return
 
+    setIsRemovingDraft(true)
     setErrors([])
     try {
-      await removeImportDraft(currentHousehold.id, detail.id, draftId)
+      const result = await deleteImportDraft(currentHousehold.id, detail.id, draftId, versionRef.current)
       if (!isSelectedContextCurrent()) return
       setDirtyDraftUpdates(current => {
         const updated = new Map(current)
         updated.delete(draftId)
         return updated
       })
-      await refreshDetail()
+      await handleMutation(result)
     } catch (error) {
-      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
-    }
+      handleWriteError(error)
+    } finally { if (isSelectedContextCurrent()) setIsRemovingDraft(false) }
   }
 
   const handleDiscard = async () => {
@@ -1027,7 +1112,7 @@ export function ImportReviewPage() {
       changeSelection(current => ({ ...current, importId: '' }), true)
       await refreshList(currentHousehold.id)
     } catch (error) {
-      if (isSelectedContextCurrent()) setErrors(getErrorMessages(error))
+      handleWriteError(error)
     } finally {
       if (isSelectedContextCurrent()) setIsDiscarding(false)
     }
@@ -1048,6 +1133,13 @@ export function ImportReviewPage() {
         <ContextualHelp topic="import-approval" />
         <p className="field-help">{helpWarnings.sharePersonalExpense}</p>
         <ErrorSummary errors={errors} />
+        {writeNeedsReload && <div role="alert">
+          <p>The save result is uncertain or this import changed elsewhere. Your corrections are kept. Reload before trying another save.</p>
+          <button type="button" className="secondary-button" disabled={isLoading || mutationBusy}
+            onClick={() => { void refreshRows().then(loaded => { if (loaded && isSelectedContextCurrent()) setWriteNeedsReload(false) }) }}>
+            Reload rows without discarding corrections
+          </button>
+        </div>}
         {completionMessage && <p role="status">{completionMessage}</p>}
         {!categoryLoad.isFresh && <PageLoadFeedback {...categoryLoad} subject="categories" onReload={() => void reloadCategories()} />}
         {detailLoad.hasData && detail?.canEdit && detail.status === 'ReadyForReview' && !rulePreviewLoad.isFresh &&
@@ -1135,7 +1227,8 @@ export function ImportReviewPage() {
             <h2>{noMatchingFilesLabel}</h2>
             <p>Choose another file status or upload a new file.</p>
           </div>
-        ) : detailLoad.hasData && detail && (
+        ) : (detailLoad.hasData || detailLoad.isPending && detail?.id === selectedImportId &&
+          detail.loadedHouseholdId === householdId) && detail && (
           <>
             <section className="import-review-summary">
               <div className="import-section-heading">
@@ -1294,8 +1387,8 @@ export function ImportReviewPage() {
             <div className="import-row-toolbar">
               <label>
                 <span>Show transactions</span>
-                <select value={rowFilter} onChange={event => {
-                  if (!confirmNavigation()) return
+                <select value={rowFilter} disabled={mutationBusy} onChange={event => {
+                  if (event.target.value === rowFilter || !confirmRowNavigation()) return
                   setRowFilter(event.target.value as DraftRowFilter)
                   setDraftPage(1)
                 }}>
@@ -1311,7 +1404,8 @@ export function ImportReviewPage() {
                 </select>
               </label>
               <span>
-                Showing <strong>{filteredDrafts.length}</strong> of {detail.totalRows} rows
+                {detailLoad.isFresh ? <>Showing <strong>{matchingRowCount}</strong> of {detail.totalRows} rows</>
+                  : 'Refreshing matching rows; the previous count is not current.'}
               </span>
             </div>
             {detail.canEdit && detail.status === 'ReadyForReview' && <section
@@ -1330,12 +1424,12 @@ export function ImportReviewPage() {
                 <label><span>Apply to</span>
                   <select value={bulkBudgetScope} disabled={bulkActionsBusy}
                     onChange={event => { setBulkBudgetScope(event.target.value as 'matching' | 'page'); setBulkBudgetMessage('') }}>
-                    <option value="matching">All matching rows ({filteredDrafts.length}), across pages</option>
+                    <option value="matching">All matching rows ({detailLoad.isFresh ? matchingRowCount : 'loading…'}), across pages</option>
                     <option value="page">Current page ({visibleDrafts.length})</option>
                   </select>
                 </label>
                 <button className="secondary-button" type="button"
-                  disabled={bulkActionsBusy || bulkBudgetPreview.changes.size === 0}
+                  disabled={bulkActionsBusy || (bulkBudgetScope === 'matching' && !budgetPreviewLoad.isFresh) || bulkBudgetPreview.changes.size === 0}
                   onClick={handleBulkBudgetInclusion}>Apply budget choices ({bulkBudgetPreview.changes.size})</button>
               </div>
               <p className="field-help">Keeps your existing corrections. Changes are staged, then saved with
@@ -1343,12 +1437,14 @@ export function ImportReviewPage() {
               {(bulkBudgetPreset === 'Household' || bulkBudgetPreset === 'PersonalAndHousehold') &&
                 <p className="action-consequence">{helpWarnings.sharePersonalExpense}</p>}
               <ContextualHelp topic="scope-privacy" />
-              {bulkBudgetPreset && <p className="field-help">{bulkBudgetPreview.changes.size} rows would change;
+              {bulkBudgetPreset && bulkBudgetScope === 'matching' && !budgetPreviewLoad.isFresh &&
+                <PageLoadFeedback {...budgetPreviewLoad} subject="matching budget choices" onReload={() => void reloadBudgetPreview()} />}
+              {bulkBudgetPreset && (bulkBudgetScope === 'page' || budgetPreviewLoad.isFresh) && <p className="field-help">{bulkBudgetPreview.changes.size} rows would change;
                 {' '}{bulkBudgetPreview.unchanged} already match; {bulkBudgetPreview.skipped} excluded, linked,
                 or permission-protected rows will be skipped.</p>}
               {bulkBudgetMessage && <p className="field-help" role="status">{bulkBudgetMessage}</p>}
             </section>}
-            {filteredDrafts.length === 0 ? (
+            {detailLoad.isFresh && matchingRowCount === 0 ? (
               <p className="empty-state">No rows match this filter.</p>
             ) : <>
               <p className="field-help" id="import-grid-help">Budget choices count the full amount in each selected budget.
@@ -1369,7 +1465,7 @@ export function ImportReviewPage() {
                 {visibleDrafts.map(draft => (
                   <DraftRow
                     sourceWorksheetName={detail.sourceWorksheetName}
-                    key={`${draft.id}-${draft.reviewDecision}-${draft.validationStatus}-${draft.duplicateStatus}`}
+                    key={draft.id}
                     householdId={currentHousehold.id}
                     importFileId={detail.id}
                     draft={draft}
@@ -1377,12 +1473,15 @@ export function ImportReviewPage() {
                     pendingUpdate={dirtyDraftUpdates.get(draft.id) ?? null}
                     canEdit={detail.canEdit && detail.status === 'ReadyForReview' && !bulkActionsBusy}
                     isCompleted={detail.status === 'Completed'}
-                    onChanged={refreshDetail}
+                    onChanged={refreshRows}
+                    onMutation={handleMutation}
+                    getVersion={() => versionRef.current}
                     onRuleCreated={handleRuleCreated}
                     onFillRemaining={() => handleApplyCategorizationRules('fill')}
                     onDirtyChange={handleDirtyChange}
+                    onRuleDirtyChange={handleRuleDirtyChange}
                     onRemove={handleRemoveDraft}
-                    onError={error => { if (isSelectedContextCurrent()) setErrors(getErrorMessages(error)) }}
+                    onError={handleWriteError}
                     onBusyChange={handleBusyChange}
                   />
                 ))}
@@ -1393,14 +1492,14 @@ export function ImportReviewPage() {
             {draftPageCount > 1 && (
               <nav className="import-pagination" aria-label="Import rows">
                 <button className="secondary-button" type="button"
-                  disabled={draftPage === 1}
-                  onClick={() => { if (confirmNavigation()) setDraftPage(current => current - 1) }}>
+                  disabled={draftPage === 1 || bulkActionsBusy}
+                  onClick={() => { if (confirmRowNavigation()) setDraftPage(current => current - 1) }}>
                   Previous rows
                 </button>
-                <span>Page {draftPage} of {draftPageCount}</span>
+                <span>{detailLoad.isFresh ? `Page ${draftPage} of ${draftPageCount}` : 'Refreshing row page…'}</span>
                 <button className="secondary-button" type="button"
-                  disabled={draftPage === draftPageCount}
-                  onClick={() => { if (confirmNavigation()) setDraftPage(current => current + 1) }}>
+                  disabled={draftPage === draftPageCount || bulkActionsBusy}
+                  onClick={() => { if (confirmRowNavigation()) setDraftPage(current => current + 1) }}>
                   Next rows
                 </button>
               </nav>

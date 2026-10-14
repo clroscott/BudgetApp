@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { importId, responseFor } from './fixtures.mjs'
+import { importId, responseFor, draftPageFor } from './fixtures.mjs'
 
 // Read-only actual-app QA: fictional GETs only; no database, SMTP, saved browser
 // profile or server proxy. A unique port fails safely if already occupied.
@@ -59,11 +59,11 @@ try {
           else if (holdList) { holdList = false; waitingList = true; await release.promise; body = both }
           else if (scenario === 'late-list' && waitingList) body = { ...both, items: [both.items[1]], totalCount: 1 }
           else body = both
-        } else if (url.pathname.endsWith(`/imports/${importId}`)) {
+        } else if (url.pathname.endsWith(`/imports/${importId}/drafts`)) {
           detailReads++
           if (holdDetail) { holdDetail = false; await release.promise }
-          body = firstDetail
-        } else if (url.pathname.endsWith(`/imports/${otherId}`)) body = otherDetail
+          body = draftPageFor(firstDetail, url.searchParams)
+        } else if (url.pathname.endsWith(`/imports/${otherId}/drafts`)) body = draftPageFor(otherDetail, url.searchParams)
         else if (url.pathname.endsWith('/categorization-rule-application-preview')) {
           previewReads++
           failed = failPreview

@@ -901,6 +901,104 @@ compatibility checks against the combined feature as well.
       account. Archived accounts reject new imports. Other households/private
       imports remain invisible; unsaved upload/review guards remain intact.
 
+### Bounded staged-import read contract (#212, outcome 1)
+
+This first slice added server reads; the review UI now uses them in outcome 3.
+Use disposable Development/Scratch imports and never
+Production data for large fixtures. See [read contract and measurements](import-draft-read-contract.md).
+The owner's full manual sweep remains deferred; these boxes are not marked from automated tests.
+
+- [ ] With 100/1,000/10,000 synthetic rows, request `/imports/{id}/drafts` under the
+  household API prefix. Each response has at most 100 items, full matching count,
+  and exact whole-batch counts. `/imports/{id}/summary` contains no draft/raw data.
+- [ ] Repeat and navigate first/last/out-of-range pages: source row order/IDs are
+  stable, pages do not overlap, and out-of-range pages clamp. Empty filters return
+  page 1/zero total pages; invalid page/filter queries reject rather than load all.
+- [ ] Compare every row filter with the existing review screen, including inactive
+  parents with children, root categories without children, uncategorized rows,
+  duplicates, invalid rows, approved/excluded rows. Global totals do not become
+  filter totals. Change a row's decision and verify counts and page normalization.
+- [ ] Compare paged rows with existing details for CSV/Excel provenance, labels,
+  signed four-decimal amounts, category selection and Personal/Household inclusion.
+  Raw/private source columns and another user's personal inclusion identity are
+  not exposed in the new response.
+- [ ] Check shared imports as Owner/Editor/Viewer, the Viewer's own personal import,
+  another member's private import and another household. Visibility/control flags
+  match existing rules. Anonymous/unconfirmed accounts cannot gain access.
+- [ ] Read a Completed import, then verify existing write commands still reject
+  changes. New GETs must create no transaction, audit write or email. Current UI
+  edits, all-matching bulk actions and completion still use their existing behavior.
+- [ ] Retest stale reads, failed saves,
+  explicit category clearing, cross-page dirty corrections, rules, Back/Forward,
+  canceled navigation, whole-matching bulk actions and idempotent completion.
+  Backend coverage alone does not substitute for the client/manual cases below.
+
+### Targeted staged-import commands (#212, outcome 2)
+
+See [command contract and verification](import-targeted-commands.md). The screen
+now uses targeted responses through outcome 3. Use disposable staging
+data; the full owner manual sweep remains deferred.
+
+- [ ] Save/correct, Approve, Exclude, return to Pending and Remove individual rows
+  in the existing review screen. Counts, duplicate warnings, category restrictions
+  and permissions match previous behavior. Removing the final row is still blocked.
+- [ ] Through the API, opt into `returnChanges=true`. Single-row replies contain
+  only that row (or removed ID), accurate whole-import counts and a new timestamp,
+  even with 10,000 staged rows. Old callers retain their prior response shapes.
+- [ ] Save multiple corrections spanning different pages, including an explicitly
+  cleared category and invalid values. All requested changes commit together;
+  an invalid/foreign row ID or protected choice must not partially save other rows.
+- [ ] Supply an obsolete `expectedImportUpdatedAtUtc`: get 409 and retain edits.
+  Use two editors concurrently; a losing save must not overwrite the winner or
+  corrupt global counters. Refresh/reconcile before a deliberate retry; do not
+  replay writes automatically or assume a missing response means no write occurred.
+- [ ] Interrupt/fail a save: row values, file counts and audit must roll back
+  together. Retrying explicitly saves once. Approval/correction/removal creates
+  no official transaction; final completion keeps its existing atomic/idempotent rules.
+- [ ] Repeat as shared-account Viewer, personal-account owner with Viewer role,
+  another member and outsider. Neither richer responses nor supplied timestamps
+  bypass privacy, Household inclusion restrictions, completed-import read-only
+  rules, confirmation or antiforgery protections.
+
+### Paged import review and bulk staging (#212, outcome 3)
+
+See [client integration, contracts and evidence](import-review-paging.md). These
+manual cases remain unchecked until the owner/tester actually performs them; no
+automated result substitutes for the deferred full #197 manual sweep.
+
+- [ ] With a disposable import containing more than 100 rows, edit page 1, change
+  row page/filter and return. Text, amount, explicitly cleared category, and budget
+  choices remain intact with no confirmation for safe row paging/filtering. A dirty
+  rule editor still prompts before changing rows, and Cancel preserves its text/page.
+  Cancel leaving the import/household and verify the selected
+  context and corrections do not change. Rule-editor cancellation remains protected.
+- [ ] Browser Network shows only `/drafts?filter=...&page=...` reads (at most 100
+  returned rows), not legacy full-detail downloads. Summary and matching counts
+  remain exact for 100/1,000/10,000 rows. Page navigation does not reload the file
+  list or rule preview. A normal single-row correction/decision updates from its
+  response; a changed filter membership/removal refills only a bounded page.
+- [ ] Choose page-only budget inclusion, then All matching rows across pages.
+  Confirm skipped Excluded/linked/permission-protected counts, preserved corrections,
+  and correct off-page inclusion. Cancel first; nothing changes. Apply next; no save
+  or official transaction occurs until Save all corrections. Reverse a choice and
+  verify unrelated edits remain. Saving returns changed approved rows to Pending.
+- [ ] Remove the last matching row on page 2. The grid moves to the remaining page,
+  statistics reconcile, and controls become usable again. Removing the final row
+  in the whole import remains blocked. Exclusion/removal/category/description/rule
+  changes update rule counts; Pending-to-Approved alone does not require a preview.
+- [ ] Save and approve a corrected row that newly matches an existing transaction.
+  The correction is saved, a duplicate warning is shown, and no approval is silently
+  sent. Review and approve deliberately. A corrected invalid row cannot be approved.
+- [ ] Simulate a rejected save, 409, lost response, failed page refresh and delayed
+  old response. Corrections survive. Uncertain/conflicting writes require read-only
+  reload/reconciliation before retry, without discarding edits or automatically
+  replaying writes. Old file/household/page responses cannot overwrite new edits.
+- [ ] Repeat permissions as shared-account Viewer and Viewer owning the selected
+  personal account. Personal-only permitted changes remain usable; forbidden
+  Household inclusion and another member's personal/import data remain unavailable.
+  Complete once and verify official transactions are not duplicated by retry;
+  completed rows stay readable and read-only. Test keyboard and narrow layouts.
+
 ### Query-only navigation and filter history (#215)
 
 Use Development/Scratch data only. The owner's full manual sweep remains deferred;

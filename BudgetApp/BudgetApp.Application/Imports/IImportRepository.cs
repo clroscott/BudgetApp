@@ -28,6 +28,21 @@ public interface IImportRepository
         bool forUpdate,
         CancellationToken cancellationToken);
 
+    Task<ImportDraftCounts> GetDraftCountsAsync(Guid importFileId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ImportRuleMatchingDraft>> ListRuleMatchingDraftsAsync(Guid importFileId, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<ImportTransactionDraft>> GetDraftsForUpdateAsync(
+        Guid importFileId, IReadOnlyCollection<Guid> draftIds, CancellationToken cancellationToken);
+
+    Task<ImportDraftPageQueryResult> ListDraftPageAsync(
+        Guid importFileId, Guid householdId, ImportDraftFilter filter,
+        int page, int pageSize, CancellationToken cancellationToken);
+
+    Task<ImportBudgetChoicePreview> PreviewBudgetChoicesAsync(
+        Guid importFileId, Guid householdId, Guid userId, ImportDraftFilter filter,
+        bool personal, bool household, bool isPersonalAccount, bool canChangeHousehold,
+        IReadOnlyCollection<Guid> editedDraftIds, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<DuplicateCandidate>> ListDuplicateCandidatesAsync(
         Guid accountId,
         DateOnly fromDate,

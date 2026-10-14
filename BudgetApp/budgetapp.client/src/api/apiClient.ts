@@ -189,7 +189,7 @@ export async function apiPut<TResponse>(
     : await response.json() as TResponse
 }
 
-export async function apiDelete(path: string): Promise<void> {
+export async function apiDelete<TResponse = void>(path: string): Promise<TResponse> {
   const token = await getAntiforgeryToken()
   const response = await fetchWithCredentials(path, {
     method: 'DELETE',
@@ -202,4 +202,5 @@ export async function apiDelete(path: string): Promise<void> {
   if (!response.ok) {
     throw await readApiError(response)
   }
+  return response.status === 204 ? undefined as TResponse : await response.json() as TResponse
 }
