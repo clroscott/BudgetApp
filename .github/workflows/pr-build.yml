@@ -25,8 +25,22 @@ jobs:
       - name: Restore .NET
         run: dotnet restore BudgetApp/BudgetApp.slnx
 
+      - name: Restore EF tooling
+        run: dotnet tool restore
+
+      - name: Verify EF tooling
+        run: dotnet tool run dotnet-ef --version
+
       - name: Build .NET
         run: dotnet build BudgetApp/BudgetApp.slnx --configuration Release --no-restore
+
+      - name: Verify EF migration discovery without a database
+        env:
+          DOTNET_ENVIRONMENT: Testing
+          ASPNETCORE_ENVIRONMENT: Testing
+          ConnectionStrings__BudgetApp: 'Server=127.0.0.1,1;Database=BudgetAppDependencySmoke;Integrated Security=True;Connect Timeout=1;'
+          Email__DeliveryMode: Disabled
+        run: dotnet tool run dotnet-ef migrations list --no-connect --no-build --configuration Release --project BudgetApp/BudgetApp.Infrastructure --startup-project BudgetApp/BudgetApp.Server
 
       - name: Test .NET
         run: dotnet test BudgetApp/BudgetApp.Tests/BudgetApp.Tests.csproj --configuration Release --no-build

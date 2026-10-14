@@ -286,6 +286,31 @@ Use `npm.cmd ci`, rather than manually editing `node_modules`, so the lock file 
 
 Run commands from the repository root and use the exact project paths shown in step 6. The Infrastructure project owns migrations; the Server project supplies startup configuration.
 
+## Updating backend dependencies
+
+Update all `Microsoft.EntityFrameworkCore.*` references together, including SQL
+Server, the SQLite test provider, and both Design references. Keep
+`Microsoft.AspNetCore.Identity.EntityFrameworkCore` and the repository-local
+`dotnet-ef` version in `.config/dotnet-tools.json` aligned with that update.
+Dependabot groups these version updates in an `entity-framework` pull request.
+Check provider dependencies too: the SQLite native library pin must satisfy the
+SQLite provider's required version.
+
+After a coordinated update, restore the solution and local tools, build, and run
+the backend tests. CI also checks `dotnet-ef --version` and discovers migrations
+with `--no-connect`, using Testing configuration, disabled email, and a dummy
+connection string. Package maintenance alone must not run `database update`,
+generate a new migration, or connect to Development/Production databases.
+
+Run NuGet vulnerability checks with transitive packages included against the
+individual `.csproj` files; the solution's JavaScript `.esproj` is not supported
+by that command. Do not suppress vulnerability warnings to get a green build.
+The explicit `System.Security.Cryptography.Pkcs` reference protects the shared
+MimeKit/SQL Client dependency from resolving to a vulnerable older version
+([Microsoft advisory](https://github.com/advisories/GHSA-846f-f764-76mx)).
+Package updates do not update the machine's installed .NET SDK/runtime; maintain
+those separately through Visual Studio/.NET servicing.
+
 ## Related Documentation
 
 - [Local development and secrets](local-development.md)
