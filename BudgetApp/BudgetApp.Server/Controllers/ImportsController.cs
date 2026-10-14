@@ -70,6 +70,32 @@ public sealed class ImportsController(
         }
     }
 
+    [HttpGet("{importFileId:guid}/summary")]
+    public async Task<ActionResult<ImportReviewSummary>> ReviewSummary(
+        Guid householdId, Guid importFileId, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        try
+        {
+            return Ok(await importReviewService.GetReviewSummaryAsync(householdId, userId, importFileId, cancellationToken));
+        }
+        catch (Exception exception) when (IsExpected(exception)) { return MapException(exception); }
+    }
+
+    [HttpGet("{importFileId:guid}/drafts")]
+    public async Task<ActionResult<ImportDraftPageResult>> Drafts(
+        Guid householdId, Guid importFileId, CancellationToken cancellationToken,
+        [FromQuery] ImportDraftFilter filter = ImportDraftFilter.All,
+        [FromQuery, Range(1, int.MaxValue)] int page = 1)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        try
+        {
+            return Ok(await importReviewService.GetDraftPageAsync(householdId, userId, importFileId, filter, page, cancellationToken));
+        }
+        catch (Exception exception) when (IsExpected(exception)) { return MapException(exception); }
+    }
+
     [HttpPost]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(TransactionImportLimits.MaxRequestSizeBytes)]

@@ -901,6 +901,38 @@ compatibility checks against the combined feature as well.
       account. Archived accounts reject new imports. Other households/private
       imports remain invisible; unsaved upload/review guards remain intact.
 
+### Bounded staged-import read contract (#212, outcome 1)
+
+This slice adds server reads only; the existing review UI is unchanged until the
+later client-paging outcome. Use disposable Development/Scratch imports and never
+Production data for large fixtures. See [read contract and measurements](import-draft-read-contract.md).
+The owner's full manual sweep remains deferred; these boxes are not marked from automated tests.
+
+- [ ] With 100/1,000/10,000 synthetic rows, request `/imports/{id}/drafts` under the
+  household API prefix. Each response has at most 100 items, full matching count,
+  and exact whole-batch counts. `/imports/{id}/summary` contains no draft/raw data.
+- [ ] Repeat and navigate first/last/out-of-range pages: source row order/IDs are
+  stable, pages do not overlap, and out-of-range pages clamp. Empty filters return
+  page 1/zero total pages; invalid page/filter queries reject rather than load all.
+- [ ] Compare every row filter with the existing review screen, including inactive
+  parents with children, root categories without children, uncategorized rows,
+  duplicates, invalid rows, approved/excluded rows. Global totals do not become
+  filter totals. Change a row's decision and verify counts and page normalization.
+- [ ] Compare paged rows with existing details for CSV/Excel provenance, labels,
+  signed four-decimal amounts, category selection and Personal/Household inclusion.
+  Raw/private source columns and another user's personal inclusion identity are
+  not exposed in the new response.
+- [ ] Check shared imports as Owner/Editor/Viewer, the Viewer's own personal import,
+  another member's private import and another household. Visibility/control flags
+  match existing rules. Anonymous/unconfirmed accounts cannot gain access.
+- [ ] Read a Completed import, then verify existing write commands still reject
+  changes. New GETs must create no transaction, audit write or email. Current UI
+  edits, all-matching bulk actions and completion still use their existing behavior.
+- [ ] During the later command/client slices, retest stale reads, failed saves,
+  explicit category clearing, cross-page dirty corrections, rules, Back/Forward,
+  canceled navigation, whole-matching bulk actions and idempotent completion.
+  Do not treat this backend-only slice as completion of all #212 acceptance criteria.
+
 ### Query-only navigation and filter history (#215)
 
 Use Development/Scratch data only. The owner's full manual sweep remains deferred;

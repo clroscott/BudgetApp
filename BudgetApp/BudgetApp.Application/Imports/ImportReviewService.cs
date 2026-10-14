@@ -19,6 +19,7 @@ public sealed class ImportReviewService(
     AuditWriter? auditWriter = null)
 {
     public const int ImportListPageSize = 50;
+    public const int DraftPageSize = 100;
 
     public async Task<ImportListResult> ListAsync(
         Guid householdId,
@@ -70,6 +71,30 @@ public sealed class ImportReviewService(
         var drafts = await importRepository.ListDraftsAsync(
             importFileId, forUpdate: false, cancellationToken);
         return ToDetail(access, drafts, role, userId);
+    }
+
+    public async Task<ImportReviewSummary> GetReviewSummaryAsync(
+        Guid householdId, Guid userId, Guid importFileId, CancellationToken cancellationToken)
+    {
+        var (access, role) = await GetAuthorized(householdId, userId, importFileId, forUpdate: false, cancellationToken);
+        var counts = await importRepository.GetDraftCountsAsync(importFileId, cancellationToken);
+        return ToSummary(access, counts, role, userId);
+    }
+
+    public async Task<ImportDraftPageResult> GetDraftPageAsync(
+        Guid householdId, Guid userId, Guid importFileId, ImportDraftFilter filter,
+        int page, CancellationToken cancellationToken)
+    {
+        if (!Enum.IsDefined(filter)) throw new ArgumentException("Choose a supported row filter.", nameof(filter));
+        if (page < 1) throw new ArgumentException("Row page must be at least 1.", nameof(page));
+        var (access, role) = await GetAuthorized(householdId, userId, importFileId, forUpdate: false, cancellationToken);
+        var counts = await importRepository.GetDraftCountsAsync(importFileId, cancellationToken);
+        var result = await importRepository.ListDraftPageAsync(
+            importFileId, householdId, filter, page, DraftPageSize, cancellationToken);
+        return new ImportDraftPageResult(ToSummary(access, counts, role, userId),
+            result.Items.Select(draft => ToDraftItem(draft, access, role, userId)).ToList(),
+            filter.ToString(), result.Page, DraftPageSize, result.TotalCount,
+            (int)Math.Ceiling((double)result.TotalCount / DraftPageSize));
     }
 
     public async Task CheckDuplicatesAsync(
@@ -839,7 +864,15 @@ public sealed class ImportReviewService(
             drafts.Select(draft => ToDraftItem(draft, access, role, userId)).ToList(), file.SourceWorksheetName);
     }
 
-    private static ImportDraftItem ToDraftItem(ImportTransactionDraft draft, ImportAccessRecord access, HouseholdRole role, Guid userId)
+    private static ImportReviewSummary ToSummary(ImportAccessRecord access, ImportDraftCounts counts, HouseholdRole role, Guid userId) =>
+        new(access.ImportFile.Id, access.ImportFile.OriginalFileName, access.AccountName, access.Currency,
+            access.ImportFile.Status.ToString(), CanEdit(access.IsPersonalAccount, access.AccountOwnerUserId, role, userId),
+            counts, access.ImportFile.SourceWorksheetName, access.ImportFile.UpdatedAtUtc);
+
+    private static ImportDraftItem ToDraftItem(ImportTransactionDraft draft, ImportAccessRecord access, HouseholdRole role, Guid userId) =>
+        ToDraftItem(ImportDraftReadRecord.FromDraft(draft), access, role, userId);
+
+    private static ImportDraftItem ToDraftItem(ImportDraftReadRecord draft, ImportAccessRecord access, HouseholdRole role, Guid userId)
     {
         var (categoryName, subcategoryName) = ReadImportedCategoryNames(draft.RawData);
         return new ImportDraftItem(

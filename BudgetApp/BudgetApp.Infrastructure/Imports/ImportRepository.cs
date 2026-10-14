@@ -124,6 +124,60 @@ internal sealed class ImportRepository(BudgetAppDbContext dbContext)
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<ImportDraftCounts> GetDraftCountsAsync(Guid importFileId, CancellationToken cancellationToken) =>
+        await dbContext.ImportTransactionDrafts.AsNoTracking()
+            .Where(draft => draft.ImportFileId == importFileId).GroupBy(_ => 1)
+            .Select(group => new ImportDraftCounts(
+                group.Count(),
+                group.Count(draft => draft.ValidationStatus == ImportDraftValidationStatus.Valid),
+                group.Count(draft => draft.ValidationStatus == ImportDraftValidationStatus.Invalid),
+                group.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Approved),
+                group.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Excluded),
+                group.Count(draft => draft.DuplicateStatus == ImportDraftDuplicateStatus.PossibleDuplicate),
+                group.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Pending),
+                group.Count(draft => draft.DuplicateStatus == ImportDraftDuplicateStatus.NotChecked),
+                group.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Pending &&
+                    draft.ValidationStatus == ImportDraftValidationStatus.Valid)))
+            .SingleOrDefaultAsync(cancellationToken) ?? ImportDraftCounts.Empty;
+
+    public async Task<ImportDraftPageQueryResult> ListDraftPageAsync(
+        Guid importFileId, Guid householdId, ImportDraftFilter filter,
+        int page, int pageSize, CancellationToken cancellationToken)
+    {
+        if (!Enum.IsDefined(filter)) throw new ArgumentException("Choose a supported row filter.", nameof(filter));
+        if (page < 1) throw new ArgumentOutOfRangeException(nameof(page));
+        if (pageSize < 1 || pageSize > ImportReviewService.DraftPageSize) throw new ArgumentOutOfRangeException(nameof(pageSize));
+        var query = dbContext.ImportTransactionDrafts.AsNoTracking()
+            .Where(draft => draft.ImportFileId == importFileId);
+        query = filter switch
+        {
+            ImportDraftFilter.Pending => query.Where(draft => draft.ReviewDecision == ImportDraftReviewDecision.Pending),
+            ImportDraftFilter.Uncategorized => query.Where(draft => draft.SelectedCategoryId == null),
+            ImportDraftFilter.ParentOnly => query.Where(draft => dbContext.Categories.Any(parent =>
+                parent.Id == draft.SelectedCategoryId && parent.HouseholdId == householdId &&
+                dbContext.Categories.Any(child => child.HouseholdId == householdId && child.ParentCategoryId == parent.Id))),
+            ImportDraftFilter.Categorized => query.Where(draft => draft.SelectedCategoryId != null),
+            ImportDraftFilter.PossibleDuplicates => query.Where(draft => draft.DuplicateStatus == ImportDraftDuplicateStatus.PossibleDuplicate),
+            ImportDraftFilter.Invalid => query.Where(draft => draft.ValidationStatus == ImportDraftValidationStatus.Invalid),
+            ImportDraftFilter.Approved => query.Where(draft => draft.ReviewDecision == ImportDraftReviewDecision.Approved),
+            ImportDraftFilter.Excluded => query.Where(draft => draft.ReviewDecision == ImportDraftReviewDecision.Excluded),
+            _ => query
+        };
+        var total = await query.CountAsync(cancellationToken);
+        var lastPage = Math.Max(1, (int)Math.Ceiling((double)total / pageSize));
+        var actualPage = Math.Min(page, lastPage);
+        var items = await query.OrderBy(draft => draft.SourceRowNumber).ThenBy(draft => draft.Id)
+            .Skip((actualPage - 1) * pageSize).Take(pageSize)
+            .Select(draft => new ImportDraftReadRecord(
+                draft.Id, draft.SourceRowNumber, draft.RawData, draft.TransactionDate, draft.Amount,
+                draft.Description, draft.SelectedCategoryId, draft.ValidationStatus, draft.ValidationMessage,
+                draft.DuplicateStatus, draft.PossibleMatchingTransactionId, draft.ReviewDecision,
+                draft.IsDuplicateAcknowledged, draft.ApprovedTransactionId,
+                draft.IncludeInHouseholdBudget, draft.PersonalBudgetUserId))
+            .ToListAsync(cancellationToken);
+        return new ImportDraftPageQueryResult(items, actualPage, total);
+    }
+
     public async Task<IReadOnlyList<DuplicateCandidate>> ListDuplicateCandidatesAsync(
         Guid accountId,
         DateOnly fromDate,

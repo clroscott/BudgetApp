@@ -23,6 +23,9 @@ internal sealed class ImportReviewFixture : IImportRepository, IHouseholdAuthori
     internal int CandidateReads { get; private set; }
     internal int TransactionAdds { get; private set; }
     internal int Saves { get; private set; }
+    internal int FullDraftReads { get; private set; }
+    internal int DraftPageReads { get; private set; }
+    internal int CountReads { get; private set; }
     internal (DateOnly From, DateOnly To)? CandidateRange { get; private set; }
 
     internal ImportReviewFixture(int approvedRows = 0)
@@ -65,7 +68,34 @@ internal sealed class ImportReviewFixture : IImportRepository, IHouseholdAuthori
     public Task<IReadOnlyList<ImportTransactionDraft>> ListDraftsAsync(Guid importId, bool update, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        FullDraftReads++;
         return Task.FromResult(Drafts);
+    }
+
+    public Task<ImportDraftCounts> GetDraftCountsAsync(Guid importId, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        CountReads++;
+        return Task.FromResult(new ImportDraftCounts(Drafts.Count,
+            Drafts.Count(draft => draft.ValidationStatus == ImportDraftValidationStatus.Valid),
+            Drafts.Count(draft => draft.ValidationStatus == ImportDraftValidationStatus.Invalid),
+            Drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Approved),
+            Drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Excluded),
+            Drafts.Count(draft => draft.DuplicateStatus == ImportDraftDuplicateStatus.PossibleDuplicate),
+            Drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Pending),
+            Drafts.Count(draft => draft.DuplicateStatus == ImportDraftDuplicateStatus.NotChecked),
+            Drafts.Count(draft => draft.ReviewDecision == ImportDraftReviewDecision.Pending && draft.ValidationStatus == ImportDraftValidationStatus.Valid)));
+    }
+
+    public Task<ImportDraftPageQueryResult> ListDraftPageAsync(Guid importId, Guid householdId, ImportDraftFilter filter,
+        int page, int pageSize, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (filter != ImportDraftFilter.All) throw new NotSupportedException("Filter parity uses the real repository integration tests.");
+        DraftPageReads++;
+        var actualPage = Math.Min(page, Math.Max(1, (int)Math.Ceiling((double)Drafts.Count / pageSize)));
+        return Task.FromResult(new ImportDraftPageQueryResult(Drafts.OrderBy(draft => draft.SourceRowNumber).ThenBy(draft => draft.Id)
+            .Skip((actualPage - 1) * pageSize).Take(pageSize).Select(ImportDraftReadRecord.FromDraft).ToList(), actualPage, Drafts.Count));
     }
 
     public Task<IReadOnlyList<DuplicateCandidate>> ListDuplicateCandidatesAsync(Guid accountId,

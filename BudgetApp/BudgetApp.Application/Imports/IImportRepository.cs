@@ -28,6 +28,12 @@ public interface IImportRepository
         bool forUpdate,
         CancellationToken cancellationToken);
 
+    Task<ImportDraftCounts> GetDraftCountsAsync(Guid importFileId, CancellationToken cancellationToken);
+
+    Task<ImportDraftPageQueryResult> ListDraftPageAsync(
+        Guid importFileId, Guid householdId, ImportDraftFilter filter,
+        int page, int pageSize, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<DuplicateCandidate>> ListDuplicateCandidatesAsync(
         Guid accountId,
         DateOnly fromDate,
