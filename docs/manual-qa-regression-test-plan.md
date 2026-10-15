@@ -1631,6 +1631,55 @@ for this verification. Automated tests do not complete the live checks below.
 Measurements and repeatable synthetic verification are documented in
 [dashboard-summary-performance.md](dashboard-summary-performance.md).
 
+### Reverse an approved import (#113)
+
+Use disposable Development/Scratch CSV and Excel imports, not Production data.
+See [workflow, safety and audit contract](import-reversal.md).
+
+- [ ] Complete a small CSV import and a selected-worksheet Excel import. On Review
+  imports → Completed / undone → select file → Preview undo, verify account, currency,
+  worksheet/source row, original values, eligible/blocked counts and the explicit
+  explanation. Merely previewing changes no financial data, import state or activity.
+- [ ] Cancel Undo import confirmation: nothing changes. Confirm it: all linked
+  official transactions are voided together, import status becomes Reversed, and
+  one activity event identifies the actor, time, source import and affected count.
+  Original drafts/transaction IDs and worksheet/row history remain intact.
+- [ ] Check transaction totals/export, dashboard cards, monthly budget and annual
+  overview before/after. Only this batch disappears from active reads; manual
+  transactions, other batches and ordinary void history remain unchanged.
+- [ ] Double-click, refresh, and repeat the same command: no duplicate audit or
+  second reversal. Simulate a lost response: refresh reads the saved status, never
+  automatically resending undo. Reloaded Reversed imports remain read-only.
+- [ ] Edit/void one transaction or revoke permission after preview but before
+  confirmation. Nothing else is undone. Refresh explains the new blocker/status.
+- [ ] Failed/canceled saves roll back voids, status and audit together. Exercise
+  SQL Server concurrency/deadlock behavior on disposable data before using undo
+  with important data; failed responses require status reconciliation.
+- [ ] Re-upload the same CSV/Excel after undo: same-file warning requires explicit
+  allowance, a new batch stages, voided originals are not active duplicate matches,
+  and normal review/approval is required. Old imports cannot be reopened/completed/
+  discarded. Other still-active duplicate transactions remain flagged.
+- [ ] Edit one official transaction, change budget inclusion, or void it. Refresh
+  the preview: that row blocks the whole batch. Another row's eligibility does not
+  imply partial undo is allowed. An excluded-only batch has nothing to reverse.
+- [ ] More than 100 approved rows have stable bounded preview pages. Check signed
+  and four-decimal amounts, long descriptions and excluded rows; no unrelated or
+  manual transactions appear. Retain original CSV/Excel source history.
+- [ ] Household Viewers cannot preview household-account undo. A Viewer who owns
+  a personal account can preview its import. Other members, including household
+  admins, cannot preview/undo that private import via UI or direct URL/API. Its undo
+  activity is private to the personal account owner, not household activity.
+- [ ] Retry a failed read, close during loading, change household/file, and revoke
+  access before refreshing. Stale responses cannot replace the new selection and
+  access failures remove retained private data. No read issues an undo/write or
+  activates the existing import completion command.
+- [ ] At 320/390px, desktop, keyboard-only and real 200% zoom, table headers remain
+  associated, overflow is local, and Preview, Close, Refresh/Retry and paging stay
+  reachable without losing staged edits.
+- [ ] Server diagnostics identify preview user/import and eligible/blocked counts
+  or rejection type, but contain no descriptions, amounts, filenames, raw rows or
+  secrets. No household activity entry falsely claims the preview reversed data.
+
 ### Refined interface (#201)
 
 See [approved direction and implementation boundaries](ui-enhancement.md). These

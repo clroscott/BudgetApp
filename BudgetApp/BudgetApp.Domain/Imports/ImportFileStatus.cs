@@ -6,5 +6,6 @@ public enum ImportFileStatus
     Processing = 2,
     ReadyForReview = 3,
     Completed = 4,
-    Failed = 5
+    Failed = 5,
+    Reversed = 6
 }

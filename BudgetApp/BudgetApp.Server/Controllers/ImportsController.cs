@@ -16,8 +16,31 @@ namespace BudgetApp.Server.Controllers;
 public sealed class ImportsController(
     TransactionImportService importService,
     ImportReviewService importReviewService,
+    ImportReversalPreviewService reversalPreviewService,
     ILogger<ImportsController> logger) : ControllerBase
 {
+    [HttpPost("{importFileId:guid}/reverse")]
+    public async Task<ActionResult<ReverseImportResult>> Reverse(Guid householdId, Guid importFileId,
+        ReverseImportRequest request, [FromServices] ImportReversalService reversalService, CancellationToken cancellationToken)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        try
+        {
+            var result = await reversalService.ReverseAsync(householdId, userId, importFileId,
+                request.PreviewVersion, request.Confirmed, cancellationToken);
+            logger.LogInformation("User {UserId} undid import {ImportFileId} in household {HouseholdId}: " +
+                "{TransactionCount} transactions; already reversed: {AlreadyReversed}",
+                userId, importFileId, householdId, result.ReversedTransactionCount, result.AlreadyReversed);
+            return Ok(result);
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            logger.LogWarning("Import undo rejected for user {UserId}, import {ImportFileId}, household {HouseholdId}: {FailureType}",
+                userId, importFileId, householdId, exception.GetType().Name);
+            return MapException(exception);
+        }
+    }
+
     [HttpGet]
     public async Task<ActionResult<ImportListResult>> List(
         Guid householdId,
@@ -48,6 +71,30 @@ public sealed class ImportsController(
         }
         catch (Exception exception) when (IsExpected(exception))
         {
+            return MapException(exception);
+        }
+    }
+
+    [HttpGet("{importFileId:guid}/reversal-preview")]
+    public async Task<ActionResult<ImportReversalPreview>> ReversalPreview(
+        Guid householdId, Guid importFileId, CancellationToken cancellationToken,
+        [FromQuery, Range(1, int.MaxValue)] int page = 1)
+    {
+        if (!TryGetUserId(out var userId)) return Unauthorized();
+        try
+        {
+            var preview = await reversalPreviewService.GetAsync(householdId, userId, importFileId, page, cancellationToken);
+            logger.LogInformation(
+                "User {UserId} previewed reversal of import {ImportFileId} in household {HouseholdId}: " +
+                "{EligibleRows} eligible rows, {BlockedRows} blocked rows. No transactions changed",
+                userId, importFileId, householdId, preview.EligibleRowCount, preview.BlockedRowCount);
+            return Ok(preview);
+        }
+        catch (Exception exception) when (IsExpected(exception))
+        {
+            logger.LogWarning("Import reversal preview rejected for user {UserId}, import {ImportFileId}, " +
+                "household {HouseholdId}: {FailureType}. No transactions changed",
+                userId, importFileId, householdId, exception.GetType().Name);
             return MapException(exception);
         }
     }
@@ -462,7 +509,7 @@ public sealed class ImportsController(
     {
         var (status, title) = exception switch
         {
-            DbUpdateConcurrencyException or ImportReviewConflictException =>
+            DbUpdateConcurrencyException or ImportReviewConflictException or ImportReversalConflictException =>
                 (StatusCodes.Status409Conflict, "Import changed elsewhere"),
             HouseholdAccessDeniedException =>
                 (StatusCodes.Status403Forbidden, "Household access denied"),
@@ -497,6 +544,10 @@ public sealed class ImportsController(
             Detail = detail
         });
 }
+
+public sealed record ReverseImportRequest(
+    [param: Required, StringLength(64, MinimumLength = 64)] string PreviewVersion,
+    bool Confirmed);
 
 public sealed record UpdateImportDraftRequest(
     DateOnly? TransactionDate,

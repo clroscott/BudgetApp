@@ -18,6 +18,7 @@ import { draftPageFixture, mutationFixture } from '../test/importReviewResponses
 import { getImportDraftPage, getBudgetChoicePreview, saveImportDrafts, saveImportDraft } from '../imports/importApi'
 import { decideImportDraft, deleteImportDraft } from '../imports/importApi'
 import { ApiError } from '../api/apiClient'
+import { getImportReversalPreview, reverseImport } from '../imports/importApi'
 
 vi.mock('../categories/categoryApi', async original => ({
   ...await original<typeof import('../categories/categoryApi')>(), getCategories: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('../imports/importApi', async original => ({
   getImportCategorizationRulePreview: vi.fn(), bulkUpdateImportDrafts: vi.fn(), updateImportDraft: vi.fn(), uploadCsvImport: vi.fn(), completeImport: vi.fn(),
   getImportDraftPage: vi.fn(), getBudgetChoicePreview: vi.fn(), saveImportDrafts: vi.fn(), saveImportDraft: vi.fn(),
   decideImportDraft: vi.fn(), deleteImportDraft: vi.fn(),
+  getImportReversalPreview: vi.fn(), reverseImport: vi.fn(),
 }))
 
 const listItem: ImportListItem = {
@@ -101,6 +103,42 @@ beforeEach(() => {
 })
 
 describe('staged import edit protection', () => {
+  it('confirms undo, protects a pending command, and updates the selected import without completing it again', async () => {
+    vi.mocked(getImport).mockResolvedValue({ ...detail(), status: 'Completed' })
+    vi.mocked(getImports).mockResolvedValue(listPage([{ ...listItem, status: 'Completed' }]))
+    vi.mocked(getImportReversalPreview).mockResolvedValue({ importFileId: 'import-a', originalFileName: 'sample.csv',
+      accountName: 'Sample account', currency: 'CAD', sourceWorksheetName: null, importUpdatedAtUtc: '2026-01-01',
+      checkedAtUtc: '2026-10-15', canReverse: true, previewVersion: 'A'.repeat(64), status: 'Completed',
+      linkedTransactionCount: 1, eligibleRowCount: 1, blockedRowCount: 0, blockingReasons: [], items: [],
+      page: 1, pageSize: 100, totalCount: 0, totalPages: 0 })
+    const pending = deferred<Awaited<ReturnType<typeof reverseImport>>>()
+    vi.mocked(reverseImport).mockReturnValueOnce(pending.promise)
+    show(<ImportReviewPage />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview undo' }))
+    const undo = await screen.findByRole('button', { name: 'Undo import' })
+    vi.mocked(window.confirm).mockReturnValueOnce(true)
+    fireEvent.click(undo)
+    expect((screen.getByLabelText('Uploaded file') as HTMLSelectElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('link', { name: 'Leave page' }))
+    expect(window.confirm).toHaveBeenLastCalledWith(expect.stringContaining('Import undo is still running'))
+    expect(screen.queryByText('Destination')).toBeNull()
+    await act(async () => pending.resolve({ importFileId: 'import-a', status: 'Reversed', reversedTransactionCount: 1,
+      updatedAtUtc: '2026-10-16', alreadyReversed: false }))
+    await screen.findByText('Import undone. 1 transactions were voided; original history was retained.')
+    expect(screen.getByText(/This import was undone\. Its transactions are voided/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Preview undo' })).toBeNull()
+    expect(completeImport).not.toHaveBeenCalled()
+    expect(reverseImport).toHaveBeenCalledOnce()
+  })
+  it.each([true, false])('only offers completed-import undo preview when editing is permitted (%s)', async canEdit => {
+    const completed = { ...detail(), status: 'Completed', canEdit }
+    vi.mocked(getImport).mockResolvedValue(completed)
+    vi.mocked(getImports).mockResolvedValue(listPage([{ ...listItem, status: 'Completed', canEdit }]))
+    show(<ImportReviewPage />)
+    await screen.findByRole('heading', { name: 'Review transactions in sample.csv' })
+    if (canEdit) expect(await screen.findByRole('button', { name: 'Preview undo' })).toBeTruthy()
+    else expect(screen.queryByRole('button', { name: 'Preview undo' })).toBeNull()
+  })
   it('does not present an old empty filter as an empty new filter while its page is loading', async () => {
     show(<ImportReviewPage />)
     const filter = await screen.findByLabelText('Show transactions') as HTMLSelectElement

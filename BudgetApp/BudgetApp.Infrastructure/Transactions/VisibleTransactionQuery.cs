@@ -1,6 +1,7 @@
 using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Categories;
 using BudgetApp.Domain.Transactions;
+using BudgetApp.Domain.Imports;
 using BudgetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,6 +22,10 @@ internal static class VisibleTransactionQuery
         join category in dbContext.Categories.AsNoTracking() on transaction.CategoryId equals category.Id into categories
         from category in categories.DefaultIfEmpty()
         where transaction.HouseholdId == householdId &&
+              // Ordinary voids retain their existing unfiltered history behavior.
+              // A whole-import undo lives in retained import/audit history instead
+              // and must not contribute to active lists, totals or dashboard cards.
+              !dbContext.ImportFiles.Any(file => file.Id == transaction.ImportFileId && file.Status == ImportFileStatus.Reversed) &&
               (account.Scope == AccountScope.Household || account.OwnerUserId == userId ||
                transaction.IncludeInHouseholdBudget == true && !transaction.IsExcludedFromBudget) &&
               (!accountId.HasValue || (account.Scope == AccountScope.Household || account.OwnerUserId == userId) && transaction.AccountId == accountId.Value) &&

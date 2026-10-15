@@ -86,6 +86,9 @@ public static class DependencyInjection
         services.AddScoped<ITransactionImportReader, TransactionImportReader>();
         services.AddScoped<TransactionImportService>();
         services.AddScoped<ImportReviewService>();
+        services.AddScoped<IImportReversalRepository, ImportReversalRepository>();
+        services.AddScoped<ImportReversalPreviewService>();
+        services.AddScoped<ImportReversalService>();
         services.AddScoped<IRecurringExpenseRepository, RecurringExpenseRepository>();
         services.AddScoped<RecurringExpenseManagementService>();
         services.AddScoped<ITransactionRepository, TransactionRepository>();

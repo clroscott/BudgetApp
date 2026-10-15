@@ -1,6 +1,18 @@
 /* Transactions/imports: feature-local controls and responsive layouts.
    Page width, gutters and titles belong to page-frame.css. */
 
+.import-reversal-preview { margin-top: 1rem; }
+.import-reversal-details { margin-top: 1rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface-soft); }
+.import-reversal-details h3 { margin-top: 0; }
+.import-reversal-warning { border-inline-start: 3px solid var(--danger); padding-inline-start: 0.65rem; }
+.import-reversal-table-scroll { max-width: 100%; overflow-x: auto; }
+.import-reversal-table { width: 100%; min-width: 40rem; border-collapse: collapse; background: var(--surface); }
+.import-reversal-table caption { text-align: start; padding-block: 0.75rem; }
+.import-reversal-table :is(th, td) { padding: 0.65rem; border-bottom: 1px solid var(--border); vertical-align: top; text-align: start; overflow-wrap: anywhere; }
+.import-reversal-table .import-reversal-amount { text-align: end; white-space: nowrap; font-variant-numeric: lining-nums tabular-nums; }
+.import-reversal-table ul { padding-inline-start: 1rem; margin-block: 0.25rem; }
+.import-reversal-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.65rem; margin-top: 1rem; }
+
 .app-shell .import-content > :is(.import-form, .import-result) {
   max-width: 52rem;
   margin-inline: 0;

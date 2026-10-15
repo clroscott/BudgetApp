@@ -1,4 +1,5 @@
 import { ImportBatchControls } from '../imports/ImportBatchControls'
+import { ImportReversalPreviewPanel } from '../imports/ImportReversalPreviewPanel'
 import { useImportDraftCache, useImportReviewGuard } from '../imports/useImportDraftCache'
 import { DraftRow } from '../imports/ImportDraftRow'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -34,6 +35,7 @@ import {
   type ImportDraftFilter,
   type ImportDraftItem,
   type CategorizationRuleApplicationPreview,
+  type ReverseImportResult,
 } from '../imports/importApi'
 import { reviewPageData, mergeDraftChanges, matchesDraftFilter, type ImportReviewPageData } from '../imports/importReviewState'
 import { AppLink } from '../routing/AppLink'
@@ -69,6 +71,8 @@ export function ImportReviewPage() {
   const [rowFilter, setRowFilter] = useState<DraftRowFilter>('all')
   const [draftPage, setDraftPage] = useState(1)
   const [isCompleting, setIsCompleting] = useState(false)
+  const [isReversing, setIsReversing] = useState(false)
+  useUnsavedChangesGuard(isReversing, 'Import undo is still running. Leaving will not cancel it. Leave and check its saved status later?')
   const [isDiscarding, setIsDiscarding] = useState(false)
   const [applyingRuleMode, setApplyingRuleMode] =
     useState<RuleApplicationMode | null>(null)
@@ -223,7 +227,7 @@ export function ImportReviewPage() {
         clearDrafts()
         setErrors([])
         setWriteNeedsReload(false)
-        setCompletionMessage(current => current ? 'Import completed. Approved transactions were created.' : '')
+        setCompletionMessage('')
       }
     } finally { if (isSelectedContextCurrent()) setIsRefreshingSelected(false) }
   }
@@ -259,6 +263,7 @@ export function ImportReviewPage() {
     setErrors([])
     setWriteNeedsReload(false)
     setIsCompleting(false)
+    setIsReversing(false)
     setIsDiscarding(false)
     setIsSavingAll(false)
     setIsRefreshingSelected(false)
@@ -317,7 +322,7 @@ export function ImportReviewPage() {
     }
     return counts
   }, [bulkBudgetDrafts, budgetFlags, bulkBudgetPreset, bulkBudgetScope, matchingBudgetPreview])
-  const mutationBusy = isSavingAll || isCompleting || isDiscarding || isCheckingDuplicates || isRemovingDraft ||
+  const mutationBusy = isReversing || isSavingAll || isCompleting || isDiscarding || isCheckingDuplicates || isRemovingDraft ||
     bulkDecision !== null || applyingRuleMode !== null || busyDraftIds.size > 0
   const bulkActionsBusy = isLoading || writeNeedsReload || !categoryLoad.isFresh || (Boolean(selectedImportId) && !detailLoad.isFresh) || mutationBusy
 
@@ -569,6 +574,16 @@ export function ImportReviewPage() {
     }
   }
 
+  const handleReversed = useCallback((result: ReverseImportResult) => {
+    if (!isSelectedContextCurrent()) return
+    versionRef.current = result.updatedAtUtc
+    setDetail(current => current ? { ...current, status: result.status, updatedAtUtc: result.updatedAtUtc } : current)
+    setImportList(current => current ? { ...current, items: current.items.map(item => item.id === result.importFileId
+      ? { ...item, status: result.status } : item) } : current)
+    setIsReversing(false)
+    setCompletionMessage(`Import undone. ${result.reversedTransactionCount} transactions were voided; original history was retained.`)
+  }, [isSelectedContextCurrent])
+
   if (!currentHousehold) return null
 
   return (
@@ -624,7 +639,7 @@ export function ImportReviewPage() {
               }}>
                 <option value="inProgress">Unfinished</option>
                 <option value="ready">Awaiting review</option>
-                <option value="completed">Completed</option>
+                <option value="completed">Completed / undone</option>
                 <option value="all">All</option>
               </select>
             </label>
@@ -720,9 +735,13 @@ export function ImportReviewPage() {
                     Completed imports are retained to preserve the history of official transactions.
                   </p>
                   <AppLink to="/transactions">View transactions</AppLink>
+                  {householdId && detailLoad.isFresh && detail.canEdit && <ImportReversalPreviewPanel
+                    key={`${householdId}/${detail.id}/${detail.updatedAtUtc}`} householdId={householdId} importId={detail.id}
+                    onBusyChange={setIsReversing} onReversed={handleReversed} />}
                 </div>
               )}
-              {detail.status !== 'ReadyForReview' && detail.status !== 'Completed' &&
+              {detail.status === 'Reversed' && <p role="status">This import was undone. Its transactions are voided and excluded from active totals. Original rows and audit history are retained. Upload a corrected file as a new import if needed.</p>}
+              {detail.status !== 'ReadyForReview' && detail.status !== 'Completed' && detail.status !== 'Reversed' &&
                 <p className="field-help">This import is {detail.status.toLowerCase()} and is not ready for review. Its rows cannot be approved or edited.</p>}
             </section>
 
@@ -814,7 +833,7 @@ export function ImportReviewPage() {
                     categories={categories}
                     pendingUpdate={dirtyDraftUpdates.get(draft.id) ?? null}
                     canEdit={detail.canEdit && detail.status === 'ReadyForReview' && !bulkActionsBusy}
-                    isCompleted={detail.status === 'Completed'}
+                    isCompleted={detail.status === 'Completed' || detail.status === 'Reversed'}
                     onChanged={refreshRows}
                     onMutation={handleMutation}
                     getVersion={getVersion}

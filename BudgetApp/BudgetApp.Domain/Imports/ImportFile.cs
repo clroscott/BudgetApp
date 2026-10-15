@@ -211,9 +211,17 @@ public sealed class ImportFile
         UpdatedAtUtc = updatedAtUtc;
     }
 
+    public void Reverse(DateTimeOffset updatedAtUtc)
+    {
+        if (Status != ImportFileStatus.Completed || ApprovedRowCount == 0)
+            throw new InvalidOperationException("Only a completed import that created transactions can be reversed.");
+        Status = ImportFileStatus.Reversed;
+        UpdatedAtUtc = updatedAtUtc > UpdatedAtUtc ? updatedAtUtc : UpdatedAtUtc.AddTicks(1);
+    }
+
     public void MarkFailed(string failureSummary, DateTimeOffset updatedAtUtc)
     {
-        if (Status == ImportFileStatus.Completed)
+        if (Status is ImportFileStatus.Completed or ImportFileStatus.Reversed)
         {
             throw new InvalidOperationException(
                 "A completed import cannot be marked as failed.");

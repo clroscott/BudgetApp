@@ -594,7 +594,7 @@ export function TransactionManagementPage() {
                 ? appliedQuery.budgetInclusion === 'NotIncluded'
                   ? 'not included in budgets; voided transactions omitted'
                   : 'budget-included only; excluded and voided transactions omitted'
-                : 'includes excluded and voided transactions'}</dd></div>
+                : 'includes excluded and ordinary voided transactions; undone imports omitted'}</dd></div>
             {appliedQuery.accountId && <div><dt>Account</dt><dd>
               {accounts.find(account => account.id === appliedQuery.accountId)?.name ?? 'Selected account'}
             </dd></div>}

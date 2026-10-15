@@ -79,6 +79,57 @@ export interface CompleteImportResult {
   status: string
 }
 
+export interface ImportReversalPreviewRow {
+  draftId: string | null
+  sourceRowNumber: number | null
+  transactionId: string | null
+  transactionDate: string | null
+  amount: number | null
+  description: string | null
+  draftUpdatedAtUtc: string | null
+  transactionUpdatedAtUtc: string | null
+  isEligible: boolean
+  blockingReasons: string[]
+}
+
+export interface ImportReversalPreview {
+  previewVersion: string
+  status: string
+  importFileId: string
+  originalFileName: string
+  accountName: string
+  currency: string
+  sourceWorksheetName: string | null
+  importUpdatedAtUtc: string
+  checkedAtUtc: string
+  canReverse: boolean
+  linkedTransactionCount: number
+  eligibleRowCount: number
+  blockedRowCount: number
+  blockingReasons: string[]
+  items: ImportReversalPreviewRow[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
+export interface ReverseImportResult {
+  importFileId: string
+  status: string
+  reversedTransactionCount: number
+  updatedAtUtc: string
+  alreadyReversed: boolean
+}
+
+export function reverseImport(householdId: string, importFileId: string, previewVersion: string): Promise<ReverseImportResult> {
+  return apiPost(`${importPath(householdId, importFileId)}/reverse`, { previewVersion, confirmed: true })
+}
+
+export function getImportReversalPreview(householdId: string, importFileId: string, page = 1, signal?: AbortSignal): Promise<ImportReversalPreview> {
+  return apiGet(`${importPath(householdId, importFileId)}/reversal-preview?page=${page}`, signal)
+}
+
 export interface ImportDraftUpdate {
   draftId: string
   transactionDate: string | null
