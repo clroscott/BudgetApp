@@ -1,20 +1,32 @@
 :root {
-  --page-bg: #f4f6f3;
-  --surface: #ffffff;
-  --heading: #17211d;
-  --text: #34433d;
-  --muted-text: #69766f;
-  --border: #dfe5e1;
-  --border-strong: #c5cec8;
-  --accent: #2a6f5b;
-  --accent-hover: #215b4a;
-  --accent-soft: rgba(42, 111, 91, 0.2);
-  --danger: #9b2c2c;
+  /* Approved #201 direction: warm surfaces, evergreen, Georgia display type.
+     System fonts keep startup independent of external font services. */
+  --font-body: "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: Georgia, Cambria, "Times New Roman", serif;
+  /* Hybrid typography: editorial headings, aligned sans-serif money values. */
+  --font-numeric: var(--font-body);
+  --radius-control: 0.5rem;
+  --radius-panel: 0.8rem;
+  --page-bg: #f7f6f0;
+  --surface: #fffefa;
+  --surface-soft: #f0f2e9;
+  --heading: #283b30;
+  --text: #36463b;
+  --muted-text: #606d62;
+  --border: #daddd0;
+  --border-strong: #879589;
+  --accent: #315f48;
+  --accent-hover: #264c39;
+  --accent-soft: #e8eddf;
+  --brand-gold: #896a2b;
+  --warning: #795419;
+  --warning-soft: #fff1d3;
+  --danger: #9b3830;
   --danger-border: #e7b7b7;
   --danger-soft: #fff4f4;
-  --shadow: 0 1.2rem 3rem rgba(34, 52, 44, 0.09);
-  --small-shadow: 0 0.5rem 1.5rem rgba(34, 52, 44, 0.05);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --shadow: 0 0.3rem 1rem rgb(40 59 48 / 9%);
+  --small-shadow: none;
+  font-family: var(--font-body);
   color: var(--text);
   background: var(--page-bg);
   font-synthesis: none;
@@ -37,6 +49,8 @@ body {
   min-width: 20rem;
   min-height: 100svh;
   margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
 }
 
 button,
@@ -54,4 +68,10 @@ p {
 h1,
 h2 {
   color: var(--heading);
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.025em;
 }
+
+h1 { font-size: clamp(1.85rem, 2.5vw, 2.5rem); }
+h2 { font-size: 1.35rem; }

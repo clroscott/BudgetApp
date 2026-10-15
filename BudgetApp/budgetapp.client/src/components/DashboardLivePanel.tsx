@@ -25,7 +25,7 @@ export function DashboardLivePanel({ panelKey, snapshot, period, scope, canManag
       {budget.id ? <dl className="dashboard-metrics">
         <div><dt>Budgeted</dt><dd>{formatAmount(totals.budgeted, budget.currency)}</dd></div>
         <div><dt>Actual</dt><dd>{formatAmount(totals.actual, budget.currency)}</dd></div>
-        <div><dt>Remaining</dt><dd>{formatAmount(totals.remaining, budget.currency)}</dd></div>
+        <div className={`dashboard-remaining${totals.remaining < 0 ? ' is-negative' : ''}`}><dt>Remaining</dt><dd>{formatAmount(totals.remaining, budget.currency)}</dd></div>
       </dl> : <p>No saved {scope.toLowerCase()} budget for this month. Your transactions are kept independently.</p>}
       {budget.id && totals.remaining < 0 && <p className="dashboard-warning">Over budget by {formatAmount(-totals.remaining, budget.currency)}.</p>}
       <p className="field-help">Matches the monthly budget’s categorized actuals; this is not your bank balance.</p>
