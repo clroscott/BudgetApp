@@ -23,6 +23,40 @@ beforeEach(() => { localStorage.clear(); vi.spyOn(window, 'confirm').mockReturnV
 afterEach(() => vi.unstubAllGlobals())
 
 describe('grouped application navigation', () => {
+  it('closes the mobile disclosure on Escape and returns focus to Menu', () => {
+    show()
+    const menu = screen.getByRole('button', { name: 'Menu' })
+    fireEvent.click(menu)
+    const link = screen.getByRole('link', { name: 'Transactions' })
+    link.focus()
+    fireEvent.keyDown(link, { key: 'Escape' })
+    expect(menu.getAttribute('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(menu)
+    expect(window.confirm).not.toHaveBeenCalled()
+  })
+  it('dismisses on an outside pointer or when keyboard focus leaves, without navigating', () => {
+    show()
+    const menu = screen.getByRole('button', { name: 'Menu' })
+    fireEvent.click(menu)
+    fireEvent.pointerDown(screen.getByRole('heading', { name: 'Example page' }))
+    expect(menu.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(menu)
+    menu.focus()
+    const summary = document.querySelector('.profile-menu summary') as HTMLElement
+    act(() => summary.focus())
+    expect(menu.getAttribute('aria-expanded')).toBe('false')
+    expect(window.location.pathname).toBe('/dashboard')
+    expect(window.confirm).not.toHaveBeenCalled()
+  })
+  it('keeps the menu and staged edits when navigation is canceled', () => {
+    show({ path: '/imports/review', dirty: true })
+    const menu = screen.getByRole('button', { name: 'Menu' })
+    fireEvent.click(menu)
+    fireEvent.click(screen.getByRole('link', { name: 'Import transactions' }))
+    expect(window.confirm).toHaveBeenCalledOnce()
+    expect(window.location.pathname).toBe('/imports/review')
+    expect(menu.getAttribute('aria-expanded')).toBe('true')
+  })
   it('adds visual sections without removing destinations or changing tutorial targets', () => {
     show()
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })

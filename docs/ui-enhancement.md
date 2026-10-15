@@ -61,19 +61,30 @@ repeat the focus movement. Other pages/read/filter errors retain the default
 announcement-only behavior unless explicitly opted in; generic read failures do
 not receive a new global autofocus policy.
 
-## Mobile baseline and next review
+## Mobile pass (2026-10-15)
 
-The current narrow Menu behavior is retained, not replaced by a speculative new
-drawer. Inputs/selects retain readable narrow-screen text, touch controls receive
-minimum target sizing, wide financial grids keep local horizontal scrolling, and
-budget actions retain measured clearance and their Back-to-top host.
+At 880px and below, Menu opens a non-modal, bounded navigation disclosure under
+the compact brand strip. It does not resize the header or push content down.
+The navigation itself scrolls on short screens, sits above budget actions, and
+closes on Escape (returning focus to Menu), outside pointer, focus leaving the
+sidebar, Skip, or successful navigation. Canceled navigation preserves the open
+menu and existing dirty-data guard. No modal focus trap or body scroll lock is
+introduced. Existing tutorial targets, child groups and desktop collapse remain.
 
-The next mobile review should settle menu/context-header space, dashboard card
-density, filter/action grouping and the best small-screen review workflow. Do
-not hide household/scope context, financial columns, privacy warnings or save
-actions merely to fit a screenshot. Test real touch keyboards, device zoom and
-screen-reader focus in addition to the fixture-driven checks below. Dark mode
-was a mockup preview capability, not an added application setting in this slice.
+Phone section navigation uses a single horizontal scroll lane instead of several
+wrapped rows. The current link is revealed locally after route/width changes,
+without moving page focus or vertical scroll. Financial grids retain their own
+horizontal scrolling and all columns/actions; this is not a second mobile data
+model. The dashboard places Budgeted/Actual side by side and Remaining below,
+without changing amounts or saved card order. Import counts use two columns;
+settings/form panels use smaller inner gutters. The monthly action summary is
+more compact, keeps all save/status/delete controls, and retains measured footer
+clearance, safe-area spacing and the Back-to-top host. Currency/role are visible
+under the current household on phones.
+
+Real touch keyboards, device zoom, screen-reader focus and manual financial
+workflows still need human validation. Dark mode was a mockup preview capability,
+not an added application setting in this slice.
 
 ## Verification
 
@@ -90,8 +101,8 @@ not overwritten. Intentional visual differences are reviewed, not pixel-equality
 requirements. Emulated viewports do not prove real 200% zoom or screen-reader QA.
 
 The permanent [#201 manual cases](manual-qa-regression-test-plan.md#refined-interface-201)
-remain unchecked until a human performs them. Keep this issue open for further
-page-specific polish and the requested mobile iteration.
+remain unchecked until a human performs them. Keep this issue open for any
+remaining page-specific polish and real-device findings.
 
 Verification on 2026-10-14: 648 frontend tests and 677 backend tests passed;
 TypeScript/Vite production build and client lint passed (existing lint warnings
@@ -101,3 +112,13 @@ writes. Browser artifacts are under `before` and `after-final`; the intermediate
 `after` capture is not the final verification source.
 Ten additional calculator switching/dismissal/Use-result and fixed-action cases
 passed with fictional local form values under `artifacts/layout-qa/refined-ui`.
+
+Mobile verification on 2026-10-15: all 653 frontend tests passed across 58 files;
+TypeScript/Vite build and lint passed (pre-existing warnings remain). The mobile
+harness passed 108 page/layout cases and 12 monthly/annual interaction cases.
+The three desktop baseline pages remained pixel-identical. Unit coverage includes
+Escape/outside/focus-leave dismissal, canceled dirty navigation, active-tab local
+scrolling and observer cleanup; integration footer tests track the footer observer
+independently from the new tab-strip observer. No backend or financial behavior
+was changed, and all browser API responses were fictional. This does not replace
+real-device/on-screen-keyboard, screen-reader or financial workflow manual QA.

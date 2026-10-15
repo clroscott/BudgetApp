@@ -511,11 +511,24 @@
 }
 
 @media (max-width: 40rem) {
-  .dashboard-overview-layout .dashboard-metrics { grid-template-columns: 1fr; }
+  .dashboard-context-controls { gap: 0.65rem; margin-bottom: 0.75rem; }
+  .dashboard-context-controls > label { flex: 1 1 8rem; min-width: 0; }
+  .dashboard-context-controls :is(input, select) { width: 100%; min-width: 0; }
+  .dashboard-context-controls > p { flex-basis: 100%; }
+  .dashboard-grid { gap: 1rem; }
+  .dashboard-overview-layout .dashboard-panel-financial-overview { padding-block: 1rem; }
+  .dashboard-overview-layout .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dashboard-overview-layout .dashboard-metrics > div {
-    padding: 0.9rem 0;
+    min-width: 0;
+    padding: 0.65rem 0;
     border-left: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 0;
   }
-  .dashboard-overview-layout .dashboard-metrics > div:last-child { border-bottom: 0; }
+  .dashboard-overview-layout .dashboard-metrics > div:nth-child(2) { padding-left: 0.75rem; border-left: 1px solid var(--border); }
+  .dashboard-overview-layout .dashboard-metrics > div:last-child { grid-column: 1 / -1; border-top: 1px solid var(--border); margin-top: 0.5rem; }
+  .dashboard-overview-layout .dashboard-metrics dd { font-size: clamp(1.25rem, 5.5vw, 1.8rem); overflow-wrap: anywhere; }
+  .dashboard-overview-layout .dashboard-remaining dd { font-size: clamp(1.8rem, 7vw, 2.3rem); }
+  .dashboard-panel-quick-actions > a { display: flex; align-items: center; min-height: 2.75rem; }
+  .dashboard-tutorial-prompt > div:last-child { flex-wrap: wrap; }
+  .dashboard-customizer-actions > button { flex: 1 1 auto; }
 }

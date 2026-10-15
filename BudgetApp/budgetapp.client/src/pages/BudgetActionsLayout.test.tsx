@@ -32,9 +32,16 @@ beforeEach(() => {
   vi.mocked(saveYearlyPlan).mockClear()
   vi.stubGlobal('scrollY', 600)
   vi.stubGlobal('ResizeObserver', class {
-    constructor(callback: () => void) { resized = callback }
-    observe() {}
-    disconnect = disconnect
+    callback: () => void
+    isBudgetBar = false
+    constructor(callback: () => void) { this.callback = callback }
+    observe(target: Element) {
+      if (target.classList.contains('budget-save-bar')) {
+        this.isBudgetBar = true
+        resized = this.callback
+      }
+    }
+    disconnect() { if (this.isBudgetBar) disconnect() }
   })
   const originalRect = HTMLElement.prototype.getBoundingClientRect
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {

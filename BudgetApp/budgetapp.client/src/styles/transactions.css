@@ -1121,6 +1121,13 @@
 }
 
 @media (max-width: 40rem) {
+  .import-form,
+  .import-file-picker,
+  .import-review-summary,
+  .complete-import-panel,
+  .transaction-filter-panel,
+  .rule-form { padding: 1rem; }
+
   .import-profile-details-grid {
     grid-template-columns: 1fr;
   }
@@ -1180,11 +1187,12 @@
     grid-column: 1;
   }
 
-  .import-review-summary .import-stat-grid,
   .import-selector-row,
   .import-control-groups {
     grid-template-columns: 1fr;
   }
+
+  .import-review-summary .import-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .import-row-toolbar {
     align-items: stretch;

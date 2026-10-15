@@ -127,6 +127,17 @@
 }
 
 @media (max-width: 40rem) {
+  .budgeting-section-nav {
+    width: 100%;
+    box-sizing: border-box;
+    flex-wrap: nowrap;
+    margin-bottom: 1rem;
+    scroll-padding-inline: 0.5rem;
+    overscroll-behavior-x: contain;
+  }
+
+  .budgeting-section-nav a { min-height: 2.75rem; box-sizing: border-box; white-space: nowrap; }
+
   .back-to-top-button {
     right: 0.8rem;
     bottom: 0.8rem;

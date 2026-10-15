@@ -1638,7 +1638,7 @@ are manual acceptance cases, not checked by synthetic screenshots or unit tests.
 
 - [ ] Compare Dashboard, Transactions/Import review, Monthly budget, Annual targets,
   Annual overview, account/household settings and Help on desktop. Georgia headings
-  and key totals, sans-serif dense data, warm surfaces, green actions and panel
+  with sans-serif lining/tabular money values, warm surfaces, green actions and panel
   shapes form one system. Page columns/tabs stay aligned when navigating.
 - [ ] Expanded and collapsed sidebar retain all six main destinations, child pages,
   current-location cues and tutorial targets. Day to day/Manage/Support clarify
@@ -1662,6 +1662,21 @@ are manual acceptance cases, not checked by synthetic screenshots or unit tests.
   permitted, calculator and Back to top remain separate and reachable. Buttons
   wrap without clipping/overlap, and measured footer clearance protects the final
   editable row. Cancel navigation and verify dirty data survives.
+- [ ] On a phone and in landscape, open Menu: the page does not jump, all six
+  groups/children are reachable by scrolling within the menu, and it paints above
+  fixed budget actions. Escape returns focus to Menu; outside tap, keyboard focus
+  leaving the menu, Skip and successful navigation dismiss it. Canceled dirty
+  navigation keeps the menu and edits intact. Tutorial navigation still works.
+- [ ] On narrow budgeting/import/settings pages, section tabs form a single local
+  scroll lane. Current tabs are visible on direct URLs and after rotation. Tab
+  through offscreen links; no link is lost and the page does not scroll sideways.
+- [ ] Dashboard Budgeted/Actual sit side by side and Remaining stays clearly
+  labeled below. Try negative and long amounts, custom card orders, setup/tour/MFA
+  prompts, stale data and Viewer access. No financial/scope information is hidden.
+- [ ] Mobile monthly footer totals/actions and Back to top do not overlap, including
+  after opening the on-screen keyboard and rotating. Last-row fields/calculator
+  remain reachable above the footer. Import review still exposes every column,
+  budget inclusion, status, Details, Approve and Exclude through local scrolling.
 - [ ] Record mobile-specific design feedback separately before calling the new
   mobile experience finished. Repeat with Viewer/private-account permissions,
   no household, empty/zero/negative totals and failed/stale reads.
