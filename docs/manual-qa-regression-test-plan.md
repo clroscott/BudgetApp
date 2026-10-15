@@ -1631,6 +1631,41 @@ for this verification. Automated tests do not complete the live checks below.
 Measurements and repeatable synthetic verification are documented in
 [dashboard-summary-performance.md](dashboard-summary-performance.md).
 
+### Refined interface (#201)
+
+See [approved direction and implementation boundaries](ui-enhancement.md). These
+are manual acceptance cases, not checked by synthetic screenshots or unit tests.
+
+- [ ] Compare Dashboard, Transactions/Import review, Monthly budget, Annual targets,
+  Annual overview, account/household settings and Help on desktop. Georgia headings
+  and key totals, sans-serif dense data, warm surfaces, green actions and panel
+  shapes form one system. Page columns/tabs stay aligned when navigating.
+- [ ] Expanded and collapsed sidebar retain all six main destinations, child pages,
+  current-location cues and tutorial targets. Day to day/Manage/Support clarify
+  grouping without losing account settings, household context or operator access.
+- [ ] The usual three-card overview has a prominent financial summary. Existing
+  customized card orders/columns, empty layouts, dragging, Earlier/Later, failed
+  saves and Cancel still work without silently rewriting preferences. Amounts and
+  report links retain their exact month/scope/currency meanings; no sample numbers
+  or invented category breakdown appears in real data.
+- [ ] Without a file, Upload for review remains disabled. Select a disposable file
+  larger than 10 MB and try uploading from the bottom of the form; then try a
+  disposable upload/save that fails. The explanation is brought into
+  view below the sticky header when necessary, is keyboard reachable and remains
+  available. Visible/unchanged errors do not repeatedly steal focus. Safe entered
+  values remain; failure does not automatically retry or approve financial writes.
+- [ ] Review 880/800/760px, real phones and 200% browser zoom. Menu, household
+  switching, profile Escape, Skip, focus indicators, touch targets and on-screen
+  keyboards remain usable. No document-wide horizontal scrolling; wide grids
+  scroll within themselves and labels never bleed between columns.
+- [ ] At the end of monthly and annual editing pages, Save, Activate/Delete where
+  permitted, calculator and Back to top remain separate and reachable. Buttons
+  wrap without clipping/overlap, and measured footer clearance protects the final
+  editable row. Cancel navigation and verify dirty data survives.
+- [ ] Record mobile-specific design feedback separately before calling the new
+  mobile experience finished. Repeat with Viewer/private-account permissions,
+  no household, empty/zero/negative totals and failed/stale reads.
+
 ### UI cleanup and mixed dashboard (#200)
 
 Use the [navigation and dashboard guide](ui-cleanup.md) for the exact summary

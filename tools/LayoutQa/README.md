@@ -130,3 +130,25 @@ and settling time. Keep regressions and remaining long tasks visible in the
 [measured results](../../docs/import-review-rendering-performance.md); do not use
 machine-specific millisecond assertions as unit tests. Functional browser checks
 and the owner's manual keyboard/focus sweep remain separate requirements.
+
+## Refined interface (#201)
+
+```powershell
+node .\tools\LayoutQa\verify-refined-ui.mjs before
+# Apply the focused design slice, then:
+node .\tools\LayoutQa\verify-refined-ui.mjs after
+# A separate final capture after any repairs:
+node .\tools\LayoutQa\verify-refined-ui.mjs after-final
+```
+
+Uses port `127.0.0.1:4184` and the same installed browser/runtime configuration.
+Seven real pages across eight layouts cover desktop/collapsed, 880/800/760px,
+390/320px and the 200%-equivalent short viewport. It verifies common content
+alignment within each layout, bounded document width, profile focus return,
+Menu/Skip behavior, import-column containment and non-overlapping budget actions.
+After captures also check Georgia headings, missing-file disabling and client-side
+oversized-file feedback without any upload. Every API response is fictional and GET-only;
+external requests and writes are blocked. Initial screenshot geometry and fonts
+are stored under ignored `artifacts/refined-ui-qa/<phase>`; completed evidence is
+never overwritten. Before/after visual changes are intentional, not a pixel-equality
+gate. Read [scope and remaining mobile/manual checks](../../docs/ui-enhancement.md).

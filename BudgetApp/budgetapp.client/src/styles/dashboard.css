@@ -4,7 +4,7 @@
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem;
+  gap: 1.5rem;
 }
 
 .dashboard-columns-2 {
@@ -22,9 +22,9 @@
 .summary-card {
   display: grid;
   gap: 0.5rem;
-  padding: 1.4rem;
+  padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -41,12 +41,11 @@
 
 .summary-card .dashboard-panel-icon {
   display: grid;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 0.7rem;
-  background: var(--accent-soft);
+  background: transparent;
   color: var(--accent);
 }
 
@@ -109,7 +108,7 @@
   margin-bottom: 1.5rem;
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
 }
 
@@ -211,7 +210,7 @@
   margin-bottom: 1.25rem;
   padding: 1.15rem 1.25rem;
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: linear-gradient(
       115deg,
       color-mix(in srgb, var(--accent) 12%, var(--surface)),
@@ -324,7 +323,7 @@
   margin: 1.25rem 0;
   background: var(--accent-soft);
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
 }
 
 .dashboard-getting-started > div {
@@ -353,7 +352,7 @@
 }
 
 .dashboard-panel h2 {
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   line-height: 1.4;
   margin: 0.25rem 0;
 }
@@ -389,8 +388,50 @@
 
 .dashboard-metrics dd {
   margin: 0;
-  font-weight: 750;
-  font-variant-numeric: tabular-nums;
+  font-family: var(--font-numeric);
+  font-size: clamp(1.35rem, 2vw, 1.9rem);
+  font-weight: 400;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1.25;
+}
+
+.dashboard-metrics .dashboard-remaining dd { color: var(--accent); }
+.dashboard-metrics .dashboard-remaining.is-negative dd { color: var(--danger); }
+
+.dashboard-overview-layout .dashboard-panel-financial-overview {
+  grid-column: 1 / -1;
+  padding: 1.4rem 0;
+  border-width: 1px 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.dashboard-overview-layout .dashboard-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-block: 0.75rem;
+}
+
+.dashboard-overview-layout .dashboard-metrics > div {
+  display: grid;
+  align-content: start;
+  padding: 0.2rem 1.5rem;
+  border-bottom: 0;
+  border-left: 1px solid var(--border);
+}
+
+.dashboard-overview-layout .dashboard-metrics > div:first-child { border-left: 0; padding-left: 0; }
+.dashboard-overview-layout .dashboard-metrics dd { font-size: clamp(1.6rem, 2.8vw, 2.3rem); }
+.dashboard-overview-layout .dashboard-remaining dd { font-size: clamp(1.85rem, 3vw, 2.5rem); }
+.dashboard-overview-layout .dashboard-panel-needs-attention { grid-column: span 2; }
+.dashboard-overview-layout .dashboard-panel-needs-attention,
+.dashboard-overview-layout .dashboard-panel-quick-actions { background: transparent; border: 0; padding-inline: 0; }
+
+.dashboard-panel-quick-actions > a {
+  padding-block: 0.65rem;
+  border-bottom: 1px solid var(--border);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
 }
 
 .dashboard-warning {
@@ -411,6 +452,8 @@
   grid-template-columns: auto 1fr;
   column-gap: 0.75rem;
   margin-bottom: 1rem;
+  padding-block: 0.75rem;
+  border-top: 1px solid var(--border);
   align-items: baseline;
 }
 
@@ -461,4 +504,18 @@
   .dashboard-getting-started {
     padding: 1.15rem;
   }
+}
+
+@media (max-width: 55rem) {
+  .dashboard-overview-layout .dashboard-panel-needs-attention { grid-column: auto; }
+}
+
+@media (max-width: 40rem) {
+  .dashboard-overview-layout .dashboard-metrics { grid-template-columns: 1fr; }
+  .dashboard-overview-layout .dashboard-metrics > div {
+    padding: 0.9rem 0;
+    border-left: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .dashboard-overview-layout .dashboard-metrics > div:last-child { border-bottom: 0; }
 }

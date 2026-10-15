@@ -23,6 +23,13 @@ beforeEach(() => { localStorage.clear(); vi.spyOn(window, 'confirm').mockReturnV
 afterEach(() => vi.unstubAllGlobals())
 
 describe('grouped application navigation', () => {
+  it('adds visual sections without removing destinations or changing tutorial targets', () => {
+    show()
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' })
+    expect([...nav.querySelectorAll('.sidebar-section-label')].map(node => node.textContent)).toEqual(['Day to day', 'Manage', 'Support'])
+    expect(nav.querySelectorAll('.sidebar-group-heading > a')).toHaveLength(6)
+    expect(within(nav).getByRole('link', { name: 'Budgeting' }).getAttribute('data-tutorial-id')).toBe('nav-monthly-budget')
+  })
   it('measures changing navigation height and releases its observer on unmount', () => {
     let height = 74.2
     let resized!: () => void

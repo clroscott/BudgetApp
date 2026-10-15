@@ -585,7 +585,7 @@ export function ImportReviewPage() {
 
         <ContextualHelp topic="import-approval" />
         <p className="field-help">{helpWarnings.sharePersonalExpense}</p>
-        <ErrorSummary errors={errors} />
+        <ErrorSummary errors={errors} revealOnChange />
         {writeNeedsReload && <div role="alert">
           <p>The save result is uncertain or this import changed elsewhere. Your corrections are kept. Reload before trying another save.</p>
           <button type="button" className="secondary-button" disabled={isLoading || mutationBusy}

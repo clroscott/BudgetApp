@@ -47,6 +47,9 @@
 .page-load-feedback h2 {
   margin: 0 0 0.5rem;
   font-size: 1.1rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: normal;
 }
 
 .page-load-feedback button {
@@ -81,17 +84,17 @@
   padding: 0.3rem;
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 0.8rem;
+  border-radius: var(--radius-panel);
   background: var(--surface-soft);
 }
 
 .budgeting-section-nav a {
   flex: 0 0 auto;
   padding: 0.55rem 0.75rem;
-  border-radius: 0.55rem;
+  border-radius: var(--radius-control);
   color: var(--muted-text);
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 500;
   text-align: center;
   text-decoration: none;
 }
@@ -105,6 +108,22 @@
   color: white;
   background: var(--accent);
   box-shadow: var(--small-shadow);
+}
+
+/* Preserve readable fields and usable touch targets in the narrow baseline.
+   Dense review rows keep their own scrollable grid rather than shrinking text. */
+@media (max-width: 40rem) {
+  :is(input, select, textarea):not([type='checkbox']):not([type='radio']) {
+    font-size: 1rem;
+  }
+}
+
+@media (pointer: coarse) {
+  :is(button, summary, .primary-link-button, .secondary-link-button):not([hidden]) {
+    min-height: 2.75rem;
+  }
+  .app-sidebar .sidebar-group-toggle { min-width: 2.75rem; min-height: 2.75rem; }
+  .sidebar-navigation a, .budgeting-section-nav a, .profile-menu-content a { min-height: 2.75rem; }
 }
 
 @media (max-width: 40rem) {

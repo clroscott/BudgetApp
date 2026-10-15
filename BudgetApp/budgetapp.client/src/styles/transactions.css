@@ -13,7 +13,7 @@
   margin-bottom: 2rem;
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -67,7 +67,7 @@
 .rule-section {
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -124,7 +124,7 @@
   margin-bottom: 1.5rem;
   padding: 1.5rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -241,7 +241,7 @@
   margin-bottom: 1rem;
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -334,7 +334,7 @@
   margin-top: 1.5rem;
   padding: 1.5rem;
   border: 1px solid var(--accent);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -719,7 +719,7 @@
   margin-bottom: 1.25rem;
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -923,8 +923,8 @@
 
 .import-row-badges .possible-duplicate-badge {
   padding: 0.25rem 0.45rem;
-  background: #fff0cf;
-  color: #744700;
+  background: var(--warning-soft);
+  color: var(--warning);
   font-size: 0.78rem;
   font-weight: 800;
 }
@@ -1202,7 +1202,7 @@
   margin-bottom: 1rem;
   padding: 1rem 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
 }
 

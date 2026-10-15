@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { revealTutorialNavigationEvent } from '../tutorials/tutorialTargets'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useAuth } from '../auth/useAuth'
@@ -149,34 +149,37 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
         </button>
 
         <nav id="app-main-navigation" className="sidebar-navigation" aria-label="Main navigation">
-          {mainNavigationGroups.map(group => {
+          {mainNavigationGroups.map((group, index) => {
             const active = groupForPath(path)?.id === group.id
             const expanded = expandedGroups[group.id] ?? active
-            return <div className="sidebar-group" data-navigation-group={group.id} key={group.id}>
-              <div className="sidebar-group-heading">
-                <AppLink to={group.page.path} title={group.label} aria-label={group.label}
-                  className={active ? 'active' : undefined}
-                  aria-current={path === group.page.path ? 'page' : active ? 'location' : undefined}
-                  data-tutorial-id={`nav-${group.page.id}`}>
-                  <AppIcon className="sidebar-navigation-icon" name={group.page.icon!} />
-                  <span className="sidebar-label">{group.label}</span>
-                </AppLink>
-                {group.children.length > 0 && <button type="button" className="sidebar-group-toggle"
-                  aria-expanded={expanded} aria-controls={`navigation-${group.id}`}
-                  aria-label={`${expanded ? 'Collapse' : 'Expand'} ${group.label} navigation`}
-                  onClick={() => setExpandedGroups(current => ({ ...current, [group.id]: !expanded }))}>
-                  <span aria-hidden="true">{expanded ? '−' : '+'}</span>
-                </button>}
+            return <Fragment key={group.id}>
+              {mainNavigationGroups[index - 1]?.section !== group.section && <p className="sidebar-section-label">{group.section}</p>}
+              <div className="sidebar-group" data-navigation-group={group.id}>
+                <div className="sidebar-group-heading">
+                  <AppLink to={group.page.path} title={group.label} aria-label={group.label}
+                    className={active ? 'active' : undefined}
+                    aria-current={path === group.page.path ? 'page' : active ? 'location' : undefined}
+                    data-tutorial-id={`nav-${group.page.id}`}>
+                    <AppIcon className="sidebar-navigation-icon" name={group.page.icon!} />
+                    <span className="sidebar-label">{group.label}</span>
+                  </AppLink>
+                  {group.children.length > 0 && <button type="button" className="sidebar-group-toggle"
+                    aria-expanded={expanded} aria-controls={`navigation-${group.id}`}
+                    aria-label={`${expanded ? 'Collapse' : 'Expand'} ${group.label} navigation`}
+                    onClick={() => setExpandedGroups(current => ({ ...current, [group.id]: !expanded }))}>
+                    <span aria-hidden="true">{expanded ? '−' : '+'}</span>
+                  </button>}
+                </div>
+                {group.children.length > 0 && <div id={`navigation-${group.id}`} className="sidebar-children" hidden={!expanded}>
+                  {group.children.map(page => <AppLink to={page.path} key={page.id} title={page.label} aria-label={page.label}
+                    className={path === page.path ? 'active' : undefined} aria-current={path === page.path ? 'page' : undefined}
+                    data-tutorial-id={`nav-${page.id}`}>
+                    <AppIcon className="sidebar-navigation-icon" name={page.icon ?? 'household'} />
+                    <span className="sidebar-label">{page.label}</span>
+                  </AppLink>)}
+                </div>}
               </div>
-              {group.children.length > 0 && <div id={`navigation-${group.id}`} className="sidebar-children" hidden={!expanded}>
-                {group.children.map(page => <AppLink to={page.path} key={page.id} title={page.label} aria-label={page.label}
-                  className={path === page.path ? 'active' : undefined} aria-current={path === page.path ? 'page' : undefined}
-                  data-tutorial-id={`nav-${page.id}`}>
-                  <AppIcon className="sidebar-navigation-icon" name={page.icon ?? 'household'} />
-                  <span className="sidebar-label">{page.label}</span>
-                </AppLink>)}
-              </div>}
-            </div>
+            </Fragment>
           })}
         </nav>
 
