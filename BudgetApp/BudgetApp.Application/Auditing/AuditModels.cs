@@ -63,6 +63,7 @@ public sealed record AuditEventQueryResult(
 public static class AuditActions
 {
     public const string Created = "Created";
+    public const string Reversed = "Reversed";
     public const string Updated = "Updated";
     public const string Deleted = "Deleted";
     public const string Imported = "Imported";

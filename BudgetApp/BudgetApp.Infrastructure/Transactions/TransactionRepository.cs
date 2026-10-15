@@ -1,6 +1,7 @@
 using BudgetApp.Application.Transactions;
 using BudgetApp.Domain.Accounts;
 using BudgetApp.Domain.Categories;
+using BudgetApp.Domain.Imports;
 using BudgetApp.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -97,6 +98,7 @@ internal sealed class TransactionRepository(BudgetAppDbContext dbContext)
                 on category.ParentCategoryId equals parentCategory.Id into parentCategories
             from parentCategory in parentCategories.DefaultIfEmpty()
             where transaction.HouseholdId == householdId &&
+                  !dbContext.ImportFiles.Any(file => file.Id == transaction.ImportFileId && file.Status == ImportFileStatus.Reversed) &&
                   (account.Scope == AccountScope.Household || account.OwnerUserId == userId ||
                    transaction.IncludeInHouseholdBudget == true && !transaction.IsExcludedFromBudget) &&
                   (!criteria.AccountId.HasValue ||

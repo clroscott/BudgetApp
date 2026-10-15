@@ -31,8 +31,8 @@ internal sealed class ImportRepository(BudgetAppDbContext dbContext)
         var query = VisibleImports(householdId, userId);
         query = filter switch
         {
-            ImportListFilter.Unfinished => query.Where(item => item.File.Status != ImportFileStatus.Completed),
-            ImportListFilter.Completed => query.Where(item => item.File.Status == ImportFileStatus.Completed),
+            ImportListFilter.Unfinished => query.Where(item => item.File.Status != ImportFileStatus.Completed && item.File.Status != ImportFileStatus.Reversed),
+            ImportListFilter.Completed => query.Where(item => item.File.Status == ImportFileStatus.Completed || item.File.Status == ImportFileStatus.Reversed),
             ImportListFilter.ReadyForReview => query.Where(item => item.File.Status == ImportFileStatus.ReadyForReview),
             _ => query
         };
@@ -61,7 +61,7 @@ internal sealed class ImportRepository(BudgetAppDbContext dbContext)
     public async Task<ImportSummary> GetSummaryAsync(Guid householdId, Guid userId, CancellationToken cancellationToken) =>
         await VisibleImports(householdId, userId).GroupBy(_ => 1)
             .Select(group => new ImportSummary(group.Count(),
-                group.Count(item => item.File.Status != ImportFileStatus.Completed),
+                group.Count(item => item.File.Status != ImportFileStatus.Completed && item.File.Status != ImportFileStatus.Reversed),
                 group.Count(item => item.File.Status == ImportFileStatus.ReadyForReview)))
             .SingleOrDefaultAsync(cancellationToken) ?? new ImportSummary(0, 0, 0);
 

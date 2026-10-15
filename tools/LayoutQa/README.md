@@ -176,3 +176,16 @@ manual requirements. Do not overwrite baselines after changing source.
 The interactions mode covers monthly/annual actions in all six layouts, including
 last-field hit testing and calculator Escape/focus return. An optional final
 argument (for example `small-phone`) restricts a diagnostic rerun to one layout.
+
+## Import undo (#113)
+
+`node .\tools\LayoutQa\verify-import-undo-preview.mjs` uses the same installed
+Playwright/browser environment variables as the other harnesses. Port 4192;
+1440/390/320px; eligible, blocked, failed-read/retry, lost-response and Viewer cases.
+It verifies read-only preview wording, confirmed undo, blocked actions, status
+reconciliation, local table scrolling and bounded page width. API responses are fictional
+fixtures; only the expected undo POST is intercepted and simulated (never forwarded).
+Other writes/external requests fail closed. Screenshot evidence goes
+to ignored `artifacts/import-undo-preview-qa`. This checks confirmation, status
+reconciliation and layout, not a real database command or manual QA in
+`docs/manual-qa-regression-test-plan.md`.

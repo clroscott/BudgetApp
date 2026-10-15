@@ -724,7 +724,7 @@ public sealed class ImportReviewService(
         var (access, role) = await GetAuthorized(
             householdId, userId, importFileId, forUpdate: true, cancellationToken);
         RequireEdit(access, role, userId);
-        if (access.ImportFile.Status == ImportFileStatus.Completed)
+        if (access.ImportFile.Status is ImportFileStatus.Completed or ImportFileStatus.Reversed)
         {
             throw new InvalidOperationException(
                 "A completed import cannot be discarded because its official transactions retain import history.");
@@ -836,10 +836,7 @@ public sealed class ImportReviewService(
         var access = await importRepository.GetAccessAsync(
             householdId, importFileId, forUpdate, cancellationToken)
             ?? throw new ImportNotFoundException();
-        if (access.IsPersonalAccount && access.AccountOwnerUserId != userId)
-        {
-            throw new ImportNotFoundException();
-        }
+        ImportAuthorization.RequireVisible(access, userId);
         return (access, role);
     }
 
@@ -847,23 +844,14 @@ public sealed class ImportReviewService(
         ImportAccessRecord access,
         HouseholdRole role,
         Guid userId)
-    {
-        if (access.IsPersonalAccount)
-        {
-            if (access.AccountOwnerUserId != userId) throw new ImportNotFoundException();
-        }
-        else if (role == HouseholdRole.Viewer)
-        {
-            throw new HouseholdAccessDeniedException();
-        }
-    }
+        => ImportAuthorization.RequireEdit(access, role, userId);
 
     private static bool CanEdit(
         bool isPersonal,
         Guid? ownerUserId,
         HouseholdRole role,
         Guid userId) =>
-        isPersonal ? ownerUserId == userId : role != HouseholdRole.Viewer;
+        ImportAuthorization.CanEdit(isPersonal, ownerUserId, role, userId);
 
     private static void RequireReviewable(ImportFile importFile)
     {

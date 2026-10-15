@@ -84,9 +84,9 @@ public sealed class ImportListingTests(BudgetAppWebApplicationFactory factory)
             await db.SaveChangesAsync();
         }
         Assert.Equal(4, (await List(client, seed, "Unfinished")).Items.Count);
-        Assert.Single((await List(client, seed, "Completed")).Items);
+        Assert.Equal(2, (await List(client, seed, "Completed")).Items.Count);
         Assert.Single((await List(client, seed, "ReadyForReview")).Items);
-        Assert.Equal(new ImportSummary(5, 4, 1), await client.GetFromJsonAsync<ImportSummary>(SummaryPath(seed)));
+        Assert.Equal(new ImportSummary(6, 4, 1), await client.GetFromJsonAsync<ImportSummary>(SummaryPath(seed)));
     }
 
     [Fact]
@@ -210,6 +210,11 @@ public sealed class ImportListingTests(BudgetAppWebApplicationFactory factory)
         if (status == ImportFileStatus.Failed) { file.MarkFailed("Synthetic failure", uploaded); return file; }
         file.MarkReadyForReview(new ImportStatistics(1, 1, 0, 0, 0, 0), uploaded);
         if (status == ImportFileStatus.Completed) file.Complete(new ImportStatistics(1, 1, 0, 0, 1, 0), uploaded);
+        if (status == ImportFileStatus.Reversed)
+        {
+            file.Complete(new ImportStatistics(1, 1, 0, 1, 0, 0), uploaded);
+            file.Reverse(uploaded);
+        }
         return file;
     }
 
