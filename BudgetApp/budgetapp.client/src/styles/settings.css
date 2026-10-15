@@ -530,6 +530,13 @@
 }
 
 @media (max-width: 40rem) {
+  .account-settings-card,
+  .household-settings-form,
+  .household-management-section,
+  .household-invite-form { padding: 1rem; }
+
+  .household-settings-actions > button { flex: 1 1 auto; }
+
   .account-card,
   .account-form-heading,
   .account-section-heading {

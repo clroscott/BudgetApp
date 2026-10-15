@@ -28,8 +28,8 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
     const shell = shellRef.current
     const sidebar = sidebarRef.current
     if (!shell || !sidebar) return
-    // CSS uses this only in the narrow layout. Measure actual wrapped/open menu
-    // height rather than assuming a breakpoint-specific fixed header size.
+    // CSS uses this only in the narrow layout. Measure the actual brand strip;
+    // the absolute mobile navigation disclosure does not change its height.
     const measure = () => {
       const height = Math.ceil(sidebar.getBoundingClientRect().height)
       const value = `${height}px`
@@ -84,6 +84,7 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
   useEffect(() => {
     const closeOutside = (event: PointerEvent) => {
       if (event.target instanceof Node && !profileRef.current?.contains(event.target) && profileRef.current) profileRef.current.open = false
+      if (event.target instanceof Node && !sidebarRef.current?.contains(event.target)) setIsNavigationOpen(false)
     }
     document.addEventListener('pointerdown', closeOutside)
     return () => document.removeEventListener('pointerdown', closeOutside)
@@ -121,7 +122,17 @@ export function AppShell({ children, showHouseholdNavigation = true }: { childre
 
   return (
     <div ref={shellRef} className={`app-shell${isSidebarCollapsed ? ' sidebar-collapsed' : ''}${!showHouseholdNavigation ? ' standalone-account-shell' : ''}`}>
-      <aside ref={sidebarRef} hidden={!showHouseholdNavigation} className={`app-sidebar${isNavigationOpen ? ' open' : ''}${isSidebarCollapsed ? ' collapsed' : ''}`}>
+      <aside ref={sidebarRef} hidden={!showHouseholdNavigation} className={`app-sidebar${isNavigationOpen ? ' open' : ''}${isSidebarCollapsed ? ' collapsed' : ''}`}
+        onKeyDown={event => {
+          if (event.key === 'Escape' && isNavigationOpen) {
+            event.stopPropagation()
+            setIsNavigationOpen(false)
+            menuRef.current?.focus()
+          }
+        }}
+        onBlur={event => {
+          if (event.relatedTarget instanceof Node && !event.currentTarget.contains(event.relatedTarget)) setIsNavigationOpen(false)
+        }}>
         <div className="sidebar-top">
           <AppLink className="sidebar-brand" to="/dashboard" title="Dashboard">
             <BrandLockup />

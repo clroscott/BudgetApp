@@ -434,17 +434,18 @@
 
   .app-sidebar {
     height: auto;
+    z-index: calc(var(--layer-budget-actions) + 1);
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 1rem;
     border-right: 0;
     border-bottom: 1px solid var(--border);
     overflow: visible;
   }
 
   .app-sidebar.collapsed {
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 1rem;
   }
 
   .app-sidebar.collapsed .sidebar-top {
@@ -494,6 +495,8 @@
 
   .sidebar-menu-button {
     display: block;
+    min-height: 2.75rem;
+    margin: 0;
   }
 
   .sidebar-navigation,
@@ -503,28 +506,40 @@
   }
 
   .app-sidebar.open .sidebar-navigation {
+    /* A non-modal disclosure below the brand strip: opening it never changes
+       page/header offsets. The menu alone scrolls on short screens. */
+    position: absolute;
+    top: 100%;
+    left: 0.5rem;
+    right: 0.5rem;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-top: 0.8rem;
-    padding-right: 0;
-    max-height: 55svh;
+    margin: 0;
+    padding: 0.5rem;
+    max-height: calc(100svh - var(--shell-navigation-height, 4.25rem) - 0.5rem);
+    max-height: calc(100dvh - var(--shell-navigation-height, 4.25rem) - 0.5rem);
+    border: 1px solid var(--border-strong);
+    border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+    background: var(--surface);
+    box-shadow: var(--shadow);
     overflow-y: auto;
   }
+
+  .app-sidebar .sidebar-navigation a { min-height: 2.75rem; }
+  .app-sidebar .sidebar-group-toggle { min-width: 2.75rem; min-height: 2.75rem; }
 
   .app-sidebar.open .sidebar-navigation p {
     grid-column: 1 / -1;
   }
 
   .app-sidebar.open .sidebar-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-top: 0.75rem;
+    display: none;
   }
 
   .app-context-header {
     gap: 0.65rem;
+    min-height: 3.5rem;
+    padding-block: 0.45rem;
   }
 
   .household-context-manage,
@@ -543,13 +558,19 @@
 }
 
 @media (max-width: 40rem) {
+  .app-sidebar .brand-mark-image { width: 2rem; height: 2rem; }
+  .household-context-bar { flex: 1 1 0; }
+  .household-context-current { width: 100%; }
+  .profile-menu summary { min-height: 2.75rem; }
+  .profile-menu summary > span:not(.visually-hidden) { max-width: 5rem; }
+
   .household-context-bar {
     align-items: flex-start;
   }
 
   .household-context-current {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.2rem 0.65rem;
   }
 
@@ -564,7 +585,9 @@
   }
 
   .household-context-meta {
+    display: block;
     align-self: center;
+    font-size: 0.72rem;
   }
 
   .app-sidebar.open .sidebar-navigation {

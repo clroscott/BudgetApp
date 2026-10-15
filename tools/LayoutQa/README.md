@@ -152,3 +152,27 @@ external requests and writes are blocked. Initial screenshot geometry and fonts
 are stored under ignored `artifacts/refined-ui-qa/<phase>`; completed evidence is
 never overwritten. Before/after visual changes are intentional, not a pixel-equality
 gate. Read [scope and remaining mobile/manual checks](../../docs/ui-enhancement.md).
+
+## Mobile interface (#201)
+
+```powershell
+node .\tools\LayoutQa\verify-mobile-ui.mjs before
+# Apply the mobile changes, then:
+node .\tools\LayoutQa\verify-mobile-ui.mjs after
+# Check final fields, menu stacking, action clearance and calculators:
+node .\tools\LayoutQa\verify-mobile-ui.mjs interactions
+```
+
+Uses port `127.0.0.1:4190` and the same installed Playwright/browser environment
+variables as the other harnesses. Captures three baseline pages on desktop/phone;
+the after run covers 18 pages at 1440px, touch 390/320px, short 844×390 landscape,
+880px tablet and 960×540/2× zoom-equivalent. Desktop dashboard, review and budget
+screenshots must remain pixel-identical to their baseline. Checks bounded document
+width, active tab visibility, menu size/non-displacement, Escape/focus return,
+outside dismissal and Skip. Only fictional GET responses are allowed; no real
+database, credentials, email or writes. Evidence is ignored under
+`artifacts/mobile-ui-qa`. Real devices/zoom/keyboard and screen-reader QA remain
+manual requirements. Do not overwrite baselines after changing source.
+The interactions mode covers monthly/annual actions in all six layouts, including
+last-field hit testing and calculator Escape/focus return. An optional final
+argument (for example `small-phone`) restricts a diagnostic rerun to one layout.
