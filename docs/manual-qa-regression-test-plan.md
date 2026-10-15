@@ -1031,6 +1031,37 @@ automated result substitutes for the deferred full #197 manual sweep.
   Complete once and verify official transactions are not duplicated by retry;
   completed rows stay readable and read-only. Test keyboard and narrow layouts.
 
+### Import-review rendering and draft-cache regression (#213)
+
+Use synthetic/disposable imports only. See
+[profiling method and measured results](import-review-rendering-performance.md).
+Automated results do not mark these manual cases as complete or replace #197.
+
+- [ ] With 10,000 staged rows and 100 visible rows, type continuously in one row's
+  description/amount, including after staging budget choices for the whole import.
+  The caret, focus and input values remain stable. Unchanged rows do not continually
+  rerender and text edits do not rescan all 10,000 budget-choice candidates. Profile
+  with the same browser/data before and after; record commits, duration and long
+  tasks separately from the functional checks, without timing-based pass gates.
+- [ ] Edit text/date/amount, explicitly clear a category, and change budget choices.
+  Page/filter away and back; every correction remains, including off-page edits.
+  Apply each page-only/all-matching preset and confirm its changed/skipped/unchanged
+  counts agree with the saved result. Existing corrections and explicit clears
+  survive. Canceling Apply does not change rows or send a financial write.
+- [ ] Save an individual correction, Save and approve, Save all, create a rule,
+  apply existing rules, exclude/reset/remove, then complete a disposable import.
+  Existing duplicate acknowledgments, permission checks and confirmations remain.
+  Completed imports are read-only; no new automatic approval/write is introduced.
+- [ ] Fail a save/refresh and retry deliberately; corrections remain intact and
+  uncertain writes still require reconciliation. Delay a response, switch imports
+  or households, and return to the original import; the old response cannot clear
+  new corrections, change the selected context or steal focus. Cancel navigation
+  with unsaved row/rule edits and verify both values and selection remain.
+- [ ] Repeat using keyboard alone at desktop/narrow widths and 200% zoom: tab between
+  row controls, open/close Details/rule editor, edit and save. Focus stays visible;
+  protected Viewer controls stay disabled, while allowed personal-account controls
+  remain usable. Another member's private import never becomes visible.
+
 ### Query-only navigation and filter history (#215)
 
 Use Development/Scratch data only. The owner's full manual sweep remains deferred;
