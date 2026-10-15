@@ -87,3 +87,68 @@ API writes and external requests are blocked. Screenshots/read counts go to
 ignored `artifacts/read-ownership-qa`. It closes its own server/browser on failure
 and emits fictional-only diagnostics. It is not a production latency benchmark
 or a substitute for the owner's manual acceptance sweep.
+
+## Import paging and staged corrections (#212, #213)
+
+```powershell
+node .\tools\LayoutQa\verify-import-paging.mjs
+```
+
+Uses port `127.0.0.1:4181` and the installed runtime/browser configuration above.
+Unlike the read-only harnesses, this test simulates saves, decisions and completion
+inside intercepted fictional responses; no request reaches an application server.
+It covers 100/1,000/10,000 staged rows at 1440px and 390px, bounded DOM/payloads,
+safe row paging/filtering, preservation of corrections while staging budget choices,
+targeted saves, approval and completion. Unknown API operations and external requests
+fail closed. Screenshots and request evidence go to ignored
+`artifacts/import-paging-ui-qa`.
+
+## Import rendering profile (#213)
+
+```powershell
+# Capture before editing the application source:
+node .\tools\LayoutQa\profile-import-rendering.mjs before
+# After the focused change, using the same browser/environment:
+node .\tools\LayoutQa\profile-import-rendering.mjs after
+# Optional final verification capture (does not replace either capture):
+node .\tools\LayoutQa\profile-import-rendering.mjs after-final
+```
+
+Uses port `127.0.0.1:4182`, 10,000 synthetic staged rows, 100 visible rows,
+1440×900 and three repetitions. All API reads are intercepted; the only allowed
+POST is a simulated read-only budget-choice preview. Real writes and external
+requests are blocked. It injects development-only React Profiler/counters through
+the disposable Vite server, never into saved application source. It records React
+commit counts and duration, row renders, bulk-preview row visits and browser long
+tasks for typing, filtering, choosing and staging a bulk preset. Browser/runtime
+versions and raw samples go to ignored `artifacts/import-rendering-qa/<phase>`;
+existing evidence is never overwritten. Run comparisons without competing tests.
+
+This is an instrumented development/StrictMode interaction profile, not production
+latency or a DOM-test timing gate. `elapsedMs` includes deliberate typing delays
+and settling time. Keep regressions and remaining long tasks visible in the
+[measured results](../../docs/import-review-rendering-performance.md); do not use
+machine-specific millisecond assertions as unit tests. Functional browser checks
+and the owner's manual keyboard/focus sweep remain separate requirements.
+
+## Refined interface (#201)
+
+```powershell
+node .\tools\LayoutQa\verify-refined-ui.mjs before
+# Apply the focused design slice, then:
+node .\tools\LayoutQa\verify-refined-ui.mjs after
+# A separate final capture after any repairs:
+node .\tools\LayoutQa\verify-refined-ui.mjs after-final
+```
+
+Uses port `127.0.0.1:4184` and the same installed browser/runtime configuration.
+Seven real pages across eight layouts cover desktop/collapsed, 880/800/760px,
+390/320px and the 200%-equivalent short viewport. It verifies common content
+alignment within each layout, bounded document width, profile focus return,
+Menu/Skip behavior, import-column containment and non-overlapping budget actions.
+After captures also check Georgia headings, missing-file disabling and client-side
+oversized-file feedback without any upload. Every API response is fictional and GET-only;
+external requests and writes are blocked. Initial screenshot geometry and fonts
+are stored under ignored `artifacts/refined-ui-qa/<phase>`; completed evidence is
+never overwritten. Before/after visual changes are intentional, not a pixel-equality
+gate. Read [scope and remaining mobile/manual checks](../../docs/ui-enhancement.md).

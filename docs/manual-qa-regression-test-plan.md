@@ -141,6 +141,21 @@ ordinary QA fixtures.
       authorization boundaries. Dependency-only updates must not add migrations
       or change existing financial records.
 
+## Frontend dependency and Node compatibility
+
+- [ ] From a clean install on a supported Node 24 patch, run `npm.cmd ci`, client
+      lint/build, and all client tests. CI must also build/test on Node 22; both
+      lines must meet the client package's declared patch minimums.
+- [ ] Verify `package.json` and `package-lock.json` agree on the jsdom dependency
+      and Node engine range, and that setup documentation matches. Unsupported
+      Node versions must receive an engine error, not a misleading DOM/test error.
+- [ ] After a jsdom upgrade, keep keyboard/focus, tutorials, MFA entry, navigation,
+      and import-review regression tests enabled. Fix actual compatibility issues
+      without weakening assertions or granting browser-like layout to jsdom.
+- [ ] Confirm a normal Development start still works on the developer's supported
+      Node installation. These tool/test updates must not alter financial data,
+      require database migrations, or change the published app's configuration.
+
 ## Critical regression checklist
 
 Run this shorter section before every merge, even when the change appears isolated.
@@ -1016,6 +1031,37 @@ automated result substitutes for the deferred full #197 manual sweep.
   Complete once and verify official transactions are not duplicated by retry;
   completed rows stay readable and read-only. Test keyboard and narrow layouts.
 
+### Import-review rendering and draft-cache regression (#213)
+
+Use synthetic/disposable imports only. See
+[profiling method and measured results](import-review-rendering-performance.md).
+Automated results do not mark these manual cases as complete or replace #197.
+
+- [ ] With 10,000 staged rows and 100 visible rows, type continuously in one row's
+  description/amount, including after staging budget choices for the whole import.
+  The caret, focus and input values remain stable. Unchanged rows do not continually
+  rerender and text edits do not rescan all 10,000 budget-choice candidates. Profile
+  with the same browser/data before and after; record commits, duration and long
+  tasks separately from the functional checks, without timing-based pass gates.
+- [ ] Edit text/date/amount, explicitly clear a category, and change budget choices.
+  Page/filter away and back; every correction remains, including off-page edits.
+  Apply each page-only/all-matching preset and confirm its changed/skipped/unchanged
+  counts agree with the saved result. Existing corrections and explicit clears
+  survive. Canceling Apply does not change rows or send a financial write.
+- [ ] Save an individual correction, Save and approve, Save all, create a rule,
+  apply existing rules, exclude/reset/remove, then complete a disposable import.
+  Existing duplicate acknowledgments, permission checks and confirmations remain.
+  Completed imports are read-only; no new automatic approval/write is introduced.
+- [ ] Fail a save/refresh and retry deliberately; corrections remain intact and
+  uncertain writes still require reconciliation. Delay a response, switch imports
+  or households, and return to the original import; the old response cannot clear
+  new corrections, change the selected context or steal focus. Cancel navigation
+  with unsaved row/rule edits and verify both values and selection remain.
+- [ ] Repeat using keyboard alone at desktop/narrow widths and 200% zoom: tab between
+  row controls, open/close Details/rule editor, edit and save. Focus stays visible;
+  protected Viewer controls stay disabled, while allowed personal-account controls
+  remain usable. Another member's private import never becomes visible.
+
 ### Query-only navigation and filter history (#215)
 
 Use Development/Scratch data only. The owner's full manual sweep remains deferred;
@@ -1584,6 +1630,41 @@ for this verification. Automated tests do not complete the live checks below.
 
 Measurements and repeatable synthetic verification are documented in
 [dashboard-summary-performance.md](dashboard-summary-performance.md).
+
+### Refined interface (#201)
+
+See [approved direction and implementation boundaries](ui-enhancement.md). These
+are manual acceptance cases, not checked by synthetic screenshots or unit tests.
+
+- [ ] Compare Dashboard, Transactions/Import review, Monthly budget, Annual targets,
+  Annual overview, account/household settings and Help on desktop. Georgia headings
+  and key totals, sans-serif dense data, warm surfaces, green actions and panel
+  shapes form one system. Page columns/tabs stay aligned when navigating.
+- [ ] Expanded and collapsed sidebar retain all six main destinations, child pages,
+  current-location cues and tutorial targets. Day to day/Manage/Support clarify
+  grouping without losing account settings, household context or operator access.
+- [ ] The usual three-card overview has a prominent financial summary. Existing
+  customized card orders/columns, empty layouts, dragging, Earlier/Later, failed
+  saves and Cancel still work without silently rewriting preferences. Amounts and
+  report links retain their exact month/scope/currency meanings; no sample numbers
+  or invented category breakdown appears in real data.
+- [ ] Without a file, Upload for review remains disabled. Select a disposable file
+  larger than 10 MB and try uploading from the bottom of the form; then try a
+  disposable upload/save that fails. The explanation is brought into
+  view below the sticky header when necessary, is keyboard reachable and remains
+  available. Visible/unchanged errors do not repeatedly steal focus. Safe entered
+  values remain; failure does not automatically retry or approve financial writes.
+- [ ] Review 880/800/760px, real phones and 200% browser zoom. Menu, household
+  switching, profile Escape, Skip, focus indicators, touch targets and on-screen
+  keyboards remain usable. No document-wide horizontal scrolling; wide grids
+  scroll within themselves and labels never bleed between columns.
+- [ ] At the end of monthly and annual editing pages, Save, Activate/Delete where
+  permitted, calculator and Back to top remain separate and reachable. Buttons
+  wrap without clipping/overlap, and measured footer clearance protects the final
+  editable row. Cancel navigation and verify dirty data survives.
+- [ ] Record mobile-specific design feedback separately before calling the new
+  mobile experience finished. Repeat with Viewer/private-account permissions,
+  no household, empty/zero/negative totals and failed/stale reads.
 
 ### UI cleanup and mixed dashboard (#200)
 

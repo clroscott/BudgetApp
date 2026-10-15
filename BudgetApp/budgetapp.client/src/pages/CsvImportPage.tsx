@@ -265,7 +265,7 @@ export function CsvImportPage() {
           <ContextualHelp topic="import-approval" />
           <ContextualHelp topic="scope-privacy" />
         </div>
-        <ErrorSummary errors={errors} />
+        <ErrorSummary errors={errors} revealOnChange />
 
         {isLoading ? (
           <p className="empty-state">Loading accounts...</p>

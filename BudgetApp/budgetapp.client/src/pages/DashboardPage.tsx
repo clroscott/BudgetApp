@@ -295,6 +295,12 @@ export function DashboardPage() {
   const columnCount = isCustomizing
     ? draftColumnCount
     : layout?.preferredColumnCount ?? 3
+  // Give the canonical three-card overview a clear summary hierarchy. Other
+  // saved arrangements keep their card order/columns; customize uses uniform
+  // cards so drag and Earlier/Later retain their existing behavior.
+  const isOverviewLayout = !isCustomizing && columnCount === 3 &&
+    visibleKeys.length === defaultDashboardPanelKeys.length &&
+    visibleKeys.every((key, index) => key === defaultDashboardPanelKeys[index])
 
   return (
     <PageFrame>
@@ -318,7 +324,7 @@ export function DashboardPage() {
           )}
         </div>
 
-        <ErrorSummary errors={errors} />
+        <ErrorSummary errors={errors} revealOnChange />
         <div className="dashboard-context-controls" aria-label="Financial summary context">
           <label>Summary month<input type="month" min="0001-01" max="9998-12" value={period}
             onChange={event => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value) && Number(event.target.value.slice(0, 4)) >= 1 && Number(event.target.value.slice(0, 4)) <= 9998) setPeriod(event.target.value) }} /></label>
@@ -432,7 +438,7 @@ export function DashboardPage() {
           </section>
         ) : (
           <div
-            className={`dashboard-grid dashboard-columns-${columnCount}${isCustomizing ? ' dashboard-customizing' : ''}`}
+            className={`dashboard-grid dashboard-columns-${columnCount}${isOverviewLayout ? ' dashboard-overview-layout' : ''}${isCustomizing ? ' dashboard-customizing' : ''}`}
           >
             {visibleKeys.map((key, index) => {
               const panel = panelByKey.get(key)
@@ -445,7 +451,7 @@ export function DashboardPage() {
                 : panel.description
               return (
                 <article
-                  className={`summary-card dashboard-panel${draggedPanelKey === key ? ' dragging' : ''}`}
+                  className={`summary-card dashboard-panel dashboard-panel-${key}${draggedPanelKey === key ? ' dragging' : ''}`}
                   draggable={isCustomizing && !isSaving}
                   key={key}
                   ref={element => {

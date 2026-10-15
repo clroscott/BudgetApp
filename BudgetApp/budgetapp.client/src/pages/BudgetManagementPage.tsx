@@ -426,7 +426,7 @@ export function BudgetManagementPage() {
           <ContextualHelp topic="budget-states" />
           <ContextualHelp topic="annual-targets" />
         </div>
-        <ErrorSummary errors={errors} />
+        <ErrorSummary errors={errors} revealOnChange />
         {notice && <p role="status">{notice}</p>}
         <PageLoadFeedback subject="budget" status={loadState.status} errors={loadState.errors}
           disabled={isSaving} onReload={reloadBudget} />

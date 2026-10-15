@@ -9,7 +9,7 @@
   margin-bottom: 2rem;
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
 }
 
@@ -35,7 +35,7 @@
 .category-section {
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -186,7 +186,7 @@
   margin-bottom: 1.5rem;
   padding: 1rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -234,7 +234,7 @@
 .budget-section {
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -557,7 +557,7 @@
   margin: 0 auto;
   padding: 1rem 1.25rem;
   border: 1px solid var(--border-strong);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--shadow);
 }
@@ -573,6 +573,9 @@
 }
 
 .budget-save-bar strong {
+  font-family: var(--font-numeric);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums lining-nums;
   font-size: 1.35rem;
 }
 
@@ -619,7 +622,7 @@
   flex-direction: column;
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -910,7 +913,7 @@
   margin: 1rem auto 0;
   padding: 0.8rem 1rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   box-shadow: 0 0.6rem 1.5rem rgb(15 49 42 / 12%);
   backdrop-filter: blur(12px);
@@ -975,6 +978,9 @@
 
 .annual-summary-card > strong {
   font-size: clamp(1.1rem, 2vw, 1.45rem);
+  font-family: var(--font-numeric);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .annual-summary-card > strong a {
@@ -1174,7 +1180,7 @@
   gap: 0.35rem;
   padding: 1rem 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -1193,7 +1199,7 @@
   margin-bottom: 1rem;
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }

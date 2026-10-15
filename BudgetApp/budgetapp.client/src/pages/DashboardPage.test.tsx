@@ -49,6 +49,24 @@ beforeEach(() => {
   window.history.replaceState(null, '', '/dashboard')
 })
 describe('mixed dashboard', () => {
+  it('features the canonical overview without rewriting the saved layout', async () => {
+    const view = show(); await loadedAmounts()
+    expect(view.container.querySelector('.dashboard-overview-layout')).not.toBeNull()
+    expect(view.container.querySelector('.dashboard-remaining')?.textContent).toContain(amount(100))
+    fireEvent.click(screen.getByRole('button', { name: 'Customize dashboard' }))
+    expect(view.container.querySelector('.dashboard-overview-layout')).toBeNull()
+    expect(saveDashboardLayout).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(view.container.querySelector('.dashboard-overview-layout')).not.toBeNull()
+    expect(saveDashboardLayout).not.toHaveBeenCalled()
+  })
+  it('does not impose the overview arrangement on other saved panel orders', async () => {
+    vi.mocked(getDashboardLayout).mockResolvedValue({ preferredColumnCount: 2, visiblePanelKeys: ['quick-actions', 'financial-overview'], isDefault: false })
+    const view = show(); await loadedAmounts()
+    expect(view.container.querySelector('.dashboard-overview-layout')).toBeNull()
+    expect(view.container.querySelector('.dashboard-columns-2')).not.toBeNull()
+    expect([...view.container.querySelectorAll('.dashboard-panel h2')].map(node => node.textContent)).toEqual(['Quick actions', 'Financial overview'])
+  })
   it('loads one summary without recent rows for the default layout', async () => {
     show(); await loadedAmounts()
     expect(readDashboardSnapshot).toHaveBeenCalledExactlyOnceWith('household-a', expect.any(String), 'Household', false)
@@ -122,6 +140,7 @@ describe('mixed dashboard', () => {
     vi.mocked(readDashboardSnapshot).mockResolvedValue(data)
     show()
     await screen.findByText(`Over budget by ${amount(10)}.`)
+    expect(financialOverview().querySelector('.dashboard-remaining.is-negative')).not.toBeNull()
     expect(screen.queryByText(/No saved household budget/)).toBeNull()
   })
   it('shows setup guidance only after a successful empty response, without creating anything', async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ImportDraftItem } from './importApi'
-import { draftUpdate, previewBulkBudgetInclusion, type BudgetInclusionPreset } from './importBudgetInclusion'
+import { countBulkBudgetInclusion, draftUpdate, previewBulkBudgetInclusion, type BudgetInclusionPreset } from './importBudgetInclusion'
 
 const row: ImportDraftItem = {
   id: 'row-a', sourceRowNumber: 2, transactionDate: '2026-07-01', amount: 100, description: 'Original',
@@ -11,6 +11,20 @@ const row: ImportDraftItem = {
   canChangeHouseholdInclusion: true, canChangePersonalInclusion: true,
 }
 describe('bulk staged budget inclusion', () => {
+  it.each<BudgetInclusionPreset | ''>(['', 'Personal', 'Household', 'PersonalAndHousehold', 'Neither'])(
+    'count-only preview matches staged-update decisions for %s', preset => {
+      const drafts = [row, { ...row, id: 'excluded', reviewDecision: 'Excluded' },
+        { ...row, id: 'linked', approvedTransactionId: 'transaction' },
+        { ...row, id: 'protected-personal', canChangePersonalInclusion: false },
+        { ...row, id: 'protected-household', canChangeHouseholdInclusion: false },
+        { ...row, id: 'defaults', includeInHouseholdBudget: undefined, includeInPersonalBudget: undefined },
+        { ...row, id: 'other', includeInHouseholdBudget: false, includeInPersonalBudget: true }]
+      const pending = new Map([[row.id, { ...draftUpdate(row), description: '', selectedCategoryId: null,
+        includeInHouseholdBudget: false, includeInPersonalBudget: true }]])
+      const updates = previewBulkBudgetInclusion(drafts, pending, preset)
+      expect(countBulkBudgetInclusion(drafts, pending, preset)).toEqual({ changed: updates.changes.size,
+        skipped: updates.skipped, unchanged: updates.unchanged })
+    })
   it.each<[BudgetInclusionPreset, boolean, boolean]>([
     ['Personal', false, true], ['Household', true, false], ['PersonalAndHousehold', true, true], ['Neither', false, false],
   ])('sets %s without changing financial corrections', (preset, household, personal) => {

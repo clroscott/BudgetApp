@@ -7,7 +7,7 @@
   margin-bottom: 1.5rem;
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -160,7 +160,7 @@
   margin-bottom: 1.5rem;
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
@@ -309,7 +309,7 @@
   margin-bottom: 1rem;
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--small-shadow);
 }
