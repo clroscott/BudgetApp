@@ -9,6 +9,7 @@ public sealed class TutorialProgressTests(BudgetAppWebApplicationFactory factory
     [Theory]
     [InlineData("getting-started", 6)]
     [InlineData("import-review", 9)]
+    [InlineData("build-first-budget", 9)]
     public async Task Progress_CanBeResumedCompletedAndReplayed(string tutorialKey, int lastStep)
     {
         using var client = factory.CreateAuthenticatedTestClient();

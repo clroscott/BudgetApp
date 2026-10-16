@@ -8,6 +8,9 @@ import { getBudget, getBudgetMonthOptions } from '../budgets/budgetApi'
 import { getYearlyPlan, saveYearlyPlan } from '../budgets/yearlyPlanApi'
 import { BudgetManagementPage } from './BudgetManagementPage'
 import { YearlyPlanManagementPage } from './YearlyPlanManagementPage'
+import { useBudgetTutorialPage } from '../tutorials/useBudgetTutorialPage'
+
+vi.mock('../tutorials/useBudgetTutorialPage', () => ({ useBudgetTutorialPage: vi.fn(() => false) }))
 
 vi.mock('../budgets/budgetApi', async original => ({
   ...await original<typeof import('../budgets/budgetApi')>(),
@@ -20,12 +23,15 @@ vi.mock('../budgets/yearlyPlanApi', async original => ({
 
 let barHeight = 112
 let resized: () => void
+let observedBar: Element | undefined
 const disconnect = vi.fn()
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/budgeting?year=2026&month=1')
   barHeight = 112
   disconnect.mockClear()
+  observedBar = undefined
+  vi.mocked(useBudgetTutorialPage).mockReturnValue(false)
   vi.mocked(getBudget).mockResolvedValue(budgetFixture())
   vi.mocked(getBudgetMonthOptions).mockResolvedValue([])
   vi.mocked(getYearlyPlan).mockResolvedValue(annualFixture())
@@ -37,6 +43,7 @@ beforeEach(() => {
     constructor(callback: () => void) { this.callback = callback }
     observe(target: Element) {
       if (target.classList.contains('budget-save-bar')) {
+        observedBar = target
         this.isBudgetBar = true
         resized = this.callback
       }
@@ -54,12 +61,37 @@ afterEach(() => vi.unstubAllGlobals())
 
 function show(annual = false) {
   if (annual) window.history.replaceState(null, '', '/budgeting/annual-targets')
-  return render(<RouterProvider><HouseholdContext.Provider value={householdsFixture()}>
+  const contents = () => <RouterProvider><HouseholdContext.Provider value={householdsFixture()}>
     {annual ? <YearlyPlanManagementPage /> : <BudgetManagementPage />}<BackToTopButton />
-  </HouseholdContext.Provider></RouterProvider>)
+  </HouseholdContext.Provider></RouterProvider>
+  const view = render(contents())
+  return { ...view, refresh: () => view.rerender(contents()) }
 }
 
 describe('monthly budget fixed-action spacing', () => {
+  it('remeasures the replacement bar after entering and leaving the tutorial', async () => {
+    const view = show()
+    const originalBar = await screen.findByRole('region', { name: 'Budget actions' })
+    const page = screen.getByRole('main')
+    expect(observedBar).toBe(originalBar)
+    expect(page.style.getPropertyValue('--budget-actions-height')).toBe('112px')
+
+    vi.mocked(useBudgetTutorialPage).mockReturnValue(true)
+    view.refresh()
+    expect(page.style.getPropertyValue('--budget-actions-height')).toBe('')
+    expect(disconnect).toHaveBeenCalledOnce()
+
+    vi.mocked(useBudgetTutorialPage).mockReturnValue(false)
+    view.refresh()
+    const replacementBar = screen.getByRole('region', { name: 'Budget actions' })
+    expect(replacementBar).not.toBe(originalBar)
+    expect(observedBar).toBe(replacementBar)
+    expect(page.style.getPropertyValue('--budget-actions-height')).toBe('112px')
+    barHeight = 248.5
+    act(() => resized())
+    expect(page.style.getPropertyValue('--budget-actions-height')).toBe('249px')
+  })
+
   it('reserves the measured bar height and keeps Back to top inside asynchronously loaded actions', async () => {
     const view = show()
     const actions = await screen.findByRole('region', { name: 'Budget actions' })

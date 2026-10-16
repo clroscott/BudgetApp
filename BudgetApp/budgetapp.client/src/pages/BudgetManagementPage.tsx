@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { PageFrame } from '../components/PageFrame'
 import { AmountCalculator } from '../components/AmountCalculator'
@@ -24,6 +24,8 @@ import { usePageLoad } from './usePageLoad'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
+import { useBudgetTutorialPage } from '../tutorials/useBudgetTutorialPage'
+import { ApiError } from '../api/apiClient'
 
 type SectionMode = 'overall' | 'detailed'
 type Amounts = Record<string, string>
@@ -75,14 +77,16 @@ function BudgetAmountInput({
   value,
   disabled,
   onChange,
+  tutorialIds = [],
 }: {
   name: string
   currency: string
   value: string
   disabled: boolean
   onChange: (value: string) => void
+  tutorialIds?: string[]
 }) {
-  return (
+  const entry = (
     <span className="amount-entry-with-calculator">
       <span className="currency-input">
         <span>{currency}</span>
@@ -105,6 +109,9 @@ function BudgetAmountInput({
       />
     </span>
   )
+  if (!tutorialIds.length) return entry
+  const labelled = <span className="budget-tutorial-field"><small>{name}</small>{entry}</span>
+  return tutorialIds.reduce<ReactNode>((content, id) => <span key={id} className="budget-tutorial-target" data-tutorial-id={id}>{content}</span>, labelled)
 }
 
 export function BudgetManagementPage() {
@@ -121,6 +128,7 @@ export function BudgetManagementPage() {
   const [modes, setModes] = useState<Modes>({})
   const [savedSnapshot, setSavedSnapshot] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [writeUncertain, setWriteUncertain] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
   const loadState = usePageLoad(`${currentHousehold?.id}/${year}/${month}/${scope}`)
@@ -129,12 +137,37 @@ export function BudgetManagementPage() {
   const actionsRef = useRef<HTMLElement>(null)
   const hasBudgetActions = Boolean(loadState.hasData && budget?.id && budget.categories.length > 0)
 
-  // Fixed actions must not cover the last rows. Measure wrapping, unsaved text
-  // and the asynchronously portaled Back to top button, not a guessed height.
+  const currentSnapshot = useMemo(() => snapshot(amounts), [amounts])
+  const isDirty = Boolean(budget?.id) && currentSnapshot !== savedSnapshot
+  const confirmDiscard = useUnsavedChangesGuard(isDirty, 'Discard your unsaved budget changes?')
+  const canManage = currentHousehold?.role !== 'Viewer' && loadState.isFresh && !writeUncertain
+  const isClosed = budget?.status === 'Closed'
+  const canEdit = canManage && Boolean(budget?.id) && !isClosed
+  const activeRoots = budget?.categories.filter(root => root.isActive || root.children.some(child => child.isActive)) ?? []
+  // Stable category choices: changing a mode must not silently move the guide to
+  // another category. Prefer a simple total, then a different breakdown category.
+  const planningRoot = activeRoots.find(root => root.children.length === 0) ?? activeRoots[0]
+  const breakdownRoot = activeRoots.find(root => root.id !== planningRoot?.id && root.children.some(child => child.isActive))
+    ?? activeRoots.find(root => root.children.some(child => child.isActive))
+  const otherRoots = activeRoots.filter(root => root.id !== planningRoot?.id && root.id !== breakdownRoot?.id)
+  const tutorialActive = useBudgetTutorialPage(currentHousehold ? {
+    householdId: currentHousehold.id, year, month, scope, budgetId: budget?.id ?? null, status: budget?.status ?? null,
+    fresh: loadState.isFresh, canManage, canPlan: Boolean(planningRoot), busy: isSaving, dirty: isDirty,
+    uncertain: writeUncertain, hasEnteredAmounts: Object.values(amounts).some(value => value.trim() !== ''),
+    hasSavedAmounts: Boolean(budget?.categories.some(root => root.budgetedAmount !== null || root.children.some(child => child.budgetedAmount !== null))),
+    overallDetailed: Boolean(planningRoot && modes[planningRoot.id] === 'detailed'),
+    hasBreakdown: Boolean(breakdownRoot), breakdownDetailed: Boolean(breakdownRoot && modes[breakdownRoot.id] === 'detailed'),
+    hasSecondCategory: Boolean(otherRoots[0]), hasThirdCategory: Boolean(otherRoots[1]),
+  } : null)
+
+  // The tutorial's in-flow wrapper replaces the action-bar element. Rebind on
+  // both entry and exit so spacing never observes a detached, zero-height bar.
+  // Fixed actions also resize when buttons wrap, unsaved text appears or the
+  // Back to top button is portaled in; reserve their measured height.
   useLayoutEffect(() => {
     const page = pageRef.current
     const actions = actionsRef.current
-    if (!hasBudgetActions || !page || !actions) return
+    if (tutorialActive || !hasBudgetActions || !page || !actions) return
     const reserveSpace = () => page.style.setProperty(
       '--budget-actions-height', `${Math.ceil(actions.getBoundingClientRect().height)}px`,
     )
@@ -147,18 +180,24 @@ export function BudgetManagementPage() {
       window.removeEventListener('resize', reserveSpace)
       page.style.removeProperty('--budget-actions-height')
     }
-  }, [hasBudgetActions])
+  }, [hasBudgetActions, tutorialActive])
 
-  const currentSnapshot = useMemo(() => snapshot(amounts), [amounts])
-  const isDirty = Boolean(budget?.id) && currentSnapshot !== savedSnapshot
-  const confirmDiscard = useUnsavedChangesGuard(isDirty, 'Discard your unsaved budget changes?')
-  const canManage = currentHousehold?.role !== 'Viewer' && loadState.isFresh
-  const isClosed = budget?.status === 'Closed'
-  const canEdit = canManage && Boolean(budget?.id) && !isClosed
+  const inputTutorialIds = (root: BudgetPageData['categories'][number], childId?: string) => {
+    if (!tutorialActive || childId && childId !== (root.children.find(child => child.isActive) ?? root.children[0])?.id) return []
+    return [root.id === planningRoot?.id ? 'budget-tutorial-planning' : '',
+      root.id === breakdownRoot?.id && childId ? 'budget-tutorial-breakdown-input' : '',
+      root.id === otherRoots[0]?.id ? 'budget-tutorial-category-two' : '',
+      root.id === otherRoots[1]?.id ? 'budget-tutorial-category-three' : ''].filter(Boolean)
+  }
+
+  const markUncertainWrite = (error: unknown) => {
+    if (tutorialActive && (!(error instanceof ApiError) || ![400, 422].includes(error.status))) setWriteUncertain(true)
+  }
 
   const applyBudget = useCallback((data: BudgetPageData) => {
     const state = stateFromBudget(data)
     setBudget(data)
+    setWriteUncertain(false)
     setAmounts(state.amounts)
     setModes(state.modes)
     setSavedSnapshot(snapshot(state.amounts))
@@ -194,6 +233,7 @@ export function BudgetManagementPage() {
     setModes({})
     setSavedSnapshot(snapshot({}))
     setNotice(null)
+    setWriteUncertain(false)
   }
 
   const changePeriod = (nextYear: number, nextMonth: number) => {
@@ -217,11 +257,13 @@ export function BudgetManagementPage() {
     if (!canManage || isSaving || budget?.id) return
     setIsSaving(true)
     setErrors([])
+    const stillSelected = loadState.captureContext()
+    const accept = (data: BudgetPageData) => { if (stillSelected()) applyBudget(data) }
     try {
       if (method === 'blank') {
-        applyBudget(await createBudget(currentHousehold.id, year, month, scope))
+        accept(await createBudget(currentHousehold.id, year, month, scope))
       } else if (method === 'from-recurring') {
-        applyBudget(await initializeBudget(
+        accept(await initializeBudget(
           currentHousehold.id, year, month, scope, method,
         ))
       } else {
@@ -230,12 +272,12 @@ export function BudgetManagementPage() {
           setErrors(['Select an existing budget to copy.'])
           return
         }
-        applyBudget(await copyBudget(
+        accept(await copyBudget(
           currentHousehold.id, year, month, scope, sourceYear, sourceMonth,
         ))
       }
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (stillSelected()) { setErrors(getErrorMessages(error)); markUncertainWrite(error) }
     } finally {
       setIsSaving(false)
     }
@@ -272,10 +314,12 @@ export function BudgetManagementPage() {
 
     setIsSaving(true)
     setErrors([])
+    const stillSelected = loadState.captureContext()
     try {
-      applyBudget(await saveBudget(currentHousehold.id, budget.id, lines))
+      const saved = await saveBudget(currentHousehold.id, budget.id, lines)
+      if (stillSelected()) applyBudget(saved)
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (stillSelected()) { setErrors(getErrorMessages(error)); markUncertainWrite(error) }
     } finally {
       setIsSaving(false)
     }
@@ -292,10 +336,12 @@ export function BudgetManagementPage() {
     if (action === 'reopen' && !window.confirm('Reopen this budget and allow changes again?')) return
     setIsSaving(true)
     setErrors([])
+    const stillSelected = loadState.captureContext()
     try {
-      applyBudget(await changeBudgetStatus(currentHousehold.id, budget.id, action))
+      const saved = await changeBudgetStatus(currentHousehold.id, budget.id, action)
+      if (stillSelected()) applyBudget(saved)
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (stillSelected()) { setErrors(getErrorMessages(error)); markUncertainWrite(error) }
     } finally {
       setIsSaving(false)
     }
@@ -376,9 +422,11 @@ export function BudgetManagementPage() {
     </span>
   )
 
+  const saveAction = canEdit && <button className="primary-button" type="button" disabled={isSaving || !isDirty} onClick={() => void handleSave()}>{isSaving ? 'Saving...' : 'Save budget'}</button>
   const actions = hasBudgetActions && budget && <section
     className="budget-save-bar"
     aria-label="Budget actions"
+    data-tutorial-id="budget-tutorial-total"
     ref={actionsRef}
   >
     <div>
@@ -390,25 +438,29 @@ export function BudgetManagementPage() {
     <div className="budget-save-actions">
       <span className="budget-back-to-top-host" data-back-to-top-host />
       {budget?.status === 'Draft' && canManage && <button className="danger-button" type="button" disabled={isSaving} onClick={() => void handleDeleteDraft()}>Delete draft</button>}
-      {budget?.status === 'Draft' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before activating.' : undefined} onClick={() => void handleStatus('activate')}>Activate</button>}
+      {budget?.status === 'Draft' && canManage && <button data-tutorial-id="budget-tutorial-activate" className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before activating.' : undefined} onClick={() => void handleStatus('activate')}>Activate</button>}
       {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before returning to Draft.' : undefined} onClick={() => void handleStatus('return-to-draft')}>Return to draft</button>}
       {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before closing.' : undefined} onClick={() => void handleStatus('close')}>Close budget</button>}
       {budget?.status === 'Closed' && canManage && <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleStatus('reopen')}>Reopen budget</button>}
-      {canEdit && <button className="primary-button" type="button" disabled={isSaving || !isDirty} onClick={() => void handleSave()}>{isSaving ? 'Saving...' : 'Save budget'}</button>}
+      {tutorialActive && canEdit ? <div className="budget-tutorial-save-target" data-tutorial-id="budget-tutorial-save" role="group" aria-label="Monthly total and save">
+        <span>Monthly total <strong>{formattedTotal}</strong></span>{saveAction}
+      </div> : saveAction}
     </div>
   </section>
 
   return (
-    <PageFrame className="budget-page" contentClassName="budget-content" ref={pageRef} footer={actions}>
+    <PageFrame className={`budget-page${tutorialActive ? ' budget-tutorial-active' : ''}`} contentClassName="budget-content" ref={pageRef}
+      footer={<>{tutorialActive && actions ? <div className="page-frame-content">{actions}</div> : actions}<div id="budget-tutorial-guide-host" /></>}>
         <BudgetingSectionNav current="monthly" />
         <div className="page-title-row" data-tutorial-id="monthly-budget-page-title">
           <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time.</p>
+            {tutorialActive && <p data-tutorial-id="budget-tutorial-summary">{monthNames[month - 1]} {year} · {scope} · {budget?.currency ?? currentHousehold.defaultCurrency} · {isSaving || !loadState.isFresh ? 'Checking saved state…' : isDirty ? 'Unsaved changes' : budget?.status ? `Saved ${budget.status}` : 'No saved budget'}</p>}
             <p>Actuals follow “Include in budgets” on each transaction. Shared expenses can count
               in both scopes; your budget amounts remain separate.</p></div>
           {loadState.hasData && budget?.status && <span className={`budget-status budget-status-${budget.status.toLowerCase()}`}>{budget.status}</span>}
         </div>
 
-        <section className="budget-period-panel" aria-label="Budget period">
+        <section className="budget-period-panel" aria-label="Budget period" data-tutorial-id="budget-tutorial-period">
           <button className="secondary-button" type="button" disabled={isSaving} onClick={() => changePeriod(year, month - 1)}>Previous</button>
           <label>Month<select value={month} disabled={isSaving} onChange={event => changePeriod(year, Number(event.target.value))}>
             {monthNames.map((name, index) => <option value={index + 1} key={name}>{name}</option>)}
@@ -427,6 +479,8 @@ export function BudgetManagementPage() {
           <ContextualHelp topic="annual-targets" />
         </div>
         <ErrorSummary errors={errors} revealOnChange />
+        {writeUncertain && <section role="alert" className="error-summary"><p>The result is uncertain. Check the saved budget before trying another change.</p>
+          <button type="button" disabled={isSaving} onClick={() => reloadBudget()}>Check saved budget</button></section>}
         {notice && <p role="status">{notice}</p>}
         <PageLoadFeedback subject="budget" status={loadState.status} errors={loadState.errors}
           disabled={isSaving} onReload={reloadBudget} />
@@ -434,7 +488,14 @@ export function BudgetManagementPage() {
         {!loadState.hasData || !budget ? null : !budget.id && !loadState.isFresh ? (
           <p className="empty-state">No budget was saved in the last successful response. Its current status is unavailable.</p>
         ) : !budget.id ? (
-          <div className="budget-empty-state"><div className="empty-state"><h2>No budget for {monthNames[month - 1]} {year}</h2><p>Choose how to start this {scope.toLowerCase()} budget.</p></div>{canManage && <div className="budget-initialization-grid"><article><h3>Copy an existing month</h3><p>Copy budget amounts and category detail from any existing {scope.toLowerCase()} budget.</p><label className="budget-copy-source"><span>Budget to copy</span><select value={copySource} disabled={budgetOptions.length === 0 || isSaving} onChange={event => setCopySource(event.target.value)}>{budgetOptions.length === 0 ? <option value="">No existing budgets</option> : budgetOptions.map(option => <option key={option.id} value={`${option.year}-${option.month}`}>{monthNames[option.month - 1]} {option.year} ({option.status})</option>)}</select></label><button className="secondary-button" type="button" disabled={isSaving || !copySource} onClick={() => void handleCreate('copy')}>Copy selected month</button></article><article><h3>Use recurring expenses</h3><p>Build category amounts from active recurring expenses that apply this month.</p><button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('from-recurring')}>Build from recurring expenses</button></article><article><h3>Start from scratch</h3><p>Create an empty draft and enter every amount yourself.</p><button className="primary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('blank')}>Create blank budget</button></article></div>}</div>
+          <div className="budget-empty-state">
+            <div className="empty-state"><h2>No budget for {monthNames[month - 1]} {year}</h2><p>Choose how to start this {scope.toLowerCase()} budget.</p></div>
+            {canManage && <div className="budget-initialization-grid">
+              <article><h3>Copy an existing month</h3><p>Copy budget amounts and category detail from any existing {scope.toLowerCase()} budget.</p><label className="budget-copy-source"><span>Budget to copy</span><select value={copySource} disabled={budgetOptions.length === 0 || isSaving} onChange={event => setCopySource(event.target.value)}>{budgetOptions.length === 0 ? <option value="">No existing budgets</option> : budgetOptions.map(option => <option key={option.id} value={`${option.year}-${option.month}`}>{monthNames[option.month - 1]} {option.year} ({option.status})</option>)}</select></label><button className="secondary-button" type="button" disabled={isSaving || !copySource} onClick={() => void handleCreate('copy')}>Copy selected month</button></article>
+              <article><h3>Use recurring expenses</h3><p>Build category amounts from active recurring expenses that apply this month.</p><button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('from-recurring')}>Build from recurring expenses</button></article>
+              <article><h3>Start from scratch</h3><p>Create an empty draft and enter every amount yourself.</p><button data-tutorial-id="budget-tutorial-create" className="primary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('blank')}>Create blank budget</button></article>
+            </div>}
+          </div>
         ) : budget.categories.length === 0 ? (
           <div className="empty-state"><h2>No expense categories</h2><p>Add expense categories before entering budget amounts.</p><AppLink to="/settings/categories">Manage categories</AppLink></div>
         ) : (
@@ -446,18 +507,24 @@ export function BudgetManagementPage() {
               {budget.categories.map(root => {
                 const mode = modes[root.id] ?? 'overall'
                 const rootBudget = sectionBudget(root)
+                const modeControls = root.children.length > 0 && <div className="budget-mode" aria-label={`${root.name} budgeting mode`}>
+                  <button type="button" className={mode === 'overall' ? 'selected' : ''} disabled={!canEdit || isSaving} onClick={() => setMode(root.id, 'overall')}>Overall</button>
+                  <button type="button" className={mode === 'detailed' ? 'selected' : ''} disabled={!canEdit || isSaving} onClick={() => setMode(root.id, 'detailed')}>Detailed</button>
+                </div>
                 return <section className="budget-section" key={root.id}>
                   <div className="budget-section-heading"><div><h2>{root.name}</h2>{!root.isActive && <span className="status-pill">Deactivated</span>}</div>
-                    {root.children.length > 0 && <div className="budget-mode" aria-label={`${root.name} budgeting mode`}>
-                      <button type="button" className={mode === 'overall' ? 'selected' : ''} disabled={!canEdit || isSaving} onClick={() => setMode(root.id, 'overall')}>Overall</button>
-                      <button type="button" className={mode === 'detailed' ? 'selected' : ''} disabled={!canEdit || isSaving} onClick={() => setMode(root.id, 'detailed')}>Detailed</button>
-                    </div>}
+                    {tutorialActive && modeControls && (root.id === planningRoot?.id || root.id === breakdownRoot?.id)
+                      ? <div className="budget-tutorial-mode-target" data-tutorial-id={root.id === planningRoot?.id ? 'budget-tutorial-overall-mode' : undefined}>
+                          <div data-tutorial-id={root.id === breakdownRoot?.id ? 'budget-tutorial-breakdown-mode' : undefined}>
+                            <small>{root.name}</small>{modeControls}
+                          </div>
+                        </div> : modeControls}
                   </div>
                   <div className="budget-section-summary"><span><small>Budgeted</small><strong>{rootBudget === null ? 'No budget' : formatAmount(rootBudget)}</strong></span>{metrics(rootBudget, root.actualAmount)}</div>
-                  {mode === 'overall' ? <div className="budget-amount-row"><span className="budget-row-name">{root.name} total</span>{planningMetrics(root)}<span className="budget-row-values"><BudgetAmountInput name={root.name} currency={budget.currency} disabled={!canEdit || isSaving || !root.isActive} value={amounts[root.id] ?? ''} onChange={value => setAmounts(current => ({ ...current, [root.id]: value }))} />{metrics(amountOrNull(root.id), root.actualAmount)}</span></div> :
+                  {mode === 'overall' ? <div className="budget-amount-row"><span className="budget-row-name">{root.name} total</span>{planningMetrics(root)}<span className="budget-row-values"><BudgetAmountInput tutorialIds={inputTutorialIds(root)} name={root.name} currency={budget.currency} disabled={!canEdit || isSaving || !root.isActive} value={amounts[root.id] ?? ''} onChange={value => setAmounts(current => ({ ...current, [root.id]: value }))} />{metrics(amountOrNull(root.id), root.actualAmount)}</span></div> :
                     <div className="budget-detail-list">
                       {root.directActualAmount !== 0 && <div className="budget-amount-row budget-direct-actual"><span>Directly categorized to {root.name}</span>{metrics(null, root.directActualAmount)}</div>}
-                      {root.children.map(child => <div className="budget-amount-row" key={child.id}><span className="budget-row-name">{child.name}{!child.isActive && <small> Deactivated</small>}</span>{planningMetrics(child)}<span className="budget-row-values"><BudgetAmountInput name={child.name} currency={budget.currency} disabled={!canEdit || isSaving || !child.isActive} value={amounts[child.id] ?? ''} onChange={value => setAmounts(current => ({ ...current, [child.id]: value }))} />{metrics(amountOrNull(child.id), child.actualAmount)}</span></div>)}
+                      {root.children.map(child => <div className="budget-amount-row" key={child.id}><span className="budget-row-name">{child.name}{!child.isActive && <small> Deactivated</small>}</span>{planningMetrics(child)}<span className="budget-row-values"><BudgetAmountInput tutorialIds={inputTutorialIds(root, child.id)} name={child.name} currency={budget.currency} disabled={!canEdit || isSaving || !child.isActive} value={amounts[child.id] ?? ''} onChange={value => setAmounts(current => ({ ...current, [child.id]: value }))} />{metrics(amountOrNull(child.id), child.actualAmount)}</span></div>)}
                     </div>}
                 </section>
               })}

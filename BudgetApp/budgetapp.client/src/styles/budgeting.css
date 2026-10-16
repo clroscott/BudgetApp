@@ -562,6 +562,21 @@
   box-shadow: var(--shadow);
 }
 
+/* During the guided task, put the real save/activate controls in the page flow
+   so the fixed tutorial coach cannot cover a second fixed action bar on mobile.
+   The wrapper uses PageFrame's existing content lane; normal editing is unchanged. */
+.budget-tutorial-active .budget-save-bar {
+  position: static;
+  width: 100%;
+  margin: 0;
+}
+.app-shell .budget-tutorial-active .budget-save-bar { width: 100%; }
+.budget-tutorial-save-target { display: grid; gap: 0.35rem; flex: 1 1 auto; min-width: 0; }
+.budget-tutorial-save-target > span { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; }
+.budget-tutorial-target, .budget-tutorial-field { display: grid; min-width: 0; gap: 0.3rem; }
+.budget-tutorial-field > small, .budget-tutorial-mode-target small { color: var(--text); font-weight: 650; }
+.budget-section-heading > .budget-tutorial-mode-target { display: block; }
+
 .budget-save-bar > div:first-child {
   display: grid;
   gap: 0.15rem;
@@ -1349,6 +1364,7 @@
 
   .budget-metrics {
     width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     text-align: left;
   }
 

@@ -758,7 +758,8 @@ Only tutorial progress metadata may change during the existing Learn-only tour.
 - [ ] Block only `/api/tutorial-progress` requests. A failed progress save is
       explained; Exit/Escape/Finish still dismiss the overlay immediately. No
       financial/configuration request is sent by recovery or Learn-only steps.
-- [ ] Finish returns to Tutorials and records completion when connected. Exit
+- [ ] Finish returns to Tutorials and records completion when connected, unless
+      a guided task offers an explicit Continue action to stay on its page. Exit
       can resume its checkpoint; Replay starts at step one. Planned guided tours
       remain Coming soon rather than accidentally becoming enabled.
 - [ ] When guided tours are added, missing required actions expose Retry/Exit
@@ -1704,6 +1705,77 @@ checked automatically by the synthetic browser harness.
   requests: saved work remains, requests are not replayed/canceled by the tutorial,
   dirty form warnings remain. Getting started retains its original inert/keyboard
   behavior and replay; no private data or files appear in progress metadata.
+
+### Build your first budget: quick monthly guide (#260, slice 1)
+
+Use disposable Development/Scratch plans. See [scope, workflow and recovery
+contract](budget-tutorial.md). Annual-target guidance is a later slice, not a
+completed path in this version. Do not mark these human checks passed from tests.
+
+- [ ] Tutorials shows Build your first budget as an available Guided financial
+  task. It opens the real Monthly budget page with short spotlight prompts and a
+  real-data warning. Annual targets are clearly deferred; no example-only page.
+- [ ] Choose household, month/year and scope deliberately. Owner/Admin can use
+  permitted Draft/Active plans; Viewer cannot edit either scope. Closed is not
+  reopened, missing categories are explained, and failed/stale reads are not
+  treated as absent budgets. Starting/selecting/Next/Back never creates a plan.
+- [ ] Absent month requires the normal Create blank budget button. Wait for a
+  confirmed Draft before continuing. Existing Draft/Active continues without a
+  duplicate create, forced edit or redundant save; replay preserves it.
+- [ ] Enter Overall or Detailed plans, including blank and zero. Cancel a mode
+  switch that would clear other amounts: keep all inputs. Confirm deliberately:
+  only the intended mode's lines save. Calculators, category fields and Total
+  remain usable. At least one confirmed planned amount, including zero, is
+  needed to finish; blank is not zero and Actual is not a planned amount.
+- [ ] Guide the category total, a real subcategory breakdown, then two further
+  categories when available. The highlighted field shows its name. Detailed
+  amounts sum into the parent total without adding an Overall amount on top.
+  Changing modes does not move the guide to another category unexpectedly.
+  Existing Detailed setups can be kept; missing subcategories/fewer categories
+  are explained, not invented. Optional categories may remain unplanned.
+- [ ] Next from planning to total review keeps dirty amounts without a discard
+  prompt. Save budget is explicit; pending/failed saves cannot advance as success.
+  Correct a validation rejection. Existing saved unchanged amounts need no save.
+- [ ] Activation is explained before its page action. Keep as draft makes no
+  status request. Clicking Activate waits for saved Active; existing Active
+  does not activate again. Completion verifies the bound month/scope and saved status.
+- [ ] At the last budget step, Continue budgeting marks the tutorial complete,
+  removes the coach and leaves the same month/scope/amounts open and editable,
+  with no budget reload or write. Return to tutorials also marks it complete but
+  opens the tutorial list. Test both with Draft and Active budgets; dirty or
+  uncertain state still blocks either completion choice. Exit remains unfinished.
+- [ ] After Continue budgeting or Exit/Escape (including replay), scroll to the
+  very bottom. The removal/replacement warning and its collapsed or expanded
+  help sit fully above the fixed action bar. Repeat on desktop and narrow mobile,
+  with Draft/Active budgets and wrapped buttons; the reserved space follows the
+  current bar's height rather than the bar removed when the tutorial closed.
+- [ ] The main prompt (not just More details) explains Draft = saved, still
+  planning; Active = the plan being used. Both are editable and show actuals.
+  Active is protected from annual-target replacement, not an amount lock or a
+  transaction-creation action. Choosing status is a separate later step.
+- [ ] Simulate lost create, save and activation responses after server success.
+  Check saved budget reads current state before any new intended change; it never
+  resends the command. Cancel a dirty-input reload prompt to keep inputs; confirm
+  only when ready. A failed reconciliation stays blocked and does not mean zero
+  records. Resolve a delayed response after changing household: no old data apply.
+- [ ] Change period/scope/household or role mid-guide: advancement blocks until
+  explicit reselection. Remove/change the budget or close it elsewhere and refresh:
+  stale steps do not claim completion or automatically recreate/reopen anything.
+- [ ] Exit/Escape during editing or delayed progress saving removes the guide
+  immediately and preserves edits/saved work. Normal navigation prompts still
+  protect dirty input. Start again/Replay begins with selection; no false Resume
+  label, stored private financial context or replayed write.
+- [ ] At desktop, 390/320px, short landscape and real 200% zoom, the coach/ring
+  follows scroll, Show me reaches the input, and normal Save/Activate controls
+  are not covered. During guidance the save bar is in page flow; after Exit its
+  normal fixed placement/Back to top remains correct.
+- [ ] Keyboard/screen reader: new steps focus/announce, real forms and confirmation
+  controls work, Escape/Exit and focus return remain available. Hide a target and
+  restore it: Retry/Exit recovers without skipping a required write outcome.
+  Block progress saves: guide remains usable without financial retries.
+- [ ] Getting started still follows its navigation targets/learn-only focus
+  policy. Import tutorial still follows its real-page outcomes, errors and replay;
+  shared companion support has not changed those workflows.
 
 ### Reverse an approved import (#113)
 

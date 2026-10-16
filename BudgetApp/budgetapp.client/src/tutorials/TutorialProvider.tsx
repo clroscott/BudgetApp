@@ -23,13 +23,21 @@ import { TutorialOverlay } from './TutorialOverlay'
 import { useHouseholds } from '../households/useHouseholds'
 import { ImportTutorialPageContext, importTutorialGate, importTutorialKey, importTutorialRoute,
   type ImportTutorialPage, type ImportTutorialTask } from './importTutorialState'
+import { BudgetTutorialPageContext, budgetTutorialGate, budgetTutorialKey, budgetTutorialRoute, budgetTutorialSteps, budgetTutorialStepOverride,
+  type BudgetTutorialPage, type BudgetTutorialTask } from './budgetTutorialState'
 
 export function TutorialProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const signedInUserId = user?.emailConfirmed ? user.id : undefined
-  const { navigate } = useRouter()
+  const { navigate, path } = useRouter()
   const { currentHousehold } = useHouseholds()
   const householdId = currentHousehold?.id
+  const [budgetTask, setBudgetTask] = useState<BudgetTutorialTask | null>(null)
+  const [budgetPage, setBudgetPage] = useState<{ owner: symbol; value: BudgetTutorialPage } | null>(null)
+  const publishBudgetPage = useCallback((owner: symbol, page: BudgetTutorialPage | null) => {
+    setBudgetPage(current => page ? current?.owner === owner && JSON.stringify(current.value) === JSON.stringify(page)
+      ? current : { owner, value: page } : current?.owner === owner ? null : current)
+  }, [])
   const [importTask, setImportTask] = useState<ImportTutorialTask | null>(null)
   const [reportedPage, setReportedPage] = useState<{ owner: symbol; value: ImportTutorialPage } | null>(null)
   const publishImportPage = useCallback((owner: symbol, page: ImportTutorialPage | null) => {
@@ -53,6 +61,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     const loadRevision = ++revision.current
     setActiveTutorial(null)
     setImportTask(null)
+    setBudgetTask(null)
     setProgress([])
     if (!signedInUserId) {
       setIsLoading(false)
@@ -120,12 +129,13 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     const stepIndex = tutorial.resumeBehavior !== 'restart' && resume && saved?.status === 'InProgress'
       ? Math.max(0, Math.min(saved.currentStepIndex, tutorial.steps.length - 1))
       : 0
-    if (!navigate(tutorial.steps[stepIndex].route)) return
+    if (!(tutorialKey === budgetTutorialKey && path === '/budgeting') && !navigate(tutorial.steps[stepIndex].route)) return
     setActiveTutorial(tutorial)
     setImportTask(tutorial.key === importTutorialKey && householdId ? { householdId } : null)
+    setBudgetTask(null)
     setActiveStepIndex(stepIndex)
     await record(tutorial, 'InProgress', stepIndex)
-  }, [navigate, progress, record, signedInUserId, householdId])
+  }, [navigate, path, progress, record, signedInUserId, householdId])
 
   const dismiss = useCallback(async (tutorialKey: string) => {
     const tutorial = tutorialByKey.get(tutorialKey)
@@ -140,8 +150,22 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     await record(activeTutorial, 'InProgress', activeStepIndex)
   }, [activeStepIndex, activeTutorial, record])
 
-  const moveTo = useCallback(async (stepIndex: number) => {
+  const moveTo = useCallback(async (stepIndex: number, keepDraft = false, completionDestination: 'budget' | 'tutorials' = 'tutorials') => {
     if (!activeTutorial) return
+    let selectedBudget = budgetTask
+    if (activeTutorial.key === budgetTutorialKey) {
+      const page = budgetPage?.value ?? null
+      const gate = budgetTutorialGate(activeStepIndex, budgetTask, householdId, currentHousehold?.role, page)
+      if (stepIndex > activeStepIndex) {
+        if (keepDraft ? activeStepIndex !== budgetTutorialSteps.activate || !gate.canKeepDraft : !gate.canNext) return
+        if (!page || !householdId || !currentHousehold) return
+        if (activeStepIndex === 0) selectedBudget = { householdId, role: currentHousehold.role,
+          year: page.year, month: page.month, scope: page.scope, budgetId: page.budgetId ?? undefined }
+        if (activeStepIndex === 1) selectedBudget = { ...selectedBudget!, budgetId: page.budgetId! }
+        if (activeStepIndex === budgetTutorialSteps.activate) selectedBudget = { ...selectedBudget!, finishStatus: page.status! }
+      }
+      if (stepIndex === 0) selectedBudget = null
+    }
     let task = importTask
     const page = reportedPage?.value ?? null
     if (activeTutorial.key === importTutorialKey) {
@@ -157,18 +181,23 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
       }
     }
     if (stepIndex >= activeTutorial.steps.length) {
-      if (!navigate('/tutorials')) return
+      const stayOnBudget = activeTutorial.key === budgetTutorialKey && completionDestination === 'budget' && path === '/budgeting'
+      if (!stayOnBudget && !navigate('/tutorials')) return
       setActiveTutorial(null)
       await record(activeTutorial, 'Completed', activeTutorial.steps.length - 1)
       return
     }
     const nextIndex = Math.max(0, stepIndex)
-    const route = activeTutorial.key === importTutorialKey ? importTutorialRoute(nextIndex, task) : activeTutorial.steps[nextIndex].route
-    if (!navigate(route)) return
+    const route = activeTutorial.key === importTutorialKey ? importTutorialRoute(nextIndex, task)
+      : activeTutorial.key === budgetTutorialKey ? budgetTutorialRoute(selectedBudget) : activeTutorial.steps[nextIndex].route
+    // Monthly selectors are local state. Stepping within the same page must not
+    // replace its URL or trigger an unsaved-change prompt/discard.
+    if (!(activeTutorial.key === budgetTutorialKey && path === '/budgeting') && !navigate(route)) return
     setImportTask(task)
+    setBudgetTask(selectedBudget)
     setActiveStepIndex(nextIndex)
     await record(activeTutorial, 'InProgress', nextIndex)
-  }, [activeTutorial, activeStepIndex, importTask, reportedPage, householdId, navigate, record])
+  }, [activeTutorial, activeStepIndex, importTask, reportedPage, householdId, navigate, record, budgetTask, budgetPage, currentHousehold, path])
 
   const chooseImportPath = useCallback((path: 'upload' | 'existing') => {
     if (activeTutorial?.key !== importTutorialKey || !householdId || importTask?.householdId !== householdId) return
@@ -201,6 +230,20 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     returnToTask: returnToImport,
   } : undefined, [activeTutorial, activeStepIndex, importTask, householdId, reportedPage, chooseImportPath, restartImport, returnToImport])
 
+  const budgetGuide = useMemo(() => activeTutorial?.key === budgetTutorialKey ? {
+    ...budgetTutorialGate(activeStepIndex, budgetTask, householdId, currentHousehold?.role, path === '/budgeting' ? budgetPage?.value ?? null : null),
+    canBack: activeStepIndex > 0 && !budgetPage?.value.busy,
+    keepDraft: () => { void moveTo(budgetTutorialSteps.done, true) },
+    complete: (destination: 'budget' | 'tutorials') => {
+      if (activeStepIndex === activeTutorial.steps.length - 1) void moveTo(activeTutorial.steps.length, false, destination)
+    },
+    stepOverride: budgetTutorialStepOverride(activeStepIndex, budgetPage?.value ?? null),
+    restart: () => { void start(budgetTutorialKey) },
+    returnToTask: () => {
+      if (!budgetTask || budgetTask.householdId === householdId) navigate(budgetTutorialRoute(budgetTask))
+    },
+  } : undefined, [activeTutorial, activeStepIndex, budgetTask, householdId, currentHousehold?.role, path, budgetPage, moveTo, start, navigate])
+
   const value = useMemo<TutorialContextValue>(() => ({
     activeTutorial,
     activeStepIndex,
@@ -213,6 +256,7 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     next,
     back,
     importGuide,
+    budgetGuide,
   }), [
     activeStepIndex,
     activeTutorial,
@@ -225,11 +269,14 @@ export function TutorialProvider({ children }: { children: ReactNode }) {
     progress,
     start,
     importGuide,
+    budgetGuide,
   ])
 
   return (
     <TutorialContext.Provider value={value}>
-      <ImportTutorialPageContext.Provider value={publishImportPage}>{children}</ImportTutorialPageContext.Provider>
+      <BudgetTutorialPageContext.Provider value={publishBudgetPage}>
+        <ImportTutorialPageContext.Provider value={publishImportPage}>{children}</ImportTutorialPageContext.Provider>
+      </BudgetTutorialPageContext.Provider>
       <TutorialOverlay />
     </TutorialContext.Provider>
   )

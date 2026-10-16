@@ -8,18 +8,26 @@ import { useTutorialHost } from './useTutorialHost'
 import { useTutorialPageError } from './useTutorialPageError'
 
 export function TutorialOverlay() {
-  const { activeTutorial, activeStepIndex, back, exit, next, error, importGuide } = useTutorials()
-  const guided = Boolean(importGuide)
-  const host = useTutorialHost(guided)
+  const { activeTutorial, activeStepIndex, back, exit, next, error, importGuide, budgetGuide } = useTutorials()
+  const taskGuide = importGuide ?? budgetGuide
+  const guided = Boolean(taskGuide)
+  const host = useTutorialHost(guided, budgetGuide ? 'budget-tutorial-guide-host' : undefined)
   const pageError = useTutorialPageError(host)
   const definitionStep = activeTutorial?.steps[activeStepIndex]
-  const step = useMemo(() => guided && definitionStep && importGuide?.nextLabel === 'Verify completed import'
-    ? { ...definitionStep, targetId: 'import-completion-summary', fallbackTargetIds: undefined } : definitionStep,
-  [guided, definitionStep, importGuide?.nextLabel])
+  const overrideBody = budgetGuide?.stepOverride?.body
+  const overrideTitle = budgetGuide?.stepOverride?.title
+  const overrideTarget = budgetGuide?.stepOverride?.targetId
+  const step = useMemo(() => definitionStep && (overrideBody !== undefined || overrideTitle !== undefined || overrideTarget !== undefined)
+    ? { ...definitionStep, body: overrideBody ?? definitionStep.body, title: overrideTitle ?? definitionStep.title, targetId: overrideTarget ?? definitionStep.targetId }
+    : guided && definitionStep && importGuide?.nextLabel === 'Verify completed import'
+      ? { ...definitionStep, targetId: 'import-completion-summary', fallbackTargetIds: undefined } : definitionStep,
+  [guided, definitionStep, importGuide?.nextLabel, overrideBody, overrideTitle, overrideTarget])
   const { target, rect, phase, retry } = useTutorialTarget(step, activeTutorial?.kind, !guided, pageError)
   const layerRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<HTMLElement>(null)
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const nextRef = useRef(next)
+  useLayoutEffect(() => { nextRef.current = next }, [next])
   const descriptionId = useId()
   const [cardHeight, setCardHeight] = useState(300)
   const [viewport, setViewport] = useState({ width: window.innerWidth, height: window.innerHeight })
@@ -53,7 +61,7 @@ export function TutorialOverlay() {
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
     observer?.observe(card)
     return () => observer?.disconnect()
-  }, [step, phase, error, importGuide?.message])
+  }, [step, phase, error, taskGuide?.message])
 
   useEffect(() => {
     if (!target || step?.advance !== 'click') return
@@ -66,7 +74,7 @@ export function TutorialOverlay() {
         // AppLink prevents the default even when successful. Check the route instead:
         // a canceled unsaved-change prompt must not advance or prompt a second time.
         if (destination && destination.pathname + destination.search !== window.location.pathname + window.location.search) return
-        void next()
+        void nextRef.current()
       }, 0)
     }
     target.addEventListener('click', advance)
@@ -74,7 +82,7 @@ export function TutorialOverlay() {
       if (timer !== undefined) window.clearTimeout(timer)
       target.removeEventListener('click', advance)
     }
-  }, [next, step, target])
+  }, [step, target])
 
   if (!activeTutorial || !step) return null
   const canSkip = activeTutorial.kind === 'LearnOnly' || step.advance === 'next' && step.canSkipWhenUnavailable
@@ -136,16 +144,24 @@ export function TutorialOverlay() {
         <p id={descriptionId}>{pageError ? 'Check the error on the page and fix it before continuing. Your tutorial stays on this step.' : step.body}</p>
         {error && <p className="tutorial-recovery" role="alert">{guided ? 'Progress couldn’t save. You can still continue or exit.' : `Your tutorial progress could not be saved or loaded. You can still continue or exit. ${error}`}</p>}
         <div className="tutorial-recovery" role="status" aria-live="polite" aria-atomic="true">
-          {!pageError && importGuide?.message && <p>{importGuide.message}</p>}
+          {!pageError && taskGuide?.message && <p>{taskGuide.message}</p>}
           {phase === 'waiting' && <p>{guided ? 'Finding your next step…' : 'Waiting for the highlighted area to become available…'}</p>}
           {phase === 'unavailable' && <p>{guided ? 'Can’t find this area. Retry, return to the task, or exit.' : `This area is not available. It may be hidden, still loading, or unavailable to your account. Retry after it is available${canSkip ? ', skip this step,' : ''} or exit the tutorial. Retrying does not click controls or save page data.`}</p>}
           {phase === 'ready' && step.advance === 'click' && <p>Select the highlighted control to continue. You can reach it with Tab or the button below.</p>}
         </div>
-        {phase === 'ready' && (!guided || activeStepIndex > 0 || !!pageError) && <button type="button" className={`${guided ? 'text-button' : 'secondary-button'} tutorial-target-focus`} onClick={focusTarget}>
+        {phase === 'ready' && (!importGuide || activeStepIndex > 0 || !!pageError) && <button type="button" className={`${guided ? 'text-button' : 'secondary-button'} tutorial-target-focus`} onClick={focusTarget}>
           {pageError ? 'Show error' : guided ? 'Show me' : step.advance === 'click' ? 'Go to highlighted control' : 'Read highlighted area'}
         </button>}
         <div className="tutorial-coach-actions">
-          {(!guided || activeStepIndex > 0) && <button className="secondary-button" type="button" disabled={importGuide ? !importGuide.canBack : activeStepIndex === 0} onClick={() => void back()}>Back</button>}
+          {(!guided || activeStepIndex > 0) && <button className="secondary-button" type="button" disabled={taskGuide ? !taskGuide.canBack : activeStepIndex === 0} onClick={() => void back()}>Back</button>}
+          {budgetGuide && <>
+            {budgetGuide.canKeepDraft && <button type="button" className="secondary-button" disabled={phase !== 'ready' || !!pageError} onClick={budgetGuide.keepDraft}>Keep as draft</button>}
+            {activeStepIndex === activeTutorial.steps.length - 1 ? <>
+              <button type="button" className="secondary-button" disabled={!budgetGuide.canNext || phase !== 'ready' || !!pageError} onClick={() => budgetGuide.complete('tutorials')}>Return to tutorials</button>
+              <button type="button" disabled={!budgetGuide.canNext || phase !== 'ready' || !!pageError} onClick={() => budgetGuide.complete('budget')}>Continue budgeting</button>
+            </> : <button type="button" disabled={!budgetGuide.canNext || phase !== 'ready' || !!pageError} onClick={() => void next()}>{budgetGuide.nextLabel}</button>}
+            {!host && <button type="button" className="secondary-button" onClick={budgetGuide.returnToTask}>Return to Monthly budget</button>}
+          </>}
           {importGuide && <>
             {activeStepIndex === 0 ? <>
               <button type="button" disabled={!importGuide.canNext || phase !== 'ready' || !!pageError} onClick={() => importGuide.choose('upload')}>New CSV/Excel upload</button>
@@ -164,7 +180,7 @@ export function TutorialOverlay() {
         {guided && <details className="tutorial-more-details" key={activeStepIndex}>
           <summary>More details</summary>
           {step.details && <p>{step.details}</p>}
-          <button type="button" className="text-button" onClick={importGuide?.restart}>Restart task selection</button>
+          <button type="button" className="text-button" onClick={taskGuide?.restart}>Restart task selection</button>
         </details>}
       </section>
     </div>
