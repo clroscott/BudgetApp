@@ -19,6 +19,25 @@ function Example({ errors, reveal = true }: { errors: string[], reveal?: boolean
 }
 
 describe('action-error visibility', () => {
+  it('shows an opted-in floating notice, focuses it without scrolling, and keeps the inline error on dismiss', () => {
+    const view = render(<><button>Upload</button><ErrorSummary errors={[]} floating revealOnChange /></>)
+    const upload = screen.getByRole('button', { name: 'Upload' })
+    upload.focus()
+    view.rerender(<><button>Upload</button><ErrorSummary errors={['Duplicate file. Review your choice.']} floating revealOnChange /></>)
+    const alert = screen.getByRole('alert', { name: 'Error notification' })
+    expect(alert.classList.contains('error-notice')).toBe(true)
+    expect(document.activeElement).toBe(alert)
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss error notification' }))
+    expect(screen.getByText('Duplicate file. Review your choice.')).toBeTruthy()
+    expect(screen.getByRole('alert').classList.contains('error-notice')).toBe(false)
+    expect(document.activeElement).toBe(upload)
+    view.rerender(<><button>Upload</button><ErrorSummary errors={['Duplicate file. Review your choice.']} floating revealOnChange /></>)
+    expect(screen.queryByRole('button', { name: 'Dismiss error notification' })).toBeNull()
+    view.rerender(<><button>Upload</button><ErrorSummary errors={[]} floating revealOnChange /></>)
+    view.rerender(<><button>Upload</button><ErrorSummary errors={['Duplicate file. Review your choice.']} floating revealOnChange /></>)
+    expect(screen.getByRole('button', { name: 'Dismiss error notification' })).toBeTruthy()
+  })
+
   it('does not move focus for read/filter errors unless a page opts into action feedback', () => {
     const view = render(<Example errors={[]} reveal={false} />)
     screen.getByRole('button').focus()

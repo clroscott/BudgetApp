@@ -1,8 +1,10 @@
 import { ContextualHelp } from '../components/ContextualHelp'
 import { helpWarnings } from '../help/helpTopics'
 import type { CategorizationRuleApplicationPreview } from './importApi'
+import type { ReactNode } from 'react'
 
 interface ImportBatchControlsProps {
+  budgetTools?: ReactNode
   dirtyCount: number
   pendingRows: number
   validPendingRows: number
@@ -33,12 +35,28 @@ interface ImportBatchControlsProps {
 export function ImportBatchControls({ dirtyCount, pendingRows, validPendingRows, reviewedRows, hasUncheckedDuplicates,
   bulkActionsBusy, isSavingAll, isCompleting, isDiscarding, applyingRuleMode, bulkDecision,
   rulePreview, rulePreviewFresh, isLoadingRulePreview, fillRulePotentialCount, reapplyRulePotentialCount,
-  bulkSaveMessage, ruleApplicationMessage, onCheckDuplicates, onSaveAll, onApplyRules, onDecision, onComplete, onDiscard }: ImportBatchControlsProps) {
+  bulkSaveMessage, ruleApplicationMessage, onCheckDuplicates, onSaveAll, onApplyRules, onDecision, onComplete, onDiscard, budgetTools }: ImportBatchControlsProps) {
   const hasUnsavedRows = dirtyCount > 0
   return (
     <div className="import-control-groups">
-      <div className="import-control-group">
+      <div className="import-control-group import-control-prepare">
         <strong>1. Prepare rows</strong>
+        <div data-tutorial-id="import-bulk-budget-tools">
+          {budgetTools}
+          <div className="import-control-actions">
+            <button
+              className="primary-button"
+              type="button"
+              disabled={!hasUnsavedRows || bulkActionsBusy}
+              onClick={() => void onSaveAll()}>
+              {isSavingAll
+                ? 'Saving corrections...'
+                : `Save all corrections (${dirtyCount})`}
+            </button>
+          </div>
+          {hasUnsavedRows && <p className="field-help">Save all corrections before approving or applying rules.</p>}
+          {bulkSaveMessage && <p className="field-help" role="status">{bulkSaveMessage}</p>}
+        </div>
         <div className="import-control-actions">
           {hasUncheckedDuplicates && (
             <button className="secondary-button" type="button"
@@ -47,15 +65,6 @@ export function ImportBatchControls({ dirtyCount, pendingRows, validPendingRows,
               Check for duplicates
             </button>
           )}
-          <button
-            className="primary-button"
-            type="button"
-            disabled={!hasUnsavedRows || bulkActionsBusy}
-            onClick={() => void onSaveAll()}>
-            {isSavingAll
-              ? 'Saving corrections...'
-              : `Save all corrections (${dirtyCount})`}
-          </button>
           <button className="secondary-button" type="button"
             disabled={
               !rulePreviewFresh ||
@@ -87,14 +96,6 @@ export function ImportBatchControls({ dirtyCount, pendingRows, validPendingRows,
               })`}
           </button>
         </div>
-        {hasUnsavedRows && (
-          <p className="field-help">
-            Save all corrections before approving or applying rules.
-          </p>
-        )}
-        {bulkSaveMessage && (
-          <p className="field-help" role="status">{bulkSaveMessage}</p>
-        )}
         {!hasUnsavedRows && rulePreview && (
           <p className="field-help">
             Counts show matching rows that would actually change.
@@ -109,7 +110,7 @@ export function ImportBatchControls({ dirtyCount, pendingRows, validPendingRows,
           <p className="field-help" role="status">{ruleApplicationMessage}</p>
         )}
       </div>
-      <div className="import-control-group">
+      <div className="import-control-group" data-tutorial-id="import-review-decisions">
         <strong>2. Review decisions</strong>
         <div className="import-control-actions">
           <button className="primary-button" type="button"
@@ -134,7 +135,7 @@ export function ImportBatchControls({ dirtyCount, pendingRows, validPendingRows,
           <span>Saved corrections and categories are preserved.</span>
         </div>
       </div>
-      <div className="import-control-group">
+      <div className="import-control-group" data-tutorial-id="import-finalize">
         <strong>3. Finalize import</strong>
         <div className="import-control-actions">
           <button className="primary-button" type="button"

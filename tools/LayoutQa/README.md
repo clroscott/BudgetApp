@@ -189,3 +189,18 @@ Other writes/external requests fail closed. Screenshot evidence goes
 to ignored `artifacts/import-undo-preview-qa`. This checks confirmation, status
 reconciliation and layout, not a real database command or manual QA in
 `docs/manual-qa-regression-test-plan.md`.
+
+## Guided import tutorial (#253)
+
+`node .\tools\LayoutQa\verify-import-tutorial.mjs` uses the same Playwright/browser
+environment variables. Port 4193; 1440/390/320px; CSV, Excel, custom mapping,
+existing Completed, denied Viewer, failed staging, duplicate-file rejection and
+lost-completion cases. Scrolling tests check ring geometry across the coach and
+within the row grid; failures verify the floating notice and undimmed task.
+All API requests are fictional intercepted responses, including progress and
+explicitly user-operated financial actions. Unexpected writes/external requests
+fail closed; no real database, XLSX parser or email delivery is exercised.
+It checks outcome gates, no command replay, context-preserving completion, dimmed
+spotlights, fixed-coach bounds and bounded page width. Evidence is ignored under
+`artifacts/import-tutorial-qa`. See docs/import-tutorial.md and permanent manual QA
+for real keyboard/screen-reader/zoom, privacy and live workflow acceptance.

@@ -13,11 +13,12 @@ const clickStep: TutorialStep = { title: 'Open Accounts', body: 'Visit accounts.
 function definition(step = readStep, kind: TutorialKind = 'LearnOnly'): TutorialDefinition {
   return { key: 'sample', version: 1, title: 'Sample', description: 'Sample', estimatedMinutes: 1, kind, steps: [step, { ...readStep, title: 'Second step' }] }
 }
-function show({ tutorial = definition(), index = 0, children, active = true, error = null }: {
+function show({ tutorial = definition(), index = 0, children, active = true, error = null, importGuide }: {
   tutorial?: TutorialDefinition, index?: number, children?: ReactNode, active?: boolean, error?: string | null,
+  importGuide?: TutorialContextValue['importGuide'],
 } = {}) {
   const value: TutorialContextValue = { activeTutorial: active ? tutorial : null, activeStepIndex: index,
-    isLoading: false, error, progress: [], start: vi.fn(async () => {}), dismiss: vi.fn(async () => {}),
+    isLoading: false, error, importGuide, progress: [], start: vi.fn(async () => {}), dismiss: vi.fn(async () => {}),
     back: vi.fn(async () => {}), next: vi.fn(async () => {}), exit: vi.fn(async () => {}) }
   const background = children ?? <main><div data-tutorial-id="page-title"><h1>Page title</h1><button>Save settings</button></div><button>Unrelated action</button></main>
   const contents = () => <TutorialContext.Provider value={value}>{background}<TutorialOverlay /></TutorialContext.Provider>
@@ -31,6 +32,57 @@ beforeEach(() => { vi.useFakeTimers(); mockTutorialLayout() })
 afterEach(() => { vi.useRealTimers(); restoreTutorialLayout() })
 
 describe('tutorial target recovery', () => {
+  it('keeps the full task ring aligned across the dock height and nested scrolling', async () => {
+    const importGuide = { canNext: true, canBack: true, message: '', nextLabel: 'Next',
+      choose: vi.fn(), restart: vi.fn(), returnToTask: vi.fn() }
+    show({ tutorial: definition(readStep, 'GuidedFinancialTask'), index: 1, importGuide,
+      children: <main><div data-testid="scroller"><button data-tutorial-id="page-title" data-top={575} data-height={80}>Task action</button></div><div id="import-tutorial-guide-host" /></main> })
+    await flush()
+    const target = screen.getByRole('button', { name: 'Task action' })
+    const ring = document.querySelector<HTMLElement>('.tutorial-spotlight')!
+    expect(ring.style.top).toBe('567px')
+    expect(ring.style.height).toBe('96px')
+    const scrolls = vi.mocked(target.scrollIntoView).mock.calls.length
+    target.dataset.top = '625'
+    fireEvent.scroll(screen.getByTestId('scroller'))
+    expect(ring.style.top).toBe('617px')
+    expect(ring.style.height).toBe('96px')
+    target.dataset.top = '350'
+    fireEvent.scroll(window)
+    expect(ring.style.top).toBe('342px')
+    expect(ring.style.height).toBe('96px')
+    expect(vi.mocked(target.scrollIntoView).mock.calls.length).toBe(scrolls)
+  })
+
+  it('pauses for a page error without dimming it, then restores the same step without an action', async () => {
+    const write = vi.fn()
+    const importGuide = { canNext: true, canBack: true, message: '', nextLabel: 'Next',
+      choose: vi.fn(), restart: vi.fn(), returnToTask: vi.fn() }
+    const { value } = show({ tutorial: definition(readStep, 'GuidedFinancialTask'), index: 1, importGuide,
+      children: <><div role="alert">Unrelated shell notice</div><main>
+        <button data-tutorial-id="page-title" onClick={write}>Task action</button>
+        <div role="alert" hidden data-testid="task-error">Please fix the upload.</div>
+        <div id="import-tutorial-guide-host" />
+      </main></> })
+    await flush()
+    expect(screen.queryByText('Needs attention')).toBeNull()
+    const error = screen.getByTestId('task-error')
+    await act(async () => { error.hidden = false })
+    expect(screen.getByText('Needs attention')).toBeTruthy()
+    expect(document.querySelector('.tutorial-blocker')).toBeNull()
+    expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Show error' }))
+    expect(document.activeElement).toBe(error)
+    expect(write).not.toHaveBeenCalled()
+    expect(value.next).not.toHaveBeenCalled()
+    await act(async () => { error.hidden = true })
+    expect(screen.queryByText('Needs attention')).toBeNull()
+    expect(document.querySelector('.tutorial-blocker')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Second step' })).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(false)
+    expect(value.next).not.toHaveBeenCalled()
+  })
+
   it.each(['display', 'visibility', 'hidden', 'aria-hidden', 'zero-size', 'inert', 'opacity'])('rejects a %s target, stops waiting, and offers safe recovery', async state => {
     const hidden = state === 'hidden'
     const style = state === 'display' ? { display: 'none' } : state === 'visibility' ? { visibility: 'hidden' as const } : state === 'opacity' ? { opacity: 0 } : undefined

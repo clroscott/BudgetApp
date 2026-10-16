@@ -1,5 +1,11 @@
 # Tutorial target recovery and keyboard use (#177)
 
+The later [import task companion (#253)](import-tutorial.md) reuses target recovery,
+progress and exit ownership, with a dimmed spotlight and compact floating coach.
+Its real multi-control workflow remains modeless: dimming does not inert forms,
+errors or confirmation portals. The stricter spotlight/inert policy below still
+describes the existing Getting started tour.
+
 This hardens the existing seven-step Getting started tour, not the planned #133
 workflows. Its key, version, target IDs, and Learn only / Guided setup / Guided
 financial task distinctions remain unchanged. No database migration is required.

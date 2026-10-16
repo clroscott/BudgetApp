@@ -1631,6 +1631,80 @@ for this verification. Automated tests do not complete the live checks below.
 Measurements and repeatable synthetic verification are documented in
 [dashboard-summary-performance.md](dashboard-summary-performance.md).
 
+### Guided CSV/Excel import task (#253)
+
+Use disposable Development/Scratch files/accounts only; see [implementation and
+resume boundaries](import-tutorial.md). These are human acceptance cases, not
+checked automatically by the synthetic browser harness.
+
+- [ ] Tutorials shows Import and review transactions as an available Guided
+  financial task, without the duplicate CSV-only Coming soon card. Getting
+  started and other planned tutorials remain usable/clearly unavailable.
+- [ ] Start/Replay/Resume begins with a clear real-data warning and an explicit
+  new-upload versus existing-import choice. No start/Next/Back/Retry action makes
+  a financial/configuration write or chooses/restores a local file automatically.
+- [ ] Confirm account/currency/scope, choose a CSV, stage deliberately and verify
+  no official transactions exist yet. Next waits for successful staging, not a click.
+- [ ] After upload, try both the page's Review this import link and the coach's
+  Review staged import button. Both open the exact batch and move guidance to
+  Confirm the selected import. Canceled navigation stays put without duplicate
+  prompts; Ctrl/Cmd/new-tab clicks leave this tab's checkpoint unchanged. No extra
+  upload, approval, save or transaction-creation request occurs.
+- [ ] Preview a multi-sheet .xlsx, explicitly choose one worksheet, inspect saved
+  cell results/profile/sign/date/number formats, then stage that worksheet only.
+- [ ] Use an existing profile and an unknown structure requiring mapping. Save
+  profile and upload explains the configuration/staging effects. Viewer cannot
+  save shared mappings; their permitted Personal account flow still works.
+- [ ] Inspect/correct rows, Details, filters and more than 100 rows. Dirty row or
+  rule edits prevent Next until saved or deliberately discarded. Paging keeps edits;
+  the guide never demands a meaningless edit to an already-correct record.
+- [ ] Inspect Personal/Household/both/neither and bulk current-page versus all-
+  matching choices. Full-amount overlap, sharing exposure, skipped counts and
+  Exclude-versus-neither are explained before the relevant actions.
+- [ ] Set budgets for multiple rows is visible inside the top Prepare rows
+  workflow, with one row filter above it and Save all corrections directly below
+  the choices. The tutorial highlights this group, explains scope/Apply/Save,
+  waits for saved changes, and permits keeping existing choices. Test current
+  page and filtered all-matching scopes across more than 100 rows; row edits and
+  protected/excluded-row skips are preserved. Check desktop and narrow layouts.
+- [ ] Duplicate/invalid/unchecked rows require deliberate review. Repeated-file
+  allowance is not row acknowledgment. Every pending row needs a saved decision;
+  approving alone still creates no official transactions.
+- [ ] Final creation explains the file/account/count/effect before the normal
+  explicit action. Next/Finish unlock only after fresh Completed status. Verify
+  Transactions/Change history; excluded-only completion creates zero records.
+- [ ] Slow/failed saves and a lost completion response never trigger tutorial
+  retries. Read saved status to reconcile; confirmed Completed leads to verification,
+  not another Create/upload. A failed refresh is not zero data or success.
+- [ ] An unfinished import tutorial offers Start again (not Resume), with a short
+  saved-work explanation. It starts at task selection without deleting saved
+  imports. Getting started offers both genuine Resume and Start again.
+- [ ] Restart reselects context. Already Completed skips to verification without
+  writes; Reversed/Failed/Processing is not reopened. Change account/import/household,
+  revoke permission and resolve old delayed requests: no silent retargeting or leaks.
+- [ ] Dimmed spotlight and compact dark coach fit desktop/390/320px and real
+  200% zoom. Prompts are short; More details starts closed on each step. Scroll
+  space/Show me keeps bottom controls reachable without trapping them under the
+  coach. Forms, errors, dialogs and below-fold targets remain usable.
+- [ ] Scroll the page up/down across the fixed coach and horizontally within the
+  row grid: the ring follows the full control, not a cropped or drifting box.
+- [ ] Duplicate-file rejection and upload/save failures show the actual message
+  in a persistent top floating notice, with keyboard focus and a Dismiss control.
+  Dismiss retains the inline error; the next failure opens a new notice. No auto
+  retry, duplicate acknowledgment, data loss or tutorial step advance occurs.
+- [ ] While a visible page error exists, dimming lifts and Needs attention/Show
+  error are available. Correct the problem with the normal controls; the guide
+  continues on the same step once the error clears. Test read/row-validation
+  errors too, and verify notices still work outside a tutorial.
+- [ ] With keyboard/screen reader, each new step is announced/focused, Show me
+  reaches the intended area, normal forms remain usable, and Escape/Exit
+  returns focus appropriately. Missing/hidden targets allow retry/exit, never a
+  skipped required outcome. Guarded canceled navigation never advances the task.
+- [ ] Exit promptly during delayed/failed tutorial-progress saving and financial
+  requests: saved work remains, requests are not replayed/canceled by the tutorial,
+  dirty form warnings remain. Getting started retains its original inert/keyboard
+  behavior and replay; no private data or files appear in progress metadata.
+
 ### Reverse an approved import (#113)
 
 Use disposable Development/Scratch CSV and Excel imports, not Production data.

@@ -26,12 +26,6 @@ const plannedTutorials = [
     kind: 'GuidedFinancialTask' as TutorialKind,
   },
   {
-    title: 'Import your first CSV',
-    description:
-      'Choose an account, map columns, review staged rows, and create transactions.',
-    kind: 'GuidedFinancialTask' as TutorialKind,
-  },
-  {
     title: 'Categorize transactions efficiently',
     description:
       'Correct categories, create rules, and apply them to matching transactions.',
@@ -175,6 +169,7 @@ export function TutorialHubPage() {
                       item.tutorialKey === tutorial.key &&
                       item.tutorialVersion === tutorial.version)
                     const status = saved?.status ?? 'NotStarted'
+                    const canResume = tutorial.resumeBehavior !== 'restart'
                     return (
                       <article className="tutorial-card" key={tutorial.key}>
                         <div>
@@ -183,6 +178,8 @@ export function TutorialHubPage() {
                           </span>
                           <h2>{tutorial.title}</h2>
                           <p>{tutorial.description}</p>
+                          {status === 'InProgress' && !canResume &&
+                            <p>Restarts the guide, not your saved work.</p>}
                           <small>
                             {tutorial.steps.length} steps · about{' '}
                             {tutorial.estimatedMinutes} minutes
@@ -192,14 +189,19 @@ export function TutorialHubPage() {
                           <button type="button" disabled={isLoading}
                             onClick={() => void start(
                               tutorial.key,
-                              status === 'InProgress',
+                              status === 'InProgress' && canResume,
                             )}>
                             {status === 'InProgress'
-                              ? 'Resume tutorial'
+                              ? canResume ? 'Resume tutorial' : 'Start again'
                               : status === 'Completed'
                                 ? 'Replay tutorial'
                                 : 'Start tutorial'}
                           </button>
+                          {status === 'InProgress' && canResume &&
+                            <button className="secondary-button" type="button" disabled={isLoading}
+                              onClick={() => void start(tutorial.key, false)}>
+                              Start again
+                            </button>}
                           {status === 'NotStarted' &&
                             <button className="text-button" type="button"
                               onClick={() => void dismiss(tutorial.key)}>
