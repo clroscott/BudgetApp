@@ -1,4 +1,5 @@
 import { importTutorialDefinition } from './importTutorialDefinition'
+import { budgetTutorialDefinition } from './budgetTutorialDefinition'
 
 export type TutorialAdvance = 'next' | 'click' | 'outcome'
 export type TutorialKind = 'LearnOnly' | 'GuidedSetup' | 'GuidedFinancialTask'
@@ -98,6 +99,7 @@ export const tutorialDefinitions: TutorialDefinition[] = [
     ],
   },
   importTutorialDefinition,
+  budgetTutorialDefinition,
 ]
 
 export const tutorialByKey = new Map(

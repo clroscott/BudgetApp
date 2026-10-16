@@ -20,12 +20,6 @@ const plannedTutorials = [
     kind: 'GuidedSetup' as TutorialKind,
   },
   {
-    title: 'Build your first budget',
-    description:
-      'Set annual targets, allocate months, and activate a monthly budget.',
-    kind: 'GuidedFinancialTask' as TutorialKind,
-  },
-  {
     title: 'Categorize transactions efficiently',
     description:
       'Correct categories, create rules, and apply them to matching transactions.',
