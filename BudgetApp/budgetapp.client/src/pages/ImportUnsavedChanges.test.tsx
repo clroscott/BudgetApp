@@ -394,6 +394,9 @@ describe('staged import edit protection', () => {
     const apply = await screen.findByRole('button', { name: 'Apply budget choices (1)' }) as HTMLButtonElement
     await waitFor(() => expect(apply.disabled).toBe(false))
     fireEvent.click(apply)
+    expect(window.confirm).toHaveBeenLastCalledWith(
+      'Set Personal + Household for 1 row?\n\nThen use “Save all corrections”.\nHousehold members will see these expenses once created.',
+    )
     expect((screen.getByLabelText('My personal budget') as HTMLInputElement).checked).toBe(false)
     vi.mocked(window.confirm).mockReturnValue(true)
     fireEvent.click(screen.getByRole('button', { name: 'Apply budget choices (1)' }))

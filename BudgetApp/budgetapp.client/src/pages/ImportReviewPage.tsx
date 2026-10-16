@@ -1,6 +1,7 @@
 import { ImportBatchControls } from '../imports/ImportBatchControls'
 import { ImportReversalPreviewPanel } from '../imports/ImportReversalPreviewPanel'
 import { useImportDraftCache, useImportReviewGuard } from '../imports/useImportDraftCache'
+import { useImportTutorialPage } from '../tutorials/useImportTutorialPage'
 import { DraftRow } from '../imports/ImportDraftRow'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
@@ -97,6 +98,7 @@ export function ImportReviewPage() {
     updateDrafts, clearDrafts } = useImportDraftCache()
   const [busyDraftIds, setBusyDraftIds] = useState<Set<string>>(new Set())
   const dirtyRuleDraftIds = useRef(new Set<string>())
+  const [hasDirtyRules, setHasDirtyRules] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [writeNeedsReload, setWriteNeedsReload] = useState(false)
   useUnsavedChangesGuard(dirtyDraftUpdates.size > 0,
@@ -137,6 +139,7 @@ export function ImportReviewPage() {
   const handleRuleDirtyChange = useCallback((id: string, dirty: boolean) => {
     if (dirty) dirtyRuleDraftIds.current.add(id)
     else dirtyRuleDraftIds.current.delete(id)
+    setHasDirtyRules(dirtyRuleDraftIds.current.size > 0)
   }, [])
   const confirmRowNavigation = () => dirtyRuleDraftIds.current.size === 0 || window.confirm(
     'Discard your unsaved categorization-rule changes before changing rows? Transaction corrections will be kept.',
@@ -264,6 +267,8 @@ export function ImportReviewPage() {
     setWriteNeedsReload(false)
     setIsCompleting(false)
     setIsReversing(false)
+    dirtyRuleDraftIds.current.clear()
+    setHasDirtyRules(false)
     setIsDiscarding(false)
     setIsSavingAll(false)
     setIsRefreshingSelected(false)
@@ -326,6 +331,14 @@ export function ImportReviewPage() {
     bulkDecision !== null || applyingRuleMode !== null || busyDraftIds.size > 0
   const bulkActionsBusy = isLoading || writeNeedsReload || !categoryLoad.isFresh || (Boolean(selectedImportId) && !detailLoad.isFresh) || mutationBusy
 
+  useImportTutorialPage(householdId ? {
+    page: 'review', householdId, importId: selectedImportId,
+    fresh: detailLoad.isFresh && detail?.id === selectedImportId && detail.loadedHouseholdId === householdId && !writeNeedsReload,
+    canEdit: detail?.canEdit ?? false, status: detail?.status ?? '',
+    busy: mutationBusy || isRefreshingSelected, dirty: hasUnsavedRows || hasDirtyRules,
+    pendingRows, approvedRows: detail?.approvedRows ?? 0, totalRows: detail?.totalRows ?? 0,
+  } : null)
+
   const handleWriteError = useCallback((error: unknown) => {
     if (!isSelectedContextCurrent()) return
     setErrors(getErrorMessages(error))
@@ -360,10 +373,10 @@ export function ImportReviewPage() {
     const label = { Personal: 'My personal budget only', Household: 'Household budget only',
       PersonalAndHousehold: 'Personal + Household', Neither: 'Neither budget' }[bulkBudgetPreset as BudgetInclusionPreset]
     const count = bulkBudgetPreview.changed
-    if (!window.confirm(`Set ${label} on ${count} staged ${count === 1 ? 'row' : 'rows'}? ` +
-      'Existing corrections will be kept. Choices are not saved until you use Save all corrections.' +
+    if (!window.confirm(`Set ${label} for ${count} ${count === 1 ? 'row' : 'rows'}?\n\n` +
+      'Then use “Save all corrections”.' +
       ((bulkBudgetPreset === 'Household' || bulkBudgetPreset === 'PersonalAndHousehold')
-        ? ` ${helpWarnings.sharePersonalExpense} Sharing takes effect when approved transactions are created.` : ''))) return
+        ? '\nHousehold members will see these expenses once created.' : ''))) return
     updateDrafts(previewBulkBudgetInclusion(bulkBudgetDrafts, dirtyDraftUpdates, bulkBudgetPreset).changes)
     setBulkBudgetMessage(`Budget choices applied to ${count} ${count === 1 ? 'row' : 'rows'}. Use Save all corrections to save any pending changes.`)
     setBulkSaveMessage('')
@@ -598,9 +611,10 @@ export function ImportReviewPage() {
           <AppLink to="/import">Upload another file</AppLink>
         </div>
 
+        <div data-tutorial-id="import-review-workspace">
         <ContextualHelp topic="import-approval" />
         <p className="field-help">{helpWarnings.sharePersonalExpense}</p>
-        <ErrorSummary errors={errors} revealOnChange />
+        <ErrorSummary errors={errors} revealOnChange floating />
         {writeNeedsReload && <div role="alert">
           <p>The save result is uncertain or this import changed elsewhere. Your corrections are kept. Reload before trying another save.</p>
           <button type="button" className="secondary-button" disabled={isLoading || mutationBusy}
@@ -614,7 +628,7 @@ export function ImportReviewPage() {
           <PageLoadFeedback {...rulePreviewLoad} subject="categorization rule matches" disabled={mutationBusy}
             onReload={() => void reloadRulePreview()} />}
 
-        <section className="import-file-picker" aria-labelledby="import-file-heading">
+        <section className="import-file-picker" aria-labelledby="import-file-heading" data-tutorial-id="import-file-picker">
           <div className="import-section-heading">
             <h2 id="import-file-heading">Choose an uploaded file</h2>
             {listLoad.isFresh && <button className="text-button" type="button"
@@ -717,6 +731,30 @@ export function ImportReviewPage() {
                 <span><strong>{detail.approvedRows}</strong>Approved</span>
                 <span><strong>{detail.excludedRows}</strong>Excluded</span>
               </div>
+              <div className="import-row-toolbar" data-tutorial-id="import-row-toolbar">
+                <label>
+                  <span>Show transactions</span>
+                  <select value={rowFilter} disabled={mutationBusy} onChange={event => {
+                    if (event.target.value === rowFilter || !confirmRowNavigation()) return
+                    setRowFilter(event.target.value as DraftRowFilter)
+                    setDraftPage(1)
+                  }}>
+                    <option value="all">All rows</option>
+                    <option value="pending">Pending</option>
+                    <option value="uncategorized">Uncategorized</option>
+                    <option value="parentOnly">Parent category only</option>
+                    <option value="categorized">Has category</option>
+                    <option value="possibleDuplicates">Possible duplicates</option>
+                    <option value="invalid">Invalid</option>
+                    <option value="approved">Approved</option>
+                    <option value="excluded">Excluded</option>
+                  </select>
+                </label>
+                <span>
+                  {detailLoad.isFresh ? <>Showing <strong>{matchingRowCount}</strong> of {detail.totalRows} rows</>
+                    : 'Refreshing matching rows; the previous count is not current.'}
+                </span>
+              </div>
               {detail.canEdit && detail.status === 'ReadyForReview' && (
                 <ImportBatchControls dirtyCount={dirtyDraftUpdates.size} pendingRows={pendingRows}
                   validPendingRows={validPendingRows} reviewedRows={reviewedRows} hasUncheckedDuplicates={hasUncheckedDuplicates}
@@ -727,14 +765,57 @@ export function ImportReviewPage() {
                   bulkSaveMessage={bulkSaveMessage} ruleApplicationMessage={ruleApplicationMessage}
                   onCheckDuplicates={handleDuplicates} onSaveAll={handleSaveAllCorrections}
                   onApplyRules={handleApplyCategorizationRules} onDecision={handleBulkDecision}
-                  onComplete={handleComplete} onDiscard={handleDiscard} />
+                  onComplete={handleComplete} onDiscard={handleDiscard}
+                  budgetTools={
+                    <section
+                      className="import-bulk-budget-panel" aria-label="Bulk budget tools">
+                      <h3>Set budgets for multiple rows</h3>
+                      <p className="field-help">Choose once for this page or all matching rows. You can still adjust individual rows below.</p>
+                      <div className="import-bulk-budget-controls">
+                        <label><span>Bulk budget inclusion</span>
+                          <select value={bulkBudgetPreset} disabled={bulkActionsBusy}
+                            onChange={event => { setBulkBudgetPreset(event.target.value as BudgetInclusionPreset | ''); setBulkBudgetMessage('') }}>
+                            <option value="">Choose budget inclusion…</option>
+                            <option value="Personal">My personal budget only</option>
+                            <option value="Household">Household budget only</option>
+                            <option value="PersonalAndHousehold">Personal + Household</option>
+                            <option value="Neither">Neither budget (keep the transaction)</option>
+                          </select>
+                        </label>
+                        <label><span>Apply to</span>
+                          <select value={bulkBudgetScope} disabled={bulkActionsBusy}
+                            onChange={event => { setBulkBudgetScope(event.target.value as 'matching' | 'page'); setBulkBudgetMessage('') }}>
+                            <option value="matching">All matching rows ({detailLoad.isFresh ? matchingRowCount : 'loading…'}), across pages</option>
+                            <option value="page">Current page ({visibleDrafts.length})</option>
+                          </select>
+                        </label>
+                        <button className="secondary-button" type="button"
+                          disabled={bulkActionsBusy || (bulkBudgetScope === 'matching' && !budgetPreviewLoad.isFresh) || bulkBudgetPreview.changed === 0}
+                          onClick={handleBulkBudgetInclusion}>Apply budget choices ({bulkBudgetPreview.changed})</button>
+                      </div>
+                      <p className="field-help">Keeps your existing corrections. Changes are staged, then saved with
+                        “Save all corrections”. Saving changed approved rows returns them to Pending for review.</p>
+                      {(bulkBudgetPreset === 'Household' || bulkBudgetPreset === 'PersonalAndHousehold') &&
+                        <p className="action-consequence">{helpWarnings.sharePersonalExpense}</p>}
+                      <ContextualHelp topic="scope-privacy" />
+                      {bulkBudgetPreset && bulkBudgetScope === 'matching' && !budgetPreviewLoad.isFresh &&
+                        <PageLoadFeedback {...budgetPreviewLoad} subject="matching budget choices" onReload={() => void reloadBudgetPreview()} />}
+                      {bulkBudgetPreset && (bulkBudgetScope === 'page' || budgetPreviewLoad.isFresh) && <p className="field-help">{bulkBudgetPreview.changed} rows would change;
+                        {' '}{bulkBudgetPreview.unchanged} already match; {bulkBudgetPreview.skipped} excluded, linked,
+                        or permission-protected rows will be skipped.</p>}
+                      {bulkBudgetMessage && <p className="field-help" role="status">{bulkBudgetMessage}</p>}
+                    </section>
+                  } />
               )}
               {detail.status === 'Completed' && (
                 <div>
+                  <div data-tutorial-id="import-completion-summary">
                   <p className="field-help">
                     Completed imports are retained to preserve the history of official transactions.
                   </p>
                   <AppLink to="/transactions">View transactions</AppLink>
+                  {' · '}<AppLink to="/activity">View change history</AppLink>
+                  </div>
                   {householdId && detailLoad.isFresh && detail.canEdit && <ImportReversalPreviewPanel
                     key={`${householdId}/${detail.id}/${detail.updatedAtUtc}`} householdId={householdId} importId={detail.id}
                     onBusyChange={setIsReversing} onReversed={handleReversed} />}
@@ -745,72 +826,12 @@ export function ImportReviewPage() {
                 <p className="field-help">This import is {detail.status.toLowerCase()} and is not ready for review. Its rows cannot be approved or edited.</p>}
             </section>
 
-            <div className="import-row-toolbar">
-              <label>
-                <span>Show transactions</span>
-                <select value={rowFilter} disabled={mutationBusy} onChange={event => {
-                  if (event.target.value === rowFilter || !confirmRowNavigation()) return
-                  setRowFilter(event.target.value as DraftRowFilter)
-                  setDraftPage(1)
-                }}>
-                  <option value="all">All rows</option>
-                  <option value="pending">Pending</option>
-                  <option value="uncategorized">Uncategorized</option>
-                  <option value="parentOnly">Parent category only</option>
-                  <option value="categorized">Has category</option>
-                  <option value="possibleDuplicates">Possible duplicates</option>
-                  <option value="invalid">Invalid</option>
-                  <option value="approved">Approved</option>
-                  <option value="excluded">Excluded</option>
-                </select>
-              </label>
-              <span>
-                {detailLoad.isFresh ? <>Showing <strong>{matchingRowCount}</strong> of {detail.totalRows} rows</>
-                  : 'Refreshing matching rows; the previous count is not current.'}
-              </span>
-            </div>
-            {detail.canEdit && detail.status === 'ReadyForReview' && <section
-              className="import-bulk-budget-panel" aria-label="Bulk budget tools">
-              <div className="import-bulk-budget-controls">
-                <label><span>Bulk budget inclusion</span>
-                  <select value={bulkBudgetPreset} disabled={bulkActionsBusy}
-                    onChange={event => { setBulkBudgetPreset(event.target.value as BudgetInclusionPreset | ''); setBulkBudgetMessage('') }}>
-                    <option value="">Choose budget inclusion…</option>
-                    <option value="Personal">My personal budget only</option>
-                    <option value="Household">Household budget only</option>
-                    <option value="PersonalAndHousehold">Personal + Household</option>
-                    <option value="Neither">Neither budget (keep the transaction)</option>
-                  </select>
-                </label>
-                <label><span>Apply to</span>
-                  <select value={bulkBudgetScope} disabled={bulkActionsBusy}
-                    onChange={event => { setBulkBudgetScope(event.target.value as 'matching' | 'page'); setBulkBudgetMessage('') }}>
-                    <option value="matching">All matching rows ({detailLoad.isFresh ? matchingRowCount : 'loading…'}), across pages</option>
-                    <option value="page">Current page ({visibleDrafts.length})</option>
-                  </select>
-                </label>
-                <button className="secondary-button" type="button"
-                  disabled={bulkActionsBusy || (bulkBudgetScope === 'matching' && !budgetPreviewLoad.isFresh) || bulkBudgetPreview.changed === 0}
-                  onClick={handleBulkBudgetInclusion}>Apply budget choices ({bulkBudgetPreview.changed})</button>
-              </div>
-              <p className="field-help">Keeps your existing corrections. Changes are staged, then saved with
-                “Save all corrections”. Saving changed approved rows returns them to Pending for review.</p>
-              {(bulkBudgetPreset === 'Household' || bulkBudgetPreset === 'PersonalAndHousehold') &&
-                <p className="action-consequence">{helpWarnings.sharePersonalExpense}</p>}
-              <ContextualHelp topic="scope-privacy" />
-              {bulkBudgetPreset && bulkBudgetScope === 'matching' && !budgetPreviewLoad.isFresh &&
-                <PageLoadFeedback {...budgetPreviewLoad} subject="matching budget choices" onReload={() => void reloadBudgetPreview()} />}
-              {bulkBudgetPreset && (bulkBudgetScope === 'page' || budgetPreviewLoad.isFresh) && <p className="field-help">{bulkBudgetPreview.changed} rows would change;
-                {' '}{bulkBudgetPreview.unchanged} already match; {bulkBudgetPreview.skipped} excluded, linked,
-                or permission-protected rows will be skipped.</p>}
-              {bulkBudgetMessage && <p className="field-help" role="status">{bulkBudgetMessage}</p>}
-            </section>}
             {detailLoad.isFresh && matchingRowCount === 0 ? (
               <p className="empty-state">No rows match this filter.</p>
             ) : <>
               <p className="field-help" id="import-grid-help">Budget choices count the full amount in each selected budget.
                 Use Details for row corrections, rules, removal, and sharing information. On smaller screens, scroll horizontally to see all columns.</p>
-              <div className="import-review-grid" role="region" aria-label="Imported transactions"
+              <div className="import-review-grid" role="region" aria-label="Imported transactions" data-tutorial-id="import-review-grid"
                 aria-describedby="import-grid-help" tabIndex={0}>
                 <div className="import-draft-column-headings" aria-hidden="true">
                   <span>Date</span>
@@ -868,6 +889,8 @@ export function ImportReviewPage() {
 
           </>
         )}
+        </div>
+        <div id="import-tutorial-guide-host" />
     </PageFrame>
   )
 }

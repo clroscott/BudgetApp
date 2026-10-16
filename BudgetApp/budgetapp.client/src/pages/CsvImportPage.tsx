@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
 import { PageFrame } from '../components/PageFrame'
@@ -19,6 +19,9 @@ import {
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 import { ImportParsingFields } from '../imports/ImportParsingFields'
+import { useImportTutorialPage } from '../tutorials/useImportTutorialPage'
+import { TutorialContext } from '../tutorials/tutorialContext'
+import { importTutorialKey } from '../tutorials/importTutorialState'
 
 const maxFileSizeBytes = 10 * 1024 * 1024
 const standardCsvHeaders = new Set([
@@ -42,6 +45,7 @@ function isStandardCsvStructure(headers: string[]) {
 }
 
 export function CsvImportPage() {
+  const tutorial = useContext(TutorialContext)
   const { currentHousehold } = useHouseholds()
   const householdId = currentHousehold?.id
   const [accounts, setAccounts] = useState<AccountItem[]>([])
@@ -126,6 +130,14 @@ export function CsvImportPage() {
     () => accounts.find(account => account.id === selectedAccountId) ?? null,
     [accounts, selectedAccountId],
   )
+
+  useImportTutorialPage(householdId ? {
+    page: 'upload', householdId, accountId: selectedAccountId,
+    loaded: hasLoadedAccounts && !isLoading,
+    canImport: Boolean(selectedAccount && (currentHousehold?.role !== 'Viewer' || selectedAccount.scope === 'Personal')),
+    fileType: !selectedFile ? null : isExcel ? 'xlsx' : selectedFile.name.toLowerCase().endsWith('.csv') ? 'csv' : 'unsupported',
+    busy: isUploading, stagedId: result?.importFileId ?? null,
+  } : null)
 
   if (!currentHousehold) {
     return null
@@ -261,11 +273,12 @@ export function CsvImportPage() {
           </div>
         </div>
 
+        <div data-tutorial-id="import-upload-workspace">
         <div className="contextual-help-row">
           <ContextualHelp topic="import-approval" />
           <ContextualHelp topic="scope-privacy" />
         </div>
-        <ErrorSummary errors={errors} revealOnChange />
+        <ErrorSummary errors={errors} revealOnChange floating />
 
         {isLoading ? (
           <p className="empty-state">Loading accounts...</p>
@@ -283,7 +296,7 @@ export function CsvImportPage() {
           </div>
         ) : (
           <form className="import-form" onSubmit={(event) => void handleSubmit(event)}>
-            <label>
+            <label data-tutorial-id="import-upload-account">
               <span>Import into account</span>
               <select
                 disabled={isUploading}
@@ -305,7 +318,7 @@ export function CsvImportPage() {
               </select>
             </label>
 
-            <label className="file-drop-field">
+            <label className="file-drop-field" data-tutorial-id="import-upload-file">
               <span>CSV or Excel file</span>
               <input
                 key={currentHousehold.id}
@@ -373,6 +386,7 @@ export function CsvImportPage() {
 
             <button
               className="primary-button import-submit"
+              data-tutorial-id="import-stage-submit"
               type="submit"
               disabled={isUploading || !selectedFile || !selectedAccount || Boolean(isExcel && inspection && !inspection.selectedWorksheetId) || Boolean(mapping)}
             >
@@ -382,7 +396,8 @@ export function CsvImportPage() {
         )}
 
         {isExcel && inspection && !result && (
-          <section className="management-form import-mapping-panel" aria-label="Excel worksheet preview">
+          <section className="management-form import-mapping-panel" aria-label="Excel worksheet preview"
+            data-tutorial-id={!inspection.selectedWorksheetId ? 'import-stage-worksheet' : undefined}>
             <h2>Choose one worksheet</h2>
             <p>Only this worksheet will be staged. Worksheets are never combined.</p>
             <label><span>Worksheet</span>
@@ -402,7 +417,7 @@ export function CsvImportPage() {
         )}
 
         {inspection && mapping && (
-          <section className="management-form import-mapping-panel">
+          <section className="management-form import-mapping-panel" data-tutorial-id="import-stage-mapping">
             <div><p className="eyebrow">New file structure</p>
               <h2>Map these columns once</h2>
               <p>Save this mapping and future files with the same headers will be detected automatically.</p>
@@ -448,7 +463,7 @@ export function CsvImportPage() {
         )}
 
         {result && (
-          <section className="import-result" aria-live="polite">
+          <section className="import-result" aria-live="polite" data-tutorial-id="import-stage-result">
             <div>
               <p className="eyebrow">Ready for review</p>
               <h2>{result.originalFileName}</h2>
@@ -463,11 +478,20 @@ export function CsvImportPage() {
             <p className="field-help">
               Review every row before creating official transactions.
             </p>
-            <AppLink to={`/imports/review?importId=${result.importFileId}`}>
+            <AppLink to={`/imports/review?importId=${result.importFileId}`} onClick={event => {
+              if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+              if (tutorial?.activeTutorial?.key !== importTutorialKey || tutorial.activeStepIndex !== 3 || !tutorial.importGuide?.canNext) return
+              // Use the same guarded, outcome-checked handoff as the coach.
+              // Prevent AppLink from navigating a second time or prompting twice.
+              event.preventDefault()
+              void tutorial.next()
+            }}>
               Review this import
             </AppLink>
           </section>
         )}
+        </div>
+        <div id="import-tutorial-guide-host" />
     </PageFrame>
   )
 }

@@ -18,7 +18,7 @@ function targetFocusElement(target: HTMLElement) {
     ?? target.querySelector<HTMLElement>('h1,h2,h3,h4') ?? target
 }
 
-export function useTutorialFocus({ active, step, kind, target, layerRef, headingRef, descriptionId, exit }: {
+export function useTutorialFocus({ active, step, kind, target, layerRef, headingRef, descriptionId, exit, modeless = false, host }: {
   active: boolean
   step: TutorialStep | undefined
   kind: TutorialKind | undefined
@@ -27,6 +27,8 @@ export function useTutorialFocus({ active, step, kind, target, layerRef, heading
   headingRef: RefObject<HTMLHeadingElement | null>
   descriptionId: string
   exit: () => Promise<void>
+  modeless?: boolean
+  host?: HTMLElement | null
 }) {
   const activeRef = useRef(active)
   const lastStep = useRef<TutorialStep | undefined>(undefined)
@@ -55,6 +57,23 @@ export function useTutorialFocus({ active, step, kind, target, layerRef, heading
     const layer = layerRef.current
     const heading = headingRef.current
     if (!active || !step || !layer || !heading) return
+    if (modeless) {
+      // The dimming is visual: real task forms, errors and confirmation controls
+      // stay usable, including portals outside the spotlight. Never inert them.
+      focusTargetRef.current = () => {
+        if (!target || !isTutorialVisible(target)) return
+        target.scrollIntoView({ behavior: 'auto', block: 'start' })
+        focusElement(targetFocusElement(target))
+      }
+      const escape = (event: KeyboardEvent) => {
+        if (event.key !== 'Escape') return
+        event.preventDefault(); event.stopImmediatePropagation(); void exit()
+      }
+      document.addEventListener('keydown', escape, true)
+      if (lastStep.current !== step || document.activeElement === document.body) heading.focus()
+      lastStep.current = step
+      return () => { document.removeEventListener('keydown', escape, true); focusTargetRef.current = () => {} }
+    }
     const ownedInert = new Set<HTMLElement>()
     const described = new Map<HTMLElement, string | null>()
     const allowed = (node: Node) => layer.contains(node) || !!target?.contains(node)
@@ -143,7 +162,7 @@ export function useTutorialFocus({ active, step, kind, target, layerRef, heading
       }
       focusTargetRef.current = () => {}
     }
-  }, [active, step, kind, target, layerRef, headingRef, descriptionId, exit])
+  }, [active, step, kind, target, layerRef, headingRef, descriptionId, exit, modeless, host])
 
   return () => focusTargetRef.current()
 }

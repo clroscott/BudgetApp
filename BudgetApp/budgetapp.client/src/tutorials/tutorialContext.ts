@@ -1,6 +1,7 @@
 import { createContext } from 'react'
 import type { TutorialDefinition } from './tutorialDefinitions'
 import type { TutorialProgress } from './tutorialProgressApi'
+import type { ImportTutorialControls } from './importTutorialState'
 
 export interface TutorialContextValue {
   activeTutorial: TutorialDefinition | null
@@ -13,6 +14,7 @@ export interface TutorialContextValue {
   exit: () => Promise<void>
   next: () => Promise<void>
   back: () => Promise<void>
+  importGuide?: ImportTutorialControls
 }
 
 export const TutorialContext = createContext<TutorialContextValue | null>(null)

@@ -6,8 +6,10 @@ namespace BudgetApp.Tests.Integration;
 public sealed class TutorialProgressTests(BudgetAppWebApplicationFactory factory)
     : IClassFixture<BudgetAppWebApplicationFactory>
 {
-    [Fact]
-    public async Task Progress_CanBeResumedCompletedAndReplayed()
+    [Theory]
+    [InlineData("getting-started", 6)]
+    [InlineData("import-review", 9)]
+    public async Task Progress_CanBeResumedCompletedAndReplayed(string tutorialKey, int lastStep)
     {
         using var client = factory.CreateAuthenticatedTestClient();
         await Register(client);
@@ -17,7 +19,7 @@ public sealed class TutorialProgressTests(BudgetAppWebApplicationFactory factory
 
         var started = await Save(
             client,
-            "getting-started",
+            tutorialKey,
             version: 1,
             status: "InProgress",
             currentStepIndex: 3);
@@ -28,10 +30,10 @@ public sealed class TutorialProgressTests(BudgetAppWebApplicationFactory factory
 
         var completed = await Save(
             client,
-            "getting-started",
+            tutorialKey,
             version: 1,
             status: "Completed",
-            currentStepIndex: 6);
+            currentStepIndex: lastStep);
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
         var completedProgress =
             await completed.Content.ReadFromJsonAsync<ProgressResponse>();
@@ -39,7 +41,7 @@ public sealed class TutorialProgressTests(BudgetAppWebApplicationFactory factory
 
         var replayed = await Save(
             client,
-            "getting-started",
+            tutorialKey,
             version: 1,
             status: "InProgress",
             currentStepIndex: 0);

@@ -383,7 +383,8 @@ export const DraftRow = memo(function DraftRow({
             </select>
           </label>
         </div>
-        <fieldset className="budget-inclusion-controls import-budget-choices" disabled={!editable || isBusy}>
+        <fieldset className="budget-inclusion-controls import-budget-choices" disabled={!editable || isBusy}
+          data-tutorial-id="import-row-budget-choices">
           <legend className="visually-hidden">Include in budgets</legend>
           <label className="checkbox-row"><input type="checkbox" checked={includePersonal}
             aria-label="My personal budget"

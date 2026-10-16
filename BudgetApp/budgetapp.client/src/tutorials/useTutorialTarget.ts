@@ -24,7 +24,8 @@ function targetRect(element: HTMLElement): TargetRect | null {
     ? { top, left, right, bottom, width: right - left, height: bottom - top } : null
 }
 
-export function useTutorialTarget(step: TutorialStep | undefined, kind: TutorialKind | undefined) {
+export function useTutorialTarget(step: TutorialStep | undefined, kind: TutorialKind | undefined, scrollTarget = true,
+  priorityTarget: HTMLElement | null = null) {
   const [retryVersion, setRetryVersion] = useState(0)
   const [state, setState] = useState<TargetState>({ step: undefined, phase: 'waiting', target: null, rect: null })
   useEffect(() => {
@@ -53,7 +54,10 @@ export function useTutorialTarget(step: TutorialStep | undefined, kind: Tutorial
     }
     const check = () => {
       if (stopped) return
-      const candidates = tutorialElement(step.targetId)
+      const candidates = [
+        ...priorityTarget ? [priorityTarget] : [],
+        ...[step.targetId, ...step.fallbackTargetIds ?? []].flatMap(tutorialElement),
+      ]
       let element = candidates.find(candidate => isTutorialVisible(candidate) &&
         (step.advance !== 'click' || isEnabledTarget(candidate))) ?? null
       if (!element && step.targetId.startsWith('nav-')) {
@@ -75,11 +79,13 @@ export function useTutorialTarget(step: TutorialStep | undefined, kind: Tutorial
         if (rawElement) resizeObserver?.observe(rawElement)
       }
       if (element && element !== lastTarget) {
-        element.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' })
+        if (scrollTarget) element.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' })
         lastTarget = element
       }
       const rect = element ? targetRect(element) : null
-      if (!element || !rect) {
+      // Financial tasks keep rendered offscreen controls usable via Show me;
+      // scrolling during a multi-control task must not become a missing target.
+      if (!element || (scrollTarget && !rect)) {
         if (!element) lastTarget = null
         beginWaiting()
         return
@@ -104,7 +110,7 @@ export function useTutorialTarget(step: TutorialStep | undefined, kind: Tutorial
       window.removeEventListener('resize', check)
       window.removeEventListener('scroll', check, true)
     }
-  }, [step, kind, retryVersion])
+  }, [step, kind, retryVersion, scrollTarget, priorityTarget])
   return { ...(state.step === step ? state : { step, phase: 'waiting' as const, target: null, rect: null }),
     retry: () => setRetryVersion(version => version + 1) }
 }

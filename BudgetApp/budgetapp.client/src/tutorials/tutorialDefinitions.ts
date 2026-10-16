@@ -1,11 +1,17 @@
-export type TutorialAdvance = 'next' | 'click'
+import { importTutorialDefinition } from './importTutorialDefinition'
+
+export type TutorialAdvance = 'next' | 'click' | 'outcome'
 export type TutorialKind = 'LearnOnly' | 'GuidedSetup' | 'GuidedFinancialTask'
 
 export interface TutorialStep {
   title: string
   body: string
+  // Extra explanation stays collapsed behind the short, action-led prompt.
+  details?: string
   route: string
   targetId: string
+  // Ordered alternatives for branching UI, e.g. mapping -> worksheet -> upload.
+  fallbackTargetIds?: string[]
   advance: TutorialAdvance
   // Guided recovery can skip informational steps only, never required actions.
   canSkipWhenUnavailable?: boolean
@@ -18,6 +24,8 @@ export interface TutorialDefinition {
   title: string
   description: string
   estimatedMinutes: number
+  // Default: resume at the saved step. Tasks without persisted context restart.
+  resumeBehavior?: 'step' | 'restart'
   steps: TutorialStep[]
 }
 
@@ -89,6 +97,7 @@ export const tutorialDefinitions: TutorialDefinition[] = [
       },
     ],
   },
+  importTutorialDefinition,
 ]
 
 export const tutorialByKey = new Map(
