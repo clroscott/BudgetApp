@@ -1,0 +1,28 @@
+import type { TutorialDefinition } from './tutorialDefinitions'
+export const profileTutorial: TutorialDefinition = {
+  key: 'manage-import-profiles', version: 1, kind: 'GuidedSetup', title: 'Reuse CSV and Excel mappings', resumeBehavior: 'restart',
+  description: 'Inspect or save a reusable profile, then select it for an import without uploading automatically.', estimatedMinutes: 5,
+  steps: [
+    { title: 'Choose a mapping', targetId: 'profile-tour-choice',
+      body: 'Choose an existing profile or a new mapping. Profiles are shared household configuration. Reuse a suitable one rather than creating another copy.',
+      details: 'Owners/Admins can manage profiles. Viewers can inspect and use existing active profiles without editing them. Starting or replaying this guide never saves, deactivates or deletes a profile.' },
+    { title: 'Name and preferred account', targetId: 'profile-tour-name', fallbackTargetIds: ['profile-tour-selected'],
+      body: 'Give the mapping a recognizable name. Preferred account is optional; it does not grant anyone access to a private account. Keep existing values if they are correct.',
+      details: 'Saving changes shared configuration used by later CSV and .xlsx imports. Only accounts you can access are offered. Choosing Any account avoids a default. A preferred account does not change account ownership or sharing.' },
+    { title: 'Map the actual headers', targetId: 'profile-tour-columns', fallbackTargetIds: ['profile-tour-selected'],
+      body: 'Match file headers to date and description, then one signed amount OR debit/credit columns. Category and subcategory are optional. Ignore unrelated columns.',
+      details: 'Headers must be nonblank and unique. Use the exact header text from a known file structure. Existing categories are matched by name; a profile does not create new categories. Header names are reusable for CSV and Excel worksheets.' },
+    { title: 'Check signs and parsing', targetId: 'profile-tour-parsing', fallbackTargetIds: ['profile-tour-selected'],
+      body: 'Check what positive amounts mean, plus date format and number culture. Keep account codes with leading zeros as text in Excel. Verify read values before any later staging.',
+      details: 'A single amount may mean spending-positive or money-in-positive. Debit/credit is a separate layout. Date/culture settings interpret stored values; they cannot recover leading zeros Excel already removed. The reader never runs workbook formulas, macros or external content.' },
+    { title: 'Save deliberately', targetId: 'profile-tour-save', fallbackTargetIds: ['profile-tour-selected'],
+      body: 'Choose Create profile or Save profile on the page. An unchanged existing mapping can be canceled. Wait for the saved list before continuing; this creates no transactions.',
+      details: 'On an uncertain save, Check saved profiles before trying again. Restart and select the saved mapping instead of creating a duplicate. A confirmed save followed by a failed refresh is not another reason to click Create.' },
+    { title: 'Select it for CSV or Excel', targetId: 'profile-tour-upload', route: '/import',
+      body: 'Choose your saved mapping in Import profile; it also works with .xlsx worksheets. No file is required here. Later, preview read values and choose one worksheet before staging Excel.',
+      details: 'The account must still be permitted for import. Selecting a profile is not an upload, approval or official transaction. Its template download is optional. A later import remains staged until reviewed and explicitly completed.' },
+    { title: 'Mapping ready to reuse', targetId: 'profile-tour-upload', route: '/import',
+      body: 'Your saved profile is selected. Continue importing stays here. Start the import tutorial separately when you want to try a file.',
+      details: 'Finishing saves tutorial progress only. It does not inspect a file, stage rows, approve duplicates or create transactions. Replay starts with profile selection, so use the existing mapping rather than adding another.' },
+  ].map(step => ({ route: '/settings/import-profiles', ...step, advance: 'outcome' as const })),
+}

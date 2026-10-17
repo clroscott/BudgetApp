@@ -131,7 +131,7 @@ export function BudgetManagementPage() {
   const [writeUncertain, setWriteUncertain] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
-  const loadState = usePageLoad(`${currentHousehold?.id}/${year}/${month}/${scope}`)
+  const loadState = usePageLoad(`${currentHousehold?.id}/${currentHousehold?.role}/${year}/${month}/${scope}`)
   const { run, markReady, invalidate } = loadState
   const pageRef = useRef<HTMLElement>(null)
   const actionsRef = useRef<HTMLElement>(null)
@@ -158,6 +158,7 @@ export function BudgetManagementPage() {
     overallDetailed: Boolean(planningRoot && modes[planningRoot.id] === 'detailed'),
     hasBreakdown: Boolean(breakdownRoot), breakdownDetailed: Boolean(breakdownRoot && modes[breakdownRoot.id] === 'detailed'),
     hasSecondCategory: Boolean(otherRoots[0]), hasThirdCategory: Boolean(otherRoots[1]),
+    copySource,
   } : null)
 
   // The tutorial's in-flow wrapper replaces the action-bar element. Rebind on
@@ -439,9 +440,9 @@ export function BudgetManagementPage() {
       <span className="budget-back-to-top-host" data-back-to-top-host />
       {budget?.status === 'Draft' && canManage && <button className="danger-button" type="button" disabled={isSaving} onClick={() => void handleDeleteDraft()}>Delete draft</button>}
       {budget?.status === 'Draft' && canManage && <button data-tutorial-id="budget-tutorial-activate" className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before activating.' : undefined} onClick={() => void handleStatus('activate')}>Activate</button>}
-      {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before returning to Draft.' : undefined} onClick={() => void handleStatus('return-to-draft')}>Return to draft</button>}
+      {budget?.status === 'Active' && canManage && <button data-tutorial-id="lifecycle-tour-return" className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before returning to Draft.' : undefined} onClick={() => void handleStatus('return-to-draft')}>Return to draft</button>}
       {budget?.status === 'Active' && canManage && <button className="secondary-button" type="button" disabled={isSaving || isDirty} title={isDirty ? 'Save changes before closing.' : undefined} onClick={() => void handleStatus('close')}>Close budget</button>}
-      {budget?.status === 'Closed' && canManage && <button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleStatus('reopen')}>Reopen budget</button>}
+      {budget?.status === 'Closed' && canManage && <button data-tutorial-id="lifecycle-tour-reopen" className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleStatus('reopen')}>Reopen budget</button>}
       {tutorialActive && canEdit ? <div className="budget-tutorial-save-target" data-tutorial-id="budget-tutorial-save" role="group" aria-label="Monthly total and save">
         <span>Monthly total <strong>{formattedTotal}</strong></span>{saveAction}
       </div> : saveAction}
@@ -450,7 +451,7 @@ export function BudgetManagementPage() {
 
   return (
     <PageFrame className={`budget-page${tutorialActive ? ' budget-tutorial-active' : ''}`} contentClassName="budget-content" ref={pageRef}
-      footer={<>{tutorialActive && actions ? <div className="page-frame-content">{actions}</div> : actions}<div id="budget-tutorial-guide-host" /></>}>
+      footer={<>{tutorialActive && actions ? <div className="page-frame-content">{actions}</div> : actions}<div id="budget-tutorial-guide-host" /><div id="lifecycle-tutorial-guide-host" /><div id="annual-tutorial-guide-host" /></>}>
         <BudgetingSectionNav current="monthly" />
         <div className="page-title-row" data-tutorial-id="monthly-budget-page-title">
           <div><p className="eyebrow">Budgeting</p><h1>Monthly budget</h1><p>Plan household or personal spending one month at a time.</p>
@@ -491,8 +492,8 @@ export function BudgetManagementPage() {
           <div className="budget-empty-state">
             <div className="empty-state"><h2>No budget for {monthNames[month - 1]} {year}</h2><p>Choose how to start this {scope.toLowerCase()} budget.</p></div>
             {canManage && <div className="budget-initialization-grid">
-              <article><h3>Copy an existing month</h3><p>Copy budget amounts and category detail from any existing {scope.toLowerCase()} budget.</p><label className="budget-copy-source"><span>Budget to copy</span><select value={copySource} disabled={budgetOptions.length === 0 || isSaving} onChange={event => setCopySource(event.target.value)}>{budgetOptions.length === 0 ? <option value="">No existing budgets</option> : budgetOptions.map(option => <option key={option.id} value={`${option.year}-${option.month}`}>{monthNames[option.month - 1]} {option.year} ({option.status})</option>)}</select></label><button className="secondary-button" type="button" disabled={isSaving || !copySource} onClick={() => void handleCreate('copy')}>Copy selected month</button></article>
-              <article><h3>Use recurring expenses</h3><p>Build category amounts from active recurring expenses that apply this month.</p><button className="secondary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('from-recurring')}>Build from recurring expenses</button></article>
+              <article data-tutorial-id="lifecycle-tour-copy"><h3>Copy an existing month</h3><p>Copy budget amounts and category detail from any existing {scope.toLowerCase()} budget.</p><label className="budget-copy-source"><span>Budget to copy</span><select value={copySource} disabled={budgetOptions.length === 0 || isSaving} onChange={event => setCopySource(event.target.value)}>{budgetOptions.length === 0 ? <option value="">No existing budgets</option> : budgetOptions.map(option => <option key={option.id} value={`${option.year}-${option.month}`}>{monthNames[option.month - 1]} {option.year} ({option.status})</option>)}</select></label><button className="secondary-button" type="button" disabled={isSaving || !copySource} onClick={() => void handleCreate('copy')}>Copy selected month</button></article>
+              <article><h3>Use recurring expenses</h3><p>Build category amounts from active recurring expenses that apply this month.</p><button className="secondary-button" data-tutorial-id="recurring-tour-build" type="button" disabled={isSaving} onClick={() => void handleCreate('from-recurring')}>Build from recurring expenses</button></article>
               <article><h3>Start from scratch</h3><p>Create an empty draft and enter every amount yourself.</p><button data-tutorial-id="budget-tutorial-create" className="primary-button" type="button" disabled={isSaving} onClick={() => void handleCreate('blank')}>Create blank budget</button></article>
             </div>}
           </div>

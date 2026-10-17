@@ -934,6 +934,13 @@
   backdrop-filter: blur(12px);
 }
 
+.yearly-tutorial-active .yearly-save-bar,
+.app-shell .yearly-tutorial-active .yearly-save-bar {
+  position: static;
+  margin-block: 1rem;
+  width: auto;
+}
+
 .yearly-save-bar > div {
   display: grid;
   gap: 0.15rem;

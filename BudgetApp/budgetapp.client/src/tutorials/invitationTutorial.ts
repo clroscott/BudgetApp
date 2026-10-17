@@ -1,0 +1,25 @@
+import type { TutorialDefinition } from './tutorialDefinitions'
+export const invitationTutorial: TutorialDefinition = {
+  key: 'invite-household-member', version: 1, kind: 'GuidedSetup', title: 'Invite a household member', resumeBehavior: 'restart',
+  description: 'Check existing access, then deliberately invite someone only if needed. Never sends or resends automatically.', estimatedMinutes: 4,
+  steps: [
+    { title: 'Check existing access first', targetId: 'invite-tour-choice',
+      body: 'Review this household’s members and invitations. Choose an existing record, or a new invitation only if needed. Replaying never sends another message.',
+      details: 'Pending invitations, already-joined members, expired and revoked records are different states. Only permitted visible records are offered. Read-only members can inspect membership without inaccessible required actions.' },
+    { title: 'Choose the least access needed', targetId: 'invite-tour-roles', fallbackTargetIds: ['invite-tour-members'],
+      body: 'Admin manages household settings; Editor manages finances; Viewer reads shared household data. Only an Owner can invite an Admin. No invitation can make another Owner here.',
+      details: 'Household Admin is not an application administrator. Viewers keep permitted actions on their own Personal accounts. Joining does not expose another person’s private accounts, notes or CSV/Excel files. Shared expenses can be visible without private account details.' },
+    { title: 'Recipient and role', targetId: 'invite-tour-form', fallbackTargetIds: ['invite-tour-selected'],
+      body: 'Enter the intended email and an allowed role. Check existing members and pending invitations again. Use an existing record instead of sending another invitation to the same person.',
+      details: 'Use real values only when you intend to contact that person. Invalid emails and unsupported roles are rejected normally. The tutorial stores no recipient email, invitation token or email contents in progress.' },
+    { title: 'Sending is a real message', targetId: 'invite-tour-send', fallbackTargetIds: ['invite-tour-selected'],
+      body: 'Check the email and role, then choose Send invitation on the page only if you intend to send it. Wait for the saved result. The guide never sends or retries for you.',
+      details: 'An invitation is saved before email delivery. A failed delivery can leave a pending invitation; do not create another. An unknown result requires a fresh saved-list check before any explicit resend. Existing records can be reviewed without sending.' },
+    { title: 'Check the saved status', targetId: 'invite-tour-selected',
+      body: 'Read the actual invitation or membership status. Saved, delivered and accepted are different things. Finishing a guide does not prove a message arrived or someone joined.',
+      details: 'Use the normal page’s Resend/Revoke controls only as separate deliberate actions. Exiting never silently revokes a saved invitation. No tokens or email contents are copied into tutorial state or logs.' },
+    { title: 'The recipient accepts separately', targetId: 'invite-tour-selected', fallbackTargetIds: ['invite-tour-members'],
+      body: 'Your review ends here; acceptance is the recipient’s separate action. Continue stays with Household. Return to tutorials opens the library. No further message is sent.',
+      details: 'Pending, failed delivery, expired, revoked and accepted states are described honestly. Replay starts by checking current members/invitations, not by repeating a previous send. Last-owner and role safeguards are unchanged.' },
+  ].map(step => ({ ...step, route: '/household', advance: 'outcome' as const })),
+}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
 import { PageFrame } from '../components/PageFrame'
@@ -18,6 +18,11 @@ import {
 } from '../imports/importProfileApi'
 import { useUnsavedForm } from '../routing/useUnsavedForm'
 import { ImportParsingFields } from '../imports/ImportParsingFields'
+import { ApiError } from '../api/apiClient'
+import { PageLoadFeedback } from '../components/PageLoadFeedback'
+import { usePageLoad } from './usePageLoad'
+import { useProfileTutorialPage } from '../tutorials/profileTutorialState'
+import { TutorialContext } from '../tutorials/tutorialContext'
 
 type ImportColumnField =
   'ignore' | 'date' | 'description' | 'amount' | 'debit' | 'credit' |
@@ -75,6 +80,13 @@ export function ImportProfileManagementPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [isBusy, setIsBusy] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const profileTask = useContext(TutorialContext)?.profileGuide
+  const [guideSelection, setGuideSelection] = useState<string | null>(() => profileTask?.selection ?? null)
+  const [savedId, setSavedId] = useState<string | null>(() => profileTask?.profileId ?? null)
+  const [uncertain, setUncertain] = useState(false)
+  const [needsRead, setNeedsRead] = useState(false)
+  const loadState = usePageLoad(`${currentHousehold?.id}/${currentHousehold?.role}`)
+  const { run, captureContext } = loadState
   const canEdit = currentHousehold?.role !== 'Viewer'
   const headers = useMemo(
     () => columns.map(column => column.header.trim()).filter(Boolean),
@@ -85,22 +97,28 @@ export function ImportProfileManagementPage() {
   const formGuard = useUnsavedForm({
     form, columns: columns.map(({ header, field }) => ({ header, field })),
   }, 'Discard your unsaved import profile changes?')
+  const selectedProfile = profiles.find(profile => profile.isActive && profile.id === (guideSelection === 'new' ? savedId : guideSelection))
+  const tutorialActive = useProfileTutorialPage(currentHousehold ? {
+    page: 'profiles', householdId: currentHousehold.id, fresh: loadState.isFresh && !needsRead, busy: isBusy || loadState.isPending,
+    dirty: formGuard.isDirty, uncertain, selection: guideSelection, profileId: selectedProfile?.id ?? null,
+    canEdit, editing: guideSelection === 'new' && !savedId || Boolean(selectedProfile && editingId === selectedProfile.id),
+  } : null)
 
-  const load = async () => {
-    if (!currentHousehold) return
-    const [profileItems, accountItems] = await Promise.all([
+  const load = useCallback(async () => {
+    if (!currentHousehold) return false
+    return run(() => Promise.all([
       getImportProfiles(currentHousehold.id, true),
       getAccounts(currentHousehold.id),
-    ])
-    setProfiles(profileItems)
-    setAccounts(accountItems.filter(account => account.isActive))
-  }
+    ]), ([profileItems, accountItems]) => {
+      setProfiles(profileItems)
+      setAccounts(accountItems.filter(account => account.isActive))
+      setNeedsRead(false)
+    })
+  }, [currentHousehold, run])
 
   useEffect(() => {
-    setErrors([])
-    void load().catch(error => setErrors(getErrorMessages(error)))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentHousehold?.id])
+    void load()
+  }, [load])
 
   if (!currentHousehold) return null
 
@@ -119,8 +137,13 @@ export function ImportProfileManagementPage() {
     })
   }
 
-  const edit = (profile: ImportProfile) => {
-    if (editingId === profile.id || !formGuard.confirmDiscard()) return
+  const edit = (profile: ImportProfile, reselect = false) => {
+    if (editingId === profile.id && !reselect) return true
+    if (!formGuard.confirmDiscard()) return false
+    if (tutorialActive && guideSelection !== profile.id && !(guideSelection === 'new' && savedId === profile.id)) {
+      setGuideSelection(profile.id)
+      setSavedId(null)
+    }
     setEditingId(profile.id)
     const nextForm: SaveImportProfile = {
       name: profile.name,
@@ -155,9 +178,13 @@ export function ImportProfileManagementPage() {
       form: nextForm, columns: nextColumns.map(({ header, field }) => ({ header, field })),
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
+    return true
   }
 
   const submit = async () => {
+    if (isBusy || uncertain || !loadState.isFresh || !canEdit) return
+    if (tutorialActive && guideSelection === 'new' && savedId && !editingId) return
+    const isCurrent = captureContext()
     setIsBusy(true)
     setErrors([])
     try {
@@ -174,14 +201,16 @@ export function ImportProfileManagementPage() {
         categoryColumn: headerFor('category'),
         subcategoryColumn: headerFor('subcategory'),
       }
-      if (editingId)
-        await updateImportProfile(currentHousehold.id, editingId, request)
-      else
-        await createImportProfile(currentHousehold.id, request)
+      const saved = editingId ? await updateImportProfile(currentHousehold.id, editingId, request)
+        : await createImportProfile(currentHousehold.id, request)
+      if (!isCurrent()) return
+      setSavedId(current => current ?? saved.id)
       reset()
       await load()
     } catch (error) {
+      if (!isCurrent()) return
       setErrors(getErrorMessages(error))
+      if (tutorialActive && !(error instanceof ApiError && [400, 422].includes(error.status))) { setUncertain(true); setNeedsRead(true) }
     } finally {
       setIsBusy(false)
     }
@@ -226,32 +255,42 @@ export function ImportProfileManagementPage() {
     }])
 
   const changeActiveState = async (profile: ImportProfile) => {
+    if (isBusy || uncertain || !loadState.isFresh || !canEdit) return
+    const isCurrent = captureContext()
     setIsBusy(true)
     setErrors([])
     try {
       await setImportProfileActive(
         currentHousehold.id, profile.id, !profile.isActive)
+      if (!isCurrent()) return
       await load()
     } catch (error) {
+      if (!isCurrent()) return
       setErrors(getErrorMessages(error))
+      if (tutorialActive && !(error instanceof ApiError && [400, 422].includes(error.status))) { setUncertain(true); setNeedsRead(true) }
     } finally {
       setIsBusy(false)
     }
   }
 
   const deletePermanently = async (profile: ImportProfile) => {
+    if (isBusy || uncertain || !loadState.isFresh || !canEdit) return
     if (!window.confirm(
       `Permanently delete the "${profile.name}" import profile? This cannot be undone.`,
     )) return
 
+    const isCurrent = captureContext()
     setIsBusy(true)
     setErrors([])
     try {
       await deleteImportProfile(currentHousehold.id, profile.id)
+      if (!isCurrent()) return
       if (editingId === profile.id) reset()
       await load()
     } catch (error) {
+      if (!isCurrent()) return
       setErrors(getErrorMessages(error))
+      if (tutorialActive && !(error instanceof ApiError && [400, 422].includes(error.status))) { setUncertain(true); setNeedsRead(true) }
     } finally {
       setIsBusy(false)
     }
@@ -273,30 +312,38 @@ export function ImportProfileManagementPage() {
     hasDescription &&
     (usesAmount || hasDebitOrCredit),
   )
+  const blocked = isBusy || uncertain || !loadState.isFresh
   const renderProfile = (profile: ImportProfile) => (
-    <article className={`account-card${profile.isActive ? '' : ' inactive-row'}`} key={profile.id}>
+    <article className={`account-card${profile.isActive ? '' : ' inactive-row'}`} key={profile.id}
+      data-tutorial-id={selectedProfile?.id === profile.id ? 'profile-tour-selected' : undefined}>
       <div className="account-card-main"><div>
         <h3>{profile.name}</h3>
         <p>{profile.headers.join(' · ')}</p>
         <small>{profile.amountColumn ? 'Amount' : 'Debit/Credit'} · {profile.amountConvention}</small>
+        <details><summary>Mapping details</summary>
+          <p>Date: {profile.dateColumn} · Description: {profile.descriptionColumn}</p>
+          <p>{profile.amountColumn ? `Amount: ${profile.amountColumn}` : `Debit: ${profile.debitColumn ?? 'none'} · Credit: ${profile.creditColumn ?? 'none'}`}</p>
+          <p>Date format: {profile.dateFormat || 'Automatic'} · Number culture: {profile.numberCulture || 'Default'}</p>
+          <p>Preferred account: {profile.defaultAccountId ? accounts.find(account => account.id === profile.defaultAccountId)?.name ?? 'Not available to your account' : 'Any account'}</p>
+        </details>
       </div></div>
       <div className="account-actions">
         <a className="secondary-button" href={importProfileTemplateUrl(currentHousehold.id, profile.id)}>
           Download template
         </a>
         {canEdit && profile.isActive && (
-          <button className="secondary-button" type="button" disabled={isBusy}
+          <button className="secondary-button" type="button" disabled={blocked}
             onClick={() => edit(profile)}>Edit</button>
         )}
         {canEdit && (
           <button className={profile.isActive ? 'danger-button' : 'secondary-button'}
-            type="button" disabled={isBusy}
+            type="button" disabled={blocked}
             onClick={() => void changeActiveState(profile)}>
             {profile.isActive ? 'Deactivate' : 'Reactivate'}
           </button>
         )}
         {canEdit && !profile.isActive && (
-          <button className="danger-button" type="button" disabled={isBusy}
+            <button className="danger-button" type="button" disabled={blocked}
             onClick={() => void deletePermanently(profile)}>
             Delete permanently
           </button>
@@ -306,22 +353,39 @@ export function ImportProfileManagementPage() {
   )
 
   return (
-    <PageFrame contentClassName="import-profile-content">
+    <PageFrame contentClassName="import-profile-content" footer={<div id="profile-tutorial-guide-host" />}>
         <TransactionsSectionNav />
         <div className="page-title-row"><div>
           <p className="eyebrow">Transactions</p>
           <h1>Import profiles</h1>
           <p>Save a bank or custom CSV/Excel structure once, then reuse it automatically.</p>
         </div></div>
-        <ErrorSummary errors={errors} />
-        {canEdit && <form className="management-form import-profile-form"
+        {!uncertain && <ErrorSummary errors={errors} />}
+        <PageLoadFeedback subject="import profiles" status={loadState.status} errors={loadState.errors} onReload={() => void load()} disabled={isBusy} />
+        {uncertain && <div className="error-summary" role="alert"><p>The save result is uncertain. Check the saved list before another change.</p>
+          <button type="button" disabled={isBusy || loadState.isPending} onClick={() => { setErrors([]); void load() }}>Check saved profiles</button>
+          <p>Restart task selection and choose the saved profile rather than creating it again.</p></div>}
+        {tutorialActive && <section className="management-form" data-tutorial-id="profile-tour-choice">
+          <label><span>Profile for this tutorial</span><select value={guideSelection ?? ''} disabled={isBusy || !loadState.isFresh || needsRead} onChange={event => {
+            const id = event.target.value
+            if (needsRead) return
+            if (uncertain && id === 'new') return
+            const existing = profiles.find(profile => profile.id === id && profile.isActive)
+            if (id !== 'new' && !existing) return
+            if (existing && canEdit) { if (!edit(existing, true)) return }
+            else { if (!formGuard.confirmDiscard()) return; if (canEdit) reset() }
+            setGuideSelection(id); setSavedId(null); setUncertain(false); setErrors([])
+          }}><option value="">Choose a profile…</option>{canEdit && <option value="new" disabled={uncertain}>{savedId ? 'Use the mapping just saved' : 'New mapping'}</option>}
+            {activeProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          </select></label>
+        </section>}
+        {canEdit && loadState.hasData && <form className="management-form import-profile-form"
           onSubmit={event => event.preventDefault()}>
           <div className="account-form-heading"><div>
             <h2>{editingId ? 'Edit profile' : 'Create profile'}</h2>
             <p>Name each file column and choose what BudgetApp should do with it.</p>
-          </div>{editingId && <button className="text-button" type="button"
-            onClick={() => { if (formGuard.confirmDiscard()) reset() }}>Cancel</button>}</div>
-          <div className="import-profile-details-grid">
+          </div></div>
+          <div className="import-profile-details-grid" data-tutorial-id="profile-tour-name">
             <label><span>Profile name</span><input value={form.name} maxLength={100}
               placeholder="Example: Joint chequing CSV"
               onChange={event => setField('name', event.target.value)} /></label>
@@ -332,7 +396,7 @@ export function ImportProfileManagementPage() {
               {accounts.map(account => <option value={account.id} key={account.id}>{account.name}</option>)}
             </select></label>
           </div>
-          <div className="import-profile-column-builder">
+          <div className="import-profile-column-builder" data-tutorial-id="profile-tour-columns">
             <div className="import-profile-column-heading">
               <div>
                 <h3>File columns</h3>
@@ -399,6 +463,7 @@ export function ImportProfileManagementPage() {
               ))}
             </div>
           </div>
+          <div data-tutorial-id="profile-tour-parsing">
           {usesAmount && (
             <label className="import-profile-signs"><span>In the single amount column, what does a positive number mean?</span>
               <select value={form.amountConvention}
@@ -413,18 +478,23 @@ export function ImportProfileManagementPage() {
             <ImportParsingFields dateFormat={form.dateFormat} numberCulture={form.numberCulture}
               disabled={isBusy || !canEdit} onChange={setField} />
           </div>
+          </div>
           <p className="field-help import-profile-requirements">
             Required mappings: transaction date, description, and either a single amount
             or at least one debit/credit column.
             {hasDuplicateHeaders && ' Header names must be unique.'}
           </p>
+          <div className="account-actions" data-tutorial-id={editingId || guideSelection === 'new' && !savedId ? 'profile-tour-save' : undefined}>
           <button className="primary-button" type="button"
-            disabled={isBusy || !canSubmit}
+            disabled={blocked || !canSubmit || Boolean(tutorialActive && guideSelection === 'new' && savedId && !editingId)}
             onClick={() => void submit()}>
             {isBusy ? 'Saving...' : editingId ? 'Save profile' : 'Create profile'}
           </button>
+          {editingId && <button className="text-button" type="button" disabled={isBusy}
+            onClick={() => { if (formGuard.confirmDiscard()) reset() }}>Cancel</button>}
+          </div>
         </form>}
-        <div className="import-profile-sections">
+        {loadState.hasData && <div className="import-profile-sections">
           <section className="account-section import-profile-section import-profile-section-active">
             <div className="account-section-heading">
               <div>
@@ -455,7 +525,7 @@ export function ImportProfileManagementPage() {
               )}
             </div>
           </section>
-        </div>
+        </div>}
     </PageFrame>
   )
 }

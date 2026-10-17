@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useState,
@@ -25,6 +26,11 @@ import { PageFrame } from '../components/PageFrame'
 import { TransactionsSectionNav } from '../components/TransactionsSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
 import { useUnsavedForm } from '../routing/useUnsavedForm'
+import { usePageLoad } from './usePageLoad'
+import { PageLoadFeedback } from '../components/PageLoadFeedback'
+import { useRuleTutorialPage } from '../tutorials/categorizationTutorialState'
+import { TutorialContext } from '../tutorials/tutorialContext'
+import { ApiError } from '../api/apiClient'
 
 const operatorOptions: Array<{
   value: CategorizationRuleMatchOperator
@@ -76,33 +82,39 @@ export function CategorizationRuleManagementPage() {
   const [form, setForm] = useState<RuleForm>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draggedId, setDraggedId] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const formGuard = useUnsavedForm(form, 'Discard your unsaved categorization rule changes?')
+  const tutorials = useContext(TutorialContext)
+  const [guideSelection, setGuideSelection] = useState<string | null>(() => tutorials?.categorizationGuide?.ruleSelection ?? null)
+  const [createdId, setCreatedId] = useState<string | null>(() => tutorials?.categorizationGuide?.ruleSelection === 'new' ? tutorials.categorizationGuide.ruleId ?? null : null)
+  const [writeUncertain, setWriteUncertain] = useState(false)
+  const [needsRead, setNeedsRead] = useState(false)
+  const pageLoad = usePageLoad(`${currentHousehold?.id}/${currentHousehold?.role}`)
+  const { run, captureContext } = pageLoad
+  const selectedRule = rules.find(rule => rule.isActive && rule.id === (guideSelection === 'new' ? createdId : guideSelection))
+  const tutorialActive = useRuleTutorialPage({ householdId: currentHousehold?.id ?? '', fresh: pageLoad.isFresh,
+    busy: isSaving || Boolean(draggedId), dirty: formGuard.isDirty, uncertain: writeUncertain,
+    selection: guideSelection, ruleId: selectedRule?.id ?? null, canManage: currentHousehold?.role !== 'Viewer',
+    editing: editingId !== null || guideSelection === 'new' && !createdId })
+  const isLoading = pageLoad.isPending && !pageLoad.hasData
 
   const canManage = currentHousehold?.role !== 'Viewer'
 
-  const load = useCallback(async (showLoading = true) => {
-    if (!currentHousehold) return
-    if (showLoading) setIsLoading(true)
-    setErrors([])
-    try {
-      const [loadedRules, loadedCategories, loadedAccounts] = await Promise.all([
+  const load = useCallback(async () => {
+    if (!currentHousehold) return false
+    return run(() => Promise.all([
         getCategorizationRules(currentHousehold.id),
         getCategories(currentHousehold.id),
         getAccounts(currentHousehold.id),
-      ])
+      ]), ([loadedRules, loadedCategories, loadedAccounts]) => {
       setRules(loadedRules)
       setCategories(loadedCategories)
       setAccounts(loadedAccounts.filter(account =>
         account.isActive && account.scope === 'Household'))
-    } catch (error) {
-      setErrors(getErrorMessages(error))
-    } finally {
-      if (showLoading) setIsLoading(false)
-    }
-  }, [currentHousehold])
+      setNeedsRead(false)
+    })
+  }, [currentHousehold, run])
 
   useEffect(() => {
     void load()
@@ -140,6 +152,8 @@ export function CategorizationRuleManagementPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (isSaving || writeUncertain || !pageLoad.isFresh || !canManage || tutorialActive && guideSelection === 'new' && createdId) return
+    const stillCurrent = captureContext()
     setIsSaving(true)
     setErrors([])
     try {
@@ -150,19 +164,26 @@ export function CategorizationRuleManagementPage() {
           toRequest(),
         )
       } else {
-        await createCategorizationRule(currentHousehold.id, toRequest())
+        const result = await createCategorizationRule(currentHousehold.id, toRequest())
+        if (!stillCurrent()) return
+        if (tutorialActive) { setCreatedId(result.id); setGuideSelection('new') }
       }
+      if (!stillCurrent()) return
       resetForm()
-      await load(false)
+      await load()
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (stillCurrent()) {
+        setErrors(getErrorMessages(error))
+        if (tutorialActive && !(error instanceof ApiError && [400, 422].includes(error.status))) { setWriteUncertain(true); setNeedsRead(true) }
+      }
     } finally {
       setIsSaving(false)
     }
   }
 
   const startEditing = (rule: CategorizationRuleItem) => {
-    if (editingId === rule.id || !formGuard.confirmDiscard()) return
+    if (writeUncertain || !pageLoad.isFresh || editingId === rule.id || !formGuard.confirmDiscard()) return
+    if (tutorialActive) setGuideSelection(rule.id)
     const selection = findCategorySelection(categories, rule.targetCategoryId)
     setEditingId(rule.id)
     const next: RuleForm = {
@@ -178,13 +199,18 @@ export function CategorizationRuleManagementPage() {
   }
 
   const performChange = async (change: () => Promise<unknown>) => {
+    if (isSaving || writeUncertain || !pageLoad.isFresh) return
+    const stillCurrent = captureContext()
     setIsSaving(true)
     setErrors([])
     try {
       await change()
-      await load(false)
+      if (stillCurrent()) await load()
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (stillCurrent()) {
+        setErrors(getErrorMessages(error))
+        if (tutorialActive) { setWriteUncertain(true); setNeedsRead(true) }
+      }
     } finally {
       setIsSaving(false)
     }
@@ -197,7 +223,8 @@ export function CategorizationRuleManagementPage() {
     event.preventDefault()
     const sourceId = draggedId
     setDraggedId(null)
-    if (!sourceId || sourceId === targetId) return
+    if (!sourceId || sourceId === targetId || writeUncertain || !pageLoad.isFresh || isSaving) return
+    const stillCurrent = captureContext()
 
     const orderedIds = rules.map(rule => rule.id)
     orderedIds.splice(orderedIds.indexOf(sourceId), 1)
@@ -205,13 +232,16 @@ export function CategorizationRuleManagementPage() {
     const previousRules = rules
     const byId = new Map(rules.map(rule => [rule.id, rule]))
     setRules(orderedIds.map(id => byId.get(id)!).filter(Boolean))
+    setIsSaving(true)
 
     try {
       await reorderCategorizationRules(currentHousehold.id, orderedIds)
     } catch (error) {
-      setRules(previousRules)
-      setErrors(getErrorMessages(error))
-    }
+      if (stillCurrent()) {
+        setRules(previousRules); setErrors(getErrorMessages(error))
+        if (tutorialActive) { setWriteUncertain(true); setNeedsRead(true) }
+      }
+    } finally { setIsSaving(false) }
   }
 
   const renderRule = (rule: CategorizationRuleItem) => {
@@ -228,6 +258,7 @@ export function CategorizationRuleManagementPage() {
       <div
         className={`rule-row${rule.isActive ? '' : ' inactive-row'}${draggedId === rule.id ? ' rule-row-dragging' : ''}`}
         key={rule.id}
+        data-tutorial-id={rule.id === selectedRule?.id ? 'category-tour-selected' : undefined}
         onDragOver={event => event.preventDefault()}
         onDrop={event => void handleDrop(event, rule.id)}
       >
@@ -236,8 +267,8 @@ export function CategorizationRuleManagementPage() {
             <button
               className="category-drag-handle"
               type="button"
-              draggable={!isSaving}
-              disabled={isSaving}
+              draggable={!isSaving && !writeUncertain && pageLoad.isFresh}
+              disabled={isSaving || writeUncertain || !pageLoad.isFresh}
               title="Drag to change rule priority"
               aria-label={`Drag ${rule.name} to reorder`}
               onDragStart={event => {
@@ -257,7 +288,7 @@ export function CategorizationRuleManagementPage() {
               {' → '}
               <strong>{targetLabel ?? 'Unavailable category'}</strong>
             </p>
-            <small>{account ? `Only ${account.name}` : 'All accounts'}</small>
+            <small>{account ? `Only ${account.name}` : rule.accountId ? 'Restricted account (not available in this view)' : 'All accounts'} · Earlier active rules have priority.</small>
           </div>
         </div>
         {canManage && (
@@ -302,7 +333,7 @@ export function CategorizationRuleManagementPage() {
   const inactiveRules = rules.filter(rule => !rule.isActive)
 
   return (
-    <PageFrame>
+    <PageFrame footer={<div id="categorization-tutorial-guide-host" />}>
         <TransactionsSectionNav />
         <div className="page-title-row">
           <div>
@@ -313,12 +344,30 @@ export function CategorizationRuleManagementPage() {
         </div>
 
         <ErrorSummary errors={errors} />
+        <PageLoadFeedback {...pageLoad} subject="categorization rules" onReload={() => void load()} disabled={isSaving || pageLoad.isPending} />
+        {writeUncertain && <section className="error-summary" role="alert">
+          <p>Rule change uncertain. Check saved rules before another write; do not create another copy.</p>
+          <button type="button" disabled={pageLoad.isPending || isSaving} onClick={() => void load()}>Check saved rules</button>
+          {!needsRead && pageLoad.isFresh && <p>Choose the actual saved rule below, or restart with a different existing rule. Do not assume an unchanged form was saved.</p>}
+        </section>}
+        {tutorialActive && <section className="transaction-filter-panel" data-tutorial-id="category-tour-picker">
+          <label><span>Rule to review</span><select value={guideSelection ?? ''} disabled={!pageLoad.isFresh || needsRead || isSaving} onChange={event => {
+            if (!formGuard.confirmDiscard()) return
+            resetForm(); setGuideSelection(event.target.value || null); setWriteUncertain(false); setErrors([])
+          }}>
+            <option value="">Choose a rule…</option>
+            {canManage && !writeUncertain && <option value="new">{createdId ? 'Use the rule just saved' : 'New rule'}</option>}
+            {rules.filter(rule => rule.isActive).map(rule => <option key={rule.id} value={rule.id}>{rule.name}</option>)}
+          </select></label>
+          <p>Use a correct existing rule without editing. New rules do not recategorize all posted transactions.</p>
+        </section>}
 
-        {canManage && (
+        {canManage && pageLoad.hasData && (!tutorialActive || editingId || guideSelection === 'new' && !createdId) && (
           <form className="rule-form" onSubmit={event => void handleSubmit(event)}>
+            <fieldset className="rule-form-fields" disabled={isSaving || writeUncertain || !pageLoad.isFresh}>
             <div className="rule-form-heading">
               <h2>{editingId ? 'Edit rule' : 'Create rule'}</h2>
-              <p>Rules never overwrite a category supplied by the CSV or a manual correction.</p>
+              <p>Automatic import matching keeps supplied categories. In Import review, explicitly choosing Reapply can replace existing category choices.</p>
             </div>
             <label>
               Rule name
@@ -334,7 +383,7 @@ export function CategorizationRuleManagementPage() {
             </label>
             <label>
               Imported description
-              <select
+              <select aria-label="Imported description"
                 value={form.matchOperator}
                 onChange={event => setForm(current => ({
                   ...current,
@@ -361,7 +410,7 @@ export function CategorizationRuleManagementPage() {
             </label>
             <label>
               Account restriction
-              <select
+              <select aria-label="Account restriction"
                 value={form.accountId}
                 onChange={event => setForm(current => ({
                   ...current,
@@ -377,7 +426,7 @@ export function CategorizationRuleManagementPage() {
             </label>
             <label>
               Category
-              <select
+              <select aria-label="Category"
                 value={form.categoryId}
                 required
                 onChange={event => setForm(current => ({
@@ -396,7 +445,7 @@ export function CategorizationRuleManagementPage() {
             </label>
             <label>
               Subcategory
-              <select
+              <select aria-label="Subcategory"
                 value={form.subcategoryId}
                 disabled={!selectedCategory || selectedCategory.children.length === 0}
                 onChange={event => setForm(current => ({
@@ -410,7 +459,7 @@ export function CategorizationRuleManagementPage() {
                 ))}
               </select>
             </label>
-            <div className="rule-form-actions">
+            <div className="rule-form-actions" data-tutorial-id="category-tour-save">
               <button
                 className="primary-button"
                 type="submit"
@@ -425,12 +474,13 @@ export function CategorizationRuleManagementPage() {
                 >Cancel</button>
               )}
             </div>
+            </fieldset>
           </form>
         )}
 
         {isLoading ? (
           <p className="empty-state">Loading categorization rules...</p>
-        ) : (
+        ) : pageLoad.hasData && (
           <div className="rule-sections">
             <section className="rule-section">
               <div className="rule-section-heading">

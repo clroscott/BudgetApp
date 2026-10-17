@@ -116,8 +116,9 @@ describe('editable page guard coverage', () => {
     expect(screen.getByText('Destination')).toBeTruthy()
   })
   it('keeps native create-form values after failure and clears protection after success', async () => {
-    const { container } = show(<AccountManagementPage />)
-    const input = container.querySelector('form input[name="name"]') as HTMLInputElement
+    show(<AccountManagementPage />)
+    // Account actions now wait for the authoritative initial account read.
+    const input = await screen.findByLabelText('Account name') as HTMLInputElement
     fireEvent.change(input, { target: { value: 'Sample chequing' } })
     const form = input.closest('form')!
     vi.mocked(createAccount).mockRejectedValueOnce(new Error('Sample create failure'))

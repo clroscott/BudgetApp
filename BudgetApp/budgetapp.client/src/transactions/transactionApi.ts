@@ -97,6 +97,7 @@ export async function downloadTransactionsCsv(
   )
   const objectUrl = URL.createObjectURL(download.blob)
   const link = document.createElement('a')
+  link.dataset.tutorialId = 'transaction-tour-download'
   link.href = objectUrl
   link.download = download.fileName ?? 'budgetapp-transactions.csv'
   document.body.appendChild(link)

@@ -32,6 +32,52 @@ beforeEach(() => { vi.useFakeTimers(); mockTutorialLayout() })
 afterEach(() => { vi.useRealTimers(); restoreTutorialLayout() })
 
 describe('tutorial target recovery', () => {
+  it('starts each chapter at the top of the coach without resetting page scroll', async () => {
+    const { update } = show()
+    await flush()
+    const card = document.querySelector<HTMLElement>('.tutorial-coach-card')!
+    card.scrollTop = 100
+    const scrolls = vi.mocked(window.scrollTo).mock.calls.length
+    update({ activeStepIndex: 1 })
+    await flush()
+    expect(card.scrollTop).toBe(0)
+    expect(vi.mocked(window.scrollTo).mock.calls.length).toBe(scrolls)
+  })
+
+  it('permits only the named same-origin blob download, not an outside link with the same ID', async () => {
+    show({ tutorial: definition({ ...readStep, readControls: ['transaction-tour-download'] }) })
+    await flush()
+    const accepted = vi.fn((event: MouseEvent) => event.preventDefault())
+    const blocked = vi.fn((event: MouseEvent) => event.preventDefault())
+    const blob = document.createElement('a')
+    blob.dataset.tutorialId = 'transaction-tour-download'; blob.href = `blob:${window.location.origin}/synthetic`; blob.download = 'synthetic.csv'
+    blob.addEventListener('click', accepted); document.body.append(blob)
+    const outside = document.createElement('a')
+    outside.dataset.tutorialId = 'transaction-tour-download'; outside.href = 'https://example.test/private'; outside.download = 'not-allowed.csv'
+    outside.addEventListener('click', blocked); document.body.append(outside)
+    await flush()
+    fireEvent.click(blob); fireEvent.click(outside)
+    expect(accepted).toHaveBeenCalledOnce(); expect(blocked).not.toHaveBeenCalled()
+    blob.remove(); outside.remove()
+  })
+
+  it('allows only named read controls, not neighboring writes or implicit form submissions', async () => {
+    const write = vi.fn(), read = vi.fn()
+    show({ tutorial: definition({ ...readStep, readControls: ['safe-year'] }), children: <main>
+      <form data-tutorial-id="page-title" onSubmit={event => { event.preventDefault(); write() }}>
+        <label>Year<input data-tutorial-id="safe-year" /></label>
+        <button onClick={read}>Unlisted read button</button><button onClick={write}>Delete record</button>
+      </form>
+    </main> })
+    await flush()
+    expect(screen.getByLabelText('Year').closest('[inert]')).toBeNull()
+    fireEvent.change(screen.getByLabelText('Year'), { target: { value: '2024' } })
+    expect(screen.getByRole('button', { name: 'Delete record', hidden: true }).hasAttribute('inert')).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete record', hidden: true }))
+    fireEvent.submit(screen.getByLabelText('Year').closest('form')!)
+    expect(write).not.toHaveBeenCalled(); expect(read).not.toHaveBeenCalled()
+  })
+
   it('keeps the full task ring aligned across the dock height and nested scrolling', async () => {
     const importGuide = { canNext: true, canBack: true, message: '', nextLabel: 'Next',
       choose: vi.fn(), restart: vi.fn(), returnToTask: vi.fn() }

@@ -30,6 +30,17 @@
   box-shadow: var(--small-shadow);
 }
 
+.rule-form-fields {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: inherit;
+  gap: inherit;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .rule-form-heading,
 .rule-form-actions {
   grid-column: 1 / -1;

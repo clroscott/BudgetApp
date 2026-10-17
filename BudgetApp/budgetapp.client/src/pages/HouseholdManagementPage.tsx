@@ -22,6 +22,9 @@ import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 import { useRouter } from '../routing/useRouter'
 import { useUnsavedNativeForm } from '../routing/useUnsavedForm'
+import { ApiError } from '../api/apiClient'
+import { useInvitationTutorialPage } from '../tutorials/invitationTutorialState'
+import type { HouseholdInvitationDispatch } from '../households/householdInvitationApi'
 
 const formatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
@@ -43,15 +46,32 @@ export function HouseholdManagementPage() {
   const [errors, setErrors] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
   const [exitCompleted, setExitCompleted] = useState(false)
-  const loadState = usePageLoad(currentHousehold?.id ?? '')
-  const { run } = loadState
-  const canChange = loadState.isFresh && !isSaving && !exitCompleted
+  const [guideSelection, setGuideSelection] = useState<string | null>(null)
+  const [sentId, setSentId] = useState<string | null>(null)
+  const [lastDispatch, setLastDispatch] = useState<{ id: string; emailDelivered: boolean } | null>(null)
+  const [uncertain, setUncertain] = useState(false)
+  const [needsRead, setNeedsRead] = useState(false)
+  const loadState = usePageLoad(`${currentHousehold?.id}/${currentHousehold?.role}`)
+  const { run, captureContext } = loadState
+  const canChange = loadState.isFresh && !isSaving && !exitCompleted && !uncertain
+  const selectedInvitation = management?.invitations.find(invitation => invitation.id === (guideSelection === 'new' ? sentId
+    : guideSelection?.startsWith('invitation:') ? guideSelection.slice('invitation:'.length) : null))
+  const selectedMember = management?.members.find(member => member.userId === (guideSelection?.startsWith('member:') ? guideSelection.slice('member:'.length) : null))
+  const selectionKind = guideSelection === 'new' ? 'new' : selectedInvitation ? 'invitation' : selectedMember ? 'member'
+    : guideSelection === 'review' && !management?.canManageInvitations ? 'review' : null
+  const tutorialActive = useInvitationTutorialPage(currentHousehold ? {
+    householdId: currentHousehold.id, fresh: loadState.isFresh && !needsRead && !exitCompleted, busy: isSaving || loadState.isPending,
+    dirty: inviteGuard.isDirty, uncertain, selection: guideSelection, kind: selectionKind,
+    invitationId: selectedInvitation?.id ?? null, status: selectedInvitation?.status ?? selectedMember?.status ?? null,
+    canManage: management?.canManageInvitations ?? false,
+    emailDelivered: lastDispatch && selectedInvitation?.id === lastDispatch.id ? lastDispatch.emailDelivered : null,
+  } : null)
 
   const load = useCallback(async () => {
     if (!currentHousehold) return
 
     setErrors([])
-    return await run(() => getHouseholdMembers(currentHousehold.id), setManagement)
+    return await run(() => getHouseholdMembers(currentHousehold.id), result => { setManagement(result); setNeedsRead(false) })
   }, [currentHousehold, run])
 
   useEffect(() => {
@@ -64,21 +84,27 @@ export function HouseholdManagementPage() {
     currentHousehold.role === 'Owner'
       ? ['Admin', 'Editor', 'Viewer']
       : ['Editor', 'Viewer']
+  const canInvite = canChange && (!tutorialActive || guideSelection === 'new' && !sentId)
 
-  const runChange = async (change: () => Promise<{ emailDelivered?: boolean }>) => {
-    if (!canChange) return false
+  const runChange = async (change: () => Promise<Partial<HouseholdInvitationDispatch>>, confirmed?: (result: Partial<HouseholdInvitationDispatch>) => void) => {
+    if (!canChange || !management?.canManageInvitations) return false
+    const isCurrent = captureContext()
     setIsSaving(true)
     setErrors([])
     setNotice(null)
     try {
       const result = await change()
+      if (!isCurrent()) return false
+      if (result.invitation && result.emailDelivered !== undefined) setLastDispatch({ id: result.invitation.id, emailDelivered: result.emailDelivered })
+      confirmed?.(result)
       setNotice(result.emailDelivered === false
         ? 'The invitation was saved, but email delivery failed. You can resend it.'
         : 'Household invitations were updated.')
-      await load()
-      return true
+      return await load() ?? false
     } catch (error) {
+      if (!isCurrent()) return false
       setErrors(getErrorMessages(error))
+      if (tutorialActive && !(error instanceof ApiError && [400, 422].includes(error.status))) { setUncertain(true); setNeedsRead(true) }
       return false
     } finally {
       setIsSaving(false)
@@ -87,20 +113,20 @@ export function HouseholdManagementPage() {
 
   const handleInvite = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!canInvite) return
     const form = event.currentTarget
     const data = new FormData(form)
-    const succeeded = await runChange(() => createHouseholdInvitation(
+    await runChange(() => createHouseholdInvitation(
       currentHousehold.id,
       {
         email: String(data.get('email') ?? ''),
         role: String(data.get('role') ?? 'Viewer') as HouseholdInvitationRole,
       },
-    ))
-
-    if (succeeded) {
+    ), result => {
+      if (result.invitation) setSentId(result.invitation.id)
       form.reset()
       inviteGuard.markClean()
-    }
+    })
   }
 
   const finishExit = async (operation: () => Promise<void>) => {
@@ -154,7 +180,7 @@ export function HouseholdManagementPage() {
   }
 
   return (
-    <PageFrame>
+    <PageFrame footer={<div id="invitation-tutorial-guide-host" />}>
         <HouseholdSectionNav current="members" />
         <header className="page-title-row">
           <div>
@@ -167,13 +193,31 @@ export function HouseholdManagementPage() {
           </AppLink>
         </header>
 
-        <ErrorSummary errors={errors} />
+        {!uncertain && <ErrorSummary errors={errors} />}
+        {uncertain && <div className="error-summary" role="alert"><p>The invitation change may have saved. Do not send or resend again yet.</p>
+          <button type="button" disabled={isSaving || loadState.isPending} onClick={() => void load()}>Check saved invitations</button>
+          <p>Then restart task selection and choose the actual saved invitation or member. No email is sent by this check.</p></div>}
         {notice && <div className="success-summary" role="status">{notice}</div>}
         {exitCompleted && <button className="secondary-button" type="button" disabled={isSaving}
           onClick={() => void retryExitRefresh()}>Retry household list</button>}
         {exitCompleted && isSaving && <p role="status">Refreshing your household list…</p>}
         {!exitCompleted && <PageLoadFeedback subject="household details" status={loadState.status} errors={loadState.errors}
           disabled={isSaving} onReload={() => void load()} />}
+        {tutorialActive && <section className="household-management-section" data-tutorial-id="invite-tour-choice">
+          <label><span>Invitation or membership to review</span><select value={guideSelection ?? ''} disabled={!loadState.isFresh || isSaving || needsRead || exitCompleted} onChange={event => {
+            const value = event.target.value
+            if (needsRead || !value || value === 'new' && (uncertain || !management?.canManageInvitations) || !inviteGuard.confirmDiscard()) return
+            const exists = value === 'new' || value === 'review' && !management?.canManageInvitations || management?.invitations.some(item => `invitation:${item.id}` === value)
+              || management?.members.some(item => `member:${item.userId}` === value)
+            if (!exists) return
+            const form = document.getElementById('household-invite-create') as HTMLFormElement | null
+            form?.reset(); inviteGuard.markClean(); setGuideSelection(value); setSentId(null); setLastDispatch(null); setUncertain(false); setErrors([]); setNotice(null)
+          }}><option value="">Choose a record…</option>
+            {management?.canManageInvitations ? <option value="new" disabled={uncertain}>{sentId ? 'Use invitation just saved' : 'New invitation'}</option> : <option value="review">Review access without sending</option>}
+            {management?.invitations.map(item => <option key={item.id} value={`invitation:${item.id}`}>{item.email} · {item.role} · {item.status}</option>)}
+            {management?.members.map(item => <option key={item.userId} value={`member:${item.userId}`}>{item.displayName} · Member · {item.role}</option>)}
+          </select></label>
+        </section>}
 
         <section className="household-management-section">
           <div className="household-section-heading">
@@ -227,6 +271,8 @@ export function HouseholdManagementPage() {
         {!exitCompleted && loadState.hasData && management?.canManageInvitations && (
           <form
             {...inviteGuard.formProps}
+            id="household-invite-create"
+            data-tutorial-id="invite-tour-form"
             className="household-invite-form"
             onSubmit={(event) => void handleInvite(event)}
           >
@@ -244,12 +290,12 @@ export function HouseholdManagementPage() {
                 autoComplete="email"
                 maxLength={256}
                 required
-                disabled={!canChange}
+                disabled={!canInvite}
               />
             </label>
-            <label>
+            <label data-tutorial-id="invite-tour-roles">
               <span>Role</span>
-              <select name="role" defaultValue="Editor" disabled={!canChange}>
+              <select name="role" defaultValue="Editor" disabled={!canInvite}>
                 {availableRoles.map(role => (
                   <option key={role} value={role}>{role}</option>
                 ))}
@@ -258,7 +304,8 @@ export function HouseholdManagementPage() {
             <button
               className="primary-button"
               type="submit"
-              disabled={!canChange}
+              disabled={!canInvite}
+              data-tutorial-id={canInvite ? 'invite-tour-send' : undefined}
             >
               {isSaving ? 'Saving…' : 'Send invitation'}
             </button>
@@ -269,7 +316,7 @@ export function HouseholdManagementPage() {
           </form>
         )}
 
-        {!exitCompleted && <section className="household-management-section">
+        {!exitCompleted && <section className="household-management-section" data-tutorial-id="invite-tour-members">
           <div className="household-section-heading">
             <div>
               <h2>Members</h2>
@@ -283,7 +330,7 @@ export function HouseholdManagementPage() {
           {!loadState.hasData ? null : management?.members.length ? (
             <div className="household-member-list">
               {management.members.map(member => (
-                <article className="household-member-row" key={member.userId}>
+                <article className="household-member-row" key={member.userId} data-tutorial-id={selectedMember?.userId === member.userId ? 'invite-tour-selected' : undefined}>
                   <div>
                     <strong>{member.displayName}</strong>
                     <p>{member.email}</p>
@@ -323,6 +370,7 @@ export function HouseholdManagementPage() {
                     <article
                       className="household-member-row"
                       key={invitation.id}
+                      data-tutorial-id={selectedInvitation?.id === invitation.id ? 'invite-tour-selected' : undefined}
                     >
                       <div>
                         <strong>{invitation.email}</strong>

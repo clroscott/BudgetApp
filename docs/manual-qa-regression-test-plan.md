@@ -2071,6 +2071,169 @@ At minimum, test the supported desktop browser and one narrow/mobile layout.
 
 ## Adding future regression checks
 
+### Planned tutorials: Annual Overview (#263)
+
+- [ ] Start Read the Annual Overview as Owner and Viewer with an empty or populated
+  year. Select year/scope, confirm period/currency labels and distinguish annual
+  reporting from Annual Targets. No budget is created to fill an empty year.
+- [ ] Walk Budgeted/Actual/Remaining/Income/Net cash flow, a missing versus zero
+  month, category/subcategory averages, uncategorized and other-currency warnings.
+  Do not add overlapping Personal and Household totals.
+- [ ] Open the highlighted spending total. The transaction URL keeps the actual
+  selected year/scope/currency/household. Next returns to that same report selection,
+  not the current year/default scope. The tour cannot edit rows or save presets.
+- [ ] Delay/fail/retry the report or transaction read; stale data cannot advance as
+  a successful empty result. Change household/role, Exit/Escape, replay, Back and
+  both completion destinations. Only tutorial metadata is written.
+- [ ] Use keyboard, 320/390px layouts and 200% zoom: spotlight and dock remain
+  reachable. Only explicitly named read controls operate; neighboring Save/Delete
+  controls and implicit financial form submissions stay unavailable.
+
+### Planned tutorials: Change history (#268)
+
+- [ ] As Owner/Viewer, start with empty and populated permitted history. Explain
+  shared versus own personal activity without displaying another member's private
+  events. Choose dates/person/action/type; Apply and Reset are reads only.
+- [ ] Open available entry details and page matching results without losing
+  filters. Events with no details and empty matches are valid. No entry is invented.
+- [ ] Delay/fail a request, retry, or change household/filter before it returns.
+  Old responses cannot replace current results; failure is not “no activity”.
+- [ ] Finish via Continue reviewing and Return to tutorials, replay and Escape.
+  The guide explains that reading history does not undo its action. No financial,
+  configuration or audit writes occur except tutorial progress metadata.
+
+### Planned tutorials: Export (#269)
+
+- [ ] Choose/read/apply account/date/category/description/currency/inclusion
+  filters. Draft filter edits cannot be confused with the active export filters.
+  Matching results include all pages, retain signs and separate currencies.
+- [ ] The privacy prompt precedes the optional export action. Complete once
+  without downloading (zero export requests), then once with a deliberate click
+  (one file request). Starting, replaying or advancing never downloads anything.
+- [ ] Inspect empty results, shared/private projection, excluded/voided filter
+  rules and undone imports. Private account names/notes are not revealed. Use only
+  disposable data; the guide does not create example financial records.
+- [ ] Delay/fail the export. Pending download blocks Next; failure is visible.
+  Retry search reloads records, not the download; any new download is intentional.
+  Completion does not falsely claim that the browser saved a file successfully.
+- [ ] Keyboard/mobile/zoom can reach filters, optional export, normal
+  Next, Exit/Escape and both completion destinations without enabling row edits or
+  preset saves. All non-metadata mutations remain absent.
+
+### Planned tutorials: Dashboard customization (#267)
+
+- [ ] As Owner/Viewer, keep the existing layout unchanged; also test an empty
+  layout. Open Customize, inspect cards/order/columns, Cancel, finish and replay.
+  No financial write or automatic reset/save occurs.
+- [ ] Add/remove a card, use keyboard Earlier/Later, change desktop columns and
+  explicitly Save. Mobile stacks normally; there is no claim of arbitrary resizing.
+- [ ] Delay/fail initial layout reads and lose a save reply. Check saved layout
+  reads the result before another Save/Reset; it never repeats the command.
+- [ ] Exit/Escape preserves dirty choices; normal leaving/discard guards remain.
+  Changed household/role, both completion destinations, keyboard, zoom and narrow
+  screen coach/error visibility are checked without modifying other users' layouts.
+
+### Planned tutorials: Recurring expenses (#261)
+
+- [ ] Select an existing expectation, open Edit, inspect scope/placement/dates,
+  Cancel unchanged and finish without a write. Replay selects the existing item
+  rather than forcing another Add. Viewer can use their own Personal item but
+  cannot edit Household items or build a monthly budget.
+- [ ] Use disposable data to add an expectation with a real chosen name/amount,
+  active expense subcategory and compatible optional account. The guide never
+  clicks Add/Save or posts transactions. Detailed/Overall, date range and optional
+  expected day are explained without forcing artificial changes.
+- [ ] Optionally choose a same-scope month and explicitly Build from recurring
+  expenses. All applicable expectations contribute to a new Draft. Existing
+  budgets are kept, never replaced/activated. No applicable items, inactive
+  categories, mixed placement modes and normal validation errors recover safely.
+- [ ] Delay/fail reads, fail the post-save refresh, and lose a create/update reply.
+  A confirmed save is not offered as another Add; an unknown result requires a
+  list check and deliberate saved-item selection rather than guessing identity.
+- [ ] Changed item/scope/period/household/role blocks an unrelated outcome. Back,
+  Restart, dirty Exit/Escape, both completion destinations, keyboard/mobile/zoom
+  preserve normal guards and keep controls/errors reachable.
+
+### Planned tutorials: Spending-total evidence checklist (#264)
+
+- [ ] Choose an Annual Overview year/scope, compare the household/period/currency,
+  and distinguish a missing monthly budget, explicit zero and independent Annual
+  Targets. Check overlapping Personal/Household scopes without adding them.
+- [ ] Follow its actual spending link. Read applied filters/count/all-page currency
+  totals; inspect inclusion, refunds/signs, excluded/voided rows and uncategorized
+  spending. Applying another read view is not represented as the same report total.
+- [ ] Inspect visible Unfinished/Awaiting review/Completed-undone imports and
+  relevant history/details. Empty or privacy-limited evidence is not a diagnosis.
+  No upload, approval, correction, reversal, deletion or export occurs.
+- [ ] Delay/fail report/transaction/import/history reads and retry them; unavailable
+  is never called zero or absent. Pre-existing dirty import corrections must be
+  resolved outside the read-only guide, not silently discarded.
+- [ ] Return to the original report context, both completion choices, replay,
+  changed household/role, Escape and keyboard/mobile/zoom work. The conclusion
+  states evidence may be insufficient and never starts a financial correction.
+
+### Planned tutorials: Reusable import profiles (#257)
+
+- [ ] Use an existing profile unchanged, create a needed new one, and edit a
+  disposable existing one. Check exact/unique headers, ignored/optional columns,
+  single signed amount versus debit/credit, localized text dates/numbers and
+  leading-zero text guidance. No forced save or duplicate is required on replay.
+- [ ] Viewer can inspect Mapping details and choose an active profile but cannot
+  change shared configuration. Only accessible account names appear; a preferred
+  private account never grants access or reveals its name to another member.
+- [ ] Save explicitly, then select that mapping on the CSV/Excel import page.
+  No file/inspection/upload/approval is required to finish. Download a template
+  only if requested; Start import tutorial is a separate explicit handoff.
+- [ ] Delay/fail reads, fail the post-save refresh and lose a create/update reply.
+  Check the saved list and deliberately select the saved mapping after restart;
+  no second Create is offered as a recovery shortcut. Save and Cancel remain
+  reachable together at 320px and keyboard/zoom.
+- [ ] Dirty Exit/Escape preserves edits; normal discard guards remain. Change
+  household/role/selected profile, Back, replay and both completion destinations.
+  Exiting/replaying while an optional handoff is delayed must not start it later.
+
+### Planned tutorials: Finance setup (#265)
+
+- [ ] Choose Accounts, Categories, and Both separately. Existing setup can be kept
+  without a write. Account/category lists distinguish unavailable from empty.
+  A selected saved account remains selected when returning from Categories.
+- [ ] Add only a needed disposable account with chosen type/currency/scope. Check
+  privacy wording before saving; Viewer can create/manage their own Personal
+  account but not shared Household accounts. Currency is not converted and
+  transaction budget inclusion does not change automatically with account scope.
+- [ ] Keep or explicitly add a needed shared category/subcategory. Explain types,
+  parent organization and Rename everywhere's displayed-label effect without
+  changing amounts, forcing reordering or restructuring historical records.
+  Viewer has no shared configuration controls; empty setup is described honestly.
+- [ ] Fail/delay reads and post-save refresh, lose create/update/reorder replies,
+  check the saved list before any retry, and resolve unsaved drafts explicitly.
+  A pre-write list is not accepted as confirmation; no automatic duplicate is made.
+- [ ] Exercise Back, replay, changed household/role/account, dirty Exit/Escape,
+  ordinary discard cancellation and both completion destinations. At 320/390px,
+  keyboard and zoom, all long-form controls can be reached above the coach without
+  forced clicks or silent discard. No importing/budgeting starts automatically.
+
+### Planned tutorials: Household invitations (#266)
+
+- [ ] Inspect existing members and Pending/Expired/Revoked/Accepted invitations
+  before choosing New. Replay can retain a member/invitation without sending.
+  Viewer can review access with no inaccessible management requirement.
+- [ ] Owner can choose Admin/Editor/Viewer; Admin only Editor/Viewer. Explain
+  shared access versus private accounts/notes/files, own Personal-account actions,
+  and household Admin versus application administration. No role is changed by
+  tutorial navigation and existing owner/lifecycle safeguards remain.
+- [ ] Use a disposable fake recipient and recorded delivery only. Check email/
+  role, explicitly Send once, wait for a saved list and inspect Pending status.
+  No Next/Back/Exit/Replay sends, resends, revokes or accepts an invitation.
+- [ ] Test email-delivery failure, known save plus failed refresh, lost response,
+  duplicate/member conflict and read failures. Saved/delivered/accepted stay
+  distinct. Post-error list check precedes explicit recovery selection; an old
+  pre-send list is not confirmation. A deliberate Resend is a separate message.
+- [ ] Finish honestly with Pending, undelivered, expired, revoked or accepted
+  status without waiting for another person. Check changed household/role/record,
+  dirty Exit/Escape, both completion destinations, keyboard/mobile/zoom and error
+  reachability. No tokens/recipient addresses/message content enter progress.
+
 When a feature is added or a defect is fixed:
 
 1. Add at least one successful-path check to the relevant section.
@@ -2109,3 +2272,99 @@ Use this template for a new manual case:
 - [ ] [Workflow] Starting from [precondition], when [action] is performed,
       [expected result] occurs and remains correct after [refresh/restart if relevant].
 ```
+# Transaction search/correction tutorial (#259)
+
+- [ ] Start with a filtered search; check all-page count, signed refunds and
+  separately labelled currencies. Pending filter edits must be applied first.
+- [ ] Choose the exact row, inspect parent/subcategory, keep correct data
+  unchanged, or deliberately Save one correction. Budget inclusion saves
+  separately. Other rows' pending inclusion choices must not be discarded.
+- [ ] Try read-only shared projections, Viewer-owned permitted records, empty
+  results and another result page. Private fields/other members' accounts stay
+  protected. No sample transaction or forced edit is needed to finish.
+- [ ] Verify confirmed Save + failed refresh, record falling outside filters,
+  uncertain reply + cancelled/failed/successful saved-state check. Never repeat
+  the write automatically; reload is not proof the original request succeeded.
+- [ ] Change household/role/selected ID/query and use Back/restart. No silent
+  retarget. Exit/Escape keeps drafts and normal navigation warnings. Continue
+  stays at original filtered results; Return to tutorials opens the library.
+- [ ] Test desktop, narrow phone, keyboard, actual 200% zoom and screen reader;
+  page controls, recovery, Save/Cancel and coach remain reachable while scrolling.
+
+# Category and import-recovery guides (#258/#255)
+
+- [ ] Categorization: take both posted and staged paths, choose parent/child,
+  keep correct rows unchanged or explicitly save. Staged saves return changed
+  approved rows to Pending. Never auto-approve, create transactions or save rules.
+- [ ] Inspect an existing active rule before considering New. Verify method,
+  text, restriction and priority. Save only deliberately. Rule creation alone
+  must not recategorize posted transactions. Cancel and confirm Reapply; compare
+  current Fill/Reapply counts, zero matches, and replacement warnings.
+- [ ] Check Viewer/read-only paths, private imports, stale reads, lost create
+  replies, selection/household/role changes, Back to the known saved rule, and
+  normal dirty-row/rule navigation protection. No duplicate create on replay.
+- [ ] Recovery: distinguish staged correction from permanent staged discard.
+  Cancel discard, keep unchanged, then on disposable data explicitly discard.
+  Confirm status/list evidence; absence alone must not be called success.
+- [ ] Completed imports: explicitly open read-only Undo preview. Try eligible,
+  edited/referenced/voided/missing/blocked rows and post-preview changes. Whole-
+  batch blockers must remain enforced; no deletion fallback or partial Undo.
+- [ ] Confirm a disposable eligible Undo, inspect retained history and relevant
+  totals; test lost reply and failed preview/reload without another command.
+  Replay an already-undone batch; never run Undo automatically. Optional corrected
+  upload starts a NEW staged import with normal warnings/review/approval.
+- [ ] For both guides test phone/desktop, scroll, keyboard, actual 200% zoom,
+  screen reader, Exit/Escape/focus return, Continue and Return to tutorials.
+
+# Import problems guide (#256)
+
+- [ ] Choose upload/layout, existing staged rows, or No current problem. Do not
+  manufacture an invalid file. CSV and Excel preview/worksheet selection, header
+  profiles, signed/four-decimal values and date/number culture remain normal.
+- [ ] Try wrong/blank worksheet, unsupported file type/layout, invalid row amount/
+  date and missing fields. Row validation is visible and inspectable as the task;
+  request errors still pause the coach. Save only intended corrections and check
+  source row/worksheet context. Invalid rows cannot be called resolved.
+- [ ] Get a known repeated-file 409 rejection. Allowance must stay unchecked
+  until deliberately chosen. A possible row duplicate is a separate decision;
+  compare available Transactions evidence, Exclude an existing duplicate, or
+  intentionally Approve/acknowledge a legitimate same-value transaction. No
+  tutorial action checks allowance, acknowledges, approves all or completes.
+- [ ] Lose upload and profile-create replies. Repeated writes stay locked while
+  saved imports/profiles are inspected; no filename-based success inference or
+  automatic replay. Check both coach and actual Review this import link handoffs.
+- [ ] Test changed file/account/scope/role, failed reads, Viewer-owned Personal
+  imports and inaccessible private imports, Back/restart/Exit/Escape/dirty guards.
+  Check phone/desktop, scroll, keyboard, actual zoom and screen reader.
+
+# Budget state and annual-target guides (#262/#260)
+
+- [ ] Lifecycle: independently try Copy, Reopen and Return to Draft with disposable
+  plans. Check selected month/scope/status, a different copy source, an existing
+  destination, already editable/Draft plans and Keep unchanged. No forced reset,
+  duplicate copy, delete or status change is needed to finish.
+- [ ] For the original returned Draft only, optionally choose a saved annual plan
+  containing that month in the same scope. Select only that month and explicitly
+  enable replacement. Cancel, then deliberately confirm; compare saved planned
+  amounts and unchanged transactions/annual targets. Active/Closed stay protected.
+  Back/replay must never reallocate automatically; old replaced values are not
+  promised recoverable. Exit is not Undo.
+- [ ] Annual path: use the alternate launch on Build your first budget. Check
+  fiscal year/start month including a year-crossing fiscal plan, Personal/Household
+  scope, Overall/Detailed confirmation, blank targets and explicit zero. Save
+  intended targets only; already correct saved plans need no practice edit.
+- [ ] Keep Draft replacement off. Inspect individual allocation impacts, create
+  only chosen missing Drafts, or keep existing months. Cancel the normal creation
+  confirmation. Finish with annual targets alone if no monthly plan is needed.
+- [ ] Open a month using both the actual page link and coach. Verify cancellation
+  of dirty navigation leaves the same step. Check the actual selected month,
+  scope, currency, independent plan amounts and transaction actuals. Save intended
+  adjustments, keep Draft or optionally activate; inspect Closed without reopening.
+  Annual saves, allocation and activation must not create ledger transactions.
+- [ ] Test failed reads, lost Copy/allocation/save replies and explicit saved-state
+  inspection. No repeated write or stale state may certify success. Change
+  household/role/context, use Back/restart, and inspect Viewer/private boundaries.
+- [ ] Check Continue budgeting/annual targets and Return to tutorials, Exit/Escape,
+  focus return, phone/desktop scrolling, keyboard, actual 200% zoom and screen
+  reader. Each chapter starts at the top of its coach; primary endings remain
+  reachable without clipping. Retest the original import and Quick monthly guides.

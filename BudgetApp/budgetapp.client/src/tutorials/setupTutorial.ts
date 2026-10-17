@@ -1,0 +1,28 @@
+import type { TutorialDefinition } from './tutorialDefinitions'
+export const setupTutorial: TutorialDefinition = {
+  key: 'set-up-finances', version: 1, kind: 'GuidedSetup', title: 'Set up your finances', resumeBehavior: 'restart',
+  description: 'Check accounts, shared categories, or both. Keep suitable existing setup instead of creating duplicates.', estimatedMinutes: 5,
+  steps: [
+    { title: 'What do you want to check?', targetId: 'accounts-page-title',
+      body: 'Choose Accounts, Categories, or both. Existing setup is valid. This guide never seeds records, moves transactions or changes privacy automatically.',
+      details: 'Each household has separate configuration. Personal-account actions and shared account/category management have different permissions. Start again if you switch household or role.' },
+    { title: 'Use an account—or add one', targetId: 'setup-tour-account-choice',
+      body: 'Inspect existing accounts first. Choose a suitable active account, or New account if you really need one. Replaying does not require another account.',
+      details: 'The list contains only accounts available to you. A household Viewer can manage their own Personal accounts, not shared Household accounts. Archived accounts are not offered as ready for a new import.' },
+    { title: 'Check privacy and currency', targetId: 'setup-tour-account-form', fallbackTargetIds: ['setup-tour-account-selected'],
+      body: 'Check name, type, currency and scope. Personal keeps the account private; Household shares it. Budget inclusion is a separate transaction choice. Do not change scope just for this guide.',
+      details: 'Balances, passwords and bank credentials are not entered here. Reports keep currencies separate without automatic conversion. Changing account scope can expose its history; saved transaction budget inclusion does not automatically change.' },
+    { title: 'Save only if needed', targetId: 'setup-tour-account-save', fallbackTargetIds: ['setup-tour-account-selected'],
+      body: 'For a new account, choose Add account on the page and wait for the saved list. An existing account can stay unchanged. Save or Cancel any edit before continuing.',
+      details: 'These are real configuration writes. A lost response requires checking the saved list and selecting the actual saved account instead of adding another. No tutorial button creates an account or transaction.' },
+    { title: 'Shared organization', targetId: 'setup-tour-categories-title', route: '/settings/categories',
+      body: 'Categories organize the whole household. Expense, Income and Transfer have different purposes; subcategories refine a parent. Inspect what already exists before adding more.',
+      details: 'Categories are shared configuration, not private account folders. Viewers can inspect them but need an Owner/Admin/Editor with the existing permitted access for changes. No tutorial action bypasses permission checks.' },
+    { title: 'Adjust only what you need', targetId: 'setup-tour-category-edit', fallbackTargetIds: ['setup-tour-category-list', 'setup-tour-category-form', 'setup-tour-category-empty'], route: '/settings/categories',
+      body: 'Keep useful categories. Add or rename only what you need, then save on the page. Rename everywhere changes existing displayed labels—not amounts.',
+      details: 'No restructuring, reordering or deactivation is required. Reorder and activation controls are real shared configuration changes. Close or save open forms before continuing. With no categories and no editing permission, ask a household editor; do not invent successful setup.' },
+    { title: 'Setup reviewed', targetId: 'setup-tour-categories-title', route: '/settings/categories',
+      body: 'Setup reviewed. Saved choices stay saved; missing setup still needs attention. Continue stays here.',
+      details: 'Finishing records tutorial progress, not a certificate that every account/category is complete. It never starts an upload or budget automatically. Replay lets you check another section without duplicating records.' },
+  ].map(step => ({ route: '/accounts', ...step, advance: 'outcome' as const })),
+}

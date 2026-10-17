@@ -1,5 +1,5 @@
 import { PageFrame } from '../components/PageFrame'
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   createAccount,
   getAccounts,
@@ -16,6 +16,11 @@ import { currencies } from '../finance/currencies'
 import { useHouseholds } from '../households/useHouseholds'
 import { ContextualHelp } from '../components/ContextualHelp'
 import { useUnsavedForm, useUnsavedNativeForm } from '../routing/useUnsavedForm'
+import { ApiError } from '../api/apiClient'
+import { PageLoadFeedback } from '../components/PageLoadFeedback'
+import { usePageLoad } from './usePageLoad'
+import { useSetupTutorialPage } from '../tutorials/setupTutorialState'
+import { TutorialContext } from '../tutorials/tutorialContext'
 
 const accountTypes: AccountType[] = [
   'Chequing',
@@ -36,7 +41,6 @@ const accountTypeLabels: Record<AccountType, string> = {
 export function AccountManagementPage() {
   const { currentHousehold } = useHouseholds()
   const [accounts, setAccounts] = useState<AccountItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [showArchived, setShowArchived] = useState(false)
@@ -44,6 +48,19 @@ export function AccountManagementPage() {
   const [editDraft, setEditDraft] = useState<UpdateAccountRequest | null>(null)
   const editGuard = useUnsavedForm(editDraft, 'Discard your unsaved account changes?')
   const createGuard = useUnsavedNativeForm('Discard the new account details you entered?')
+  const setupTask = useContext(TutorialContext)?.setupGuide
+  const [guideSelection, setGuideSelection] = useState<string | null>(() => setupTask?.selection ?? null)
+  const [createdId, setCreatedId] = useState<string | null>(() => setupTask?.accountId ?? null)
+  const [uncertain, setUncertain] = useState(false)
+  const [needsRead, setNeedsRead] = useState(false)
+  const loadState = usePageLoad(`${currentHousehold?.id}/${currentHousehold?.role}`)
+  const { run, captureContext } = loadState
+  const selectedAccount = accounts.find(account => account.isActive && account.id === (guideSelection === 'new' ? createdId : guideSelection))
+  const tutorialActive = useSetupTutorialPage(currentHousehold ? {
+    page: 'accounts', householdId: currentHousehold.id, fresh: loadState.isFresh && !needsRead, busy: isSaving || loadState.isPending,
+    dirty: createGuard.isDirty || editGuard.isDirty || editingId !== null, uncertain,
+    selection: guideSelection, accountId: selectedAccount?.id ?? null,
+  } : null)
 
   const canManageHouseholdAccounts = currentHousehold?.role !== 'Viewer'
   const currencyOptions = currencies.includes(currentHousehold?.defaultCurrency ?? '')
@@ -52,19 +69,11 @@ export function AccountManagementPage() {
 
   const loadAccounts = useCallback(async () => {
     if (!currentHousehold) {
-      return
+      return false
     }
 
-    setIsLoading(true)
-    setErrors([])
-    try {
-      setAccounts(await getAccounts(currentHousehold.id))
-    } catch (error) {
-      setErrors(getErrorMessages(error))
-    } finally {
-      setIsLoading(false)
-    }
-  }, [currentHousehold])
+    return run(() => getAccounts(currentHousehold.id), items => { setAccounts(items); setNeedsRead(false) })
+  }, [currentHousehold, run])
 
   useEffect(() => {
     void loadAccounts()
@@ -79,15 +88,20 @@ export function AccountManagementPage() {
     return null
   }
 
-  const performChange = async (change: () => Promise<unknown>): Promise<boolean> => {
+  const performChange = async <T,>(change: () => Promise<T>, confirmed?: (result: T) => void): Promise<boolean> => {
+    if (isSaving || uncertain || !loadState.isFresh) return false
+    const isCurrent = captureContext()
     setIsSaving(true)
     setErrors([])
     try {
-      await change()
-      await loadAccounts()
-      return true
+      const result = await change()
+      if (!isCurrent()) return false
+      confirmed?.(result)
+      return await loadAccounts()
     } catch (error) {
+      if (!isCurrent()) return false
       setErrors(getErrorMessages(error))
+      if (tutorialActive && !(error instanceof ApiError && [400, 422].includes(error.status))) { setUncertain(true); setNeedsRead(true) }
       return false
     } finally {
       setIsSaving(false)
@@ -96,21 +110,21 @@ export function AccountManagementPage() {
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (tutorialActive && guideSelection === 'new' && createdId) return
     const form = event.currentTarget
     const data = new FormData(form)
-    const succeeded = await performChange(() => createAccount(currentHousehold.id, {
+    await performChange(() => createAccount(currentHousehold.id, {
       name: String(data.get('name') ?? ''),
       type: String(data.get('type') ?? 'Chequing') as AccountType,
       scope: String(data.get('scope') ?? 'Personal') as AccountScope,
       currency: String(data.get('currency') ?? currentHousehold.defaultCurrency),
       institutionName: String(data.get('institutionName') ?? ''),
       lastFourDigits: String(data.get('lastFourDigits') ?? ''),
-    }))
-
-    if (succeeded) {
+    }), result => {
+      setCreatedId(result.id)
       form.reset()
       createGuard.markClean()
-    }
+    })
   }
 
   const beginEdit = (account: AccountItem) => {
@@ -133,16 +147,15 @@ export function AccountManagementPage() {
       return
     }
 
-    const succeeded = await performChange(() => updateAccount(
+    await performChange(() => updateAccount(
       currentHousehold.id,
       accountId,
       editDraft,
-    ))
-    if (succeeded) {
+    ), () => {
       setEditingId(null)
       setEditDraft(null)
       editGuard.markClean(null)
-    }
+    })
   }
 
   const canChange = (account: AccountItem) =>
@@ -158,6 +171,7 @@ export function AccountManagementPage() {
       <article
         className={`account-card${account.isActive ? '' : ' archived-account'}`}
         key={account.id}
+        data-tutorial-id={selectedAccount?.id === account.id ? 'setup-tour-account-selected' : undefined}
       >
         {editingId === account.id && editDraft ? (
           <div className="account-edit-form">
@@ -246,10 +260,10 @@ export function AccountManagementPage() {
               does not change automatically. Reports keep currencies separate.
             </p>
             <ContextualHelp topic="scope-privacy" />
-            <div className="account-actions">
+            <div className="account-actions" data-tutorial-id={selectedAccount?.id === account.id ? 'setup-tour-account-save' : undefined}>
               <button
                 type="button"
-                disabled={isSaving || !editDraft.name.trim()}
+                disabled={isSaving || uncertain || !loadState.isFresh || !editDraft.name.trim()}
                 onClick={() => void handleUpdate(account.id)}
               >Save changes</button>
               <button
@@ -285,13 +299,13 @@ export function AccountManagementPage() {
                 <button
                   className="text-button"
                   type="button"
-                  disabled={isSaving}
+                  disabled={isSaving || uncertain || !loadState.isFresh}
                   onClick={() => beginEdit(account)}
                 >Edit</button>
                 <button
                   className="text-button"
                   type="button"
-                  disabled={isSaving}
+                  disabled={isSaving || uncertain || !loadState.isFresh}
                   onClick={() => void performChange(() => setAccountActive(
                     currentHousehold.id,
                     account.id,
@@ -307,7 +321,7 @@ export function AccountManagementPage() {
   }
 
   return (
-    <PageFrame>
+    <PageFrame footer={<div id="setup-tutorial-guide-host" />}>
         <div className="page-title-row" data-tutorial-id="accounts-page-title">
           <div>
             <p className="eyebrow">Household</p>
@@ -326,9 +340,25 @@ export function AccountManagementPage() {
           </label>
         </div>
 
-        <ErrorSummary errors={errors} />
+        {!uncertain && <ErrorSummary errors={errors} />}
+        <PageLoadFeedback subject="accounts" status={loadState.status} errors={loadState.errors} onReload={() => void loadAccounts()} disabled={isSaving} />
+        {uncertain && <div className="error-summary" role="alert"><p>The account request may have saved. Check the list before another change.</p>
+          <button type="button" disabled={isSaving || loadState.isPending} onClick={() => { setErrors([]); void loadAccounts() }}>Check saved accounts</button>
+          <p>Choose the actual saved account below rather than adding it again.</p></div>}
+        {tutorialActive && <section className="add-account-form" data-tutorial-id="setup-tour-account-choice">
+          <label><span>Account for this tutorial</span><select value={guideSelection ?? ''} disabled={!loadState.isFresh || isSaving || needsRead} onChange={event => {
+            const id = event.target.value
+            if (needsRead) return
+            if (!id || uncertain && id === 'new' || !createGuard.confirmDiscard() || !editGuard.confirmDiscard()) return
+            setGuideSelection(id); setCreatedId(null); setUncertain(false); setErrors([])
+            const form = document.getElementById('setup-account-create') as HTMLFormElement | null
+            form?.reset(); createGuard.markClean(); setEditingId(null); setEditDraft(null); editGuard.markClean(null)
+          }}><option value="">Choose an account…</option><option value="new" disabled={uncertain}>{createdId ? 'Use the account just saved' : 'New account'}</option>
+            {accounts.filter(account => account.isActive).map(account => <option key={account.id} value={account.id}>{account.name} · {account.currency} · {account.scope}</option>)}
+          </select></label>
+        </section>}
 
-        <form {...createGuard.formProps} className="add-account-form" onSubmit={(event) => void handleCreate(event)}>
+        {loadState.hasData && <form {...createGuard.formProps} id="setup-account-create" data-tutorial-id={guideSelection === 'new' && !createdId ? 'setup-tour-account-form' : undefined} className="add-account-form" onSubmit={(event) => void handleCreate(event)}>
           <div className="account-form-heading">
             <div>
               <h2>Add account</h2>
@@ -382,15 +412,13 @@ export function AccountManagementPage() {
               />
             </label>
           </div>
-          <button className="primary-button account-submit" type="submit" disabled={isSaving}>
+          <button className="primary-button account-submit" data-tutorial-id={guideSelection === 'new' && !createdId ? 'setup-tour-account-save' : undefined} type="submit" disabled={isSaving || uncertain || !loadState.isFresh || Boolean(tutorialActive && guideSelection === 'new' && createdId)}>
             Add account
           </button>
           <ContextualHelp topic="scope-privacy" />
-        </form>
+        </form>}
 
-        {isLoading ? (
-          <p className="empty-state">Loading accounts...</p>
-        ) : visibleAccounts.length === 0 ? (
+        {loadState.hasData && (visibleAccounts.length === 0 ? (
           <div className="empty-state">
             <h2>No accounts to show</h2>
             <p>Add your first account or show archived accounts.</p>
@@ -421,7 +449,7 @@ export function AccountManagementPage() {
               )
             })}
           </div>
-        )}
+        ))}
     </PageFrame>
   )
 }

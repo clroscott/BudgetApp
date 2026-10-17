@@ -6,8 +6,9 @@ import {
   type AuditFilterOptions,
   type AuditQuery,
 } from '../auditing/auditApi'
-import { ApiError } from '../api/apiClient'
-import { ErrorSummary } from '../components/ErrorSummary'
+import { PageLoadFeedback } from '../components/PageLoadFeedback'
+import { usePageLoad } from './usePageLoad'
+import { useReadTutorialPage } from '../tutorials/readTutorialState'
 import { HouseholdSectionNav } from '../components/HouseholdSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
 
@@ -38,30 +39,20 @@ export function ActivityPage() {
   const [filters, setFilters] = useState<AuditFilterOptions>(emptyFilters)
   const [totalCount, setTotalCount] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [errors, setErrors] = useState<string[]>([])
+  const loadState = usePageLoad(`${currentHousehold?.id}/${JSON.stringify(appliedQuery)}`)
+  const { run } = loadState
+  useReadTutorialPage(loadState.isFresh)
 
   const load = useCallback(async () => {
     if (!currentHousehold) return
 
-    setIsLoading(true)
-    setErrors([])
-    try {
-      const result = await getAuditEvents(currentHousehold.id, appliedQuery)
+    await run(() => getAuditEvents(currentHousehold.id, appliedQuery), result => {
       setEvents(result.items)
       setFilters(result.filters)
       setTotalCount(result.totalCount)
       setTotalPages(result.totalPages)
-    } catch (error) {
-      setErrors([
-        error instanceof ApiError
-          ? error.message
-          : 'Activity history could not be loaded.',
-      ])
-    } finally {
-      setIsLoading(false)
-    }
-  }, [appliedQuery, currentHousehold])
+    })
+  }, [appliedQuery, currentHousehold, run])
 
   useEffect(() => {
     void load()
@@ -84,9 +75,9 @@ export function ActivityPage() {
   }
 
   return (
-    <PageFrame contentClassName="activity-content">
+    <PageFrame contentClassName="activity-content" footer={<div id="read-tutorial-guide-host" />}>
         <HouseholdSectionNav current="activity" />
-        <div className="page-title-row">
+        <div className="page-title-row" data-tutorial-id="activity-tour-title">
           <div>
             <p className="eyebrow">Household</p>
             <h1>Change history</h1>
@@ -97,13 +88,14 @@ export function ActivityPage() {
           </div>
         </div>
 
-        <ErrorSummary errors={errors} />
+        <PageLoadFeedback subject="change history" status={loadState.status} errors={loadState.errors} onReload={() => void load()} />
 
-        <form className="activity-filter-panel" onSubmit={applyFilters}>
+        <form className="activity-filter-panel" data-tutorial-id="activity-tour-form" onSubmit={applyFilters}>
           <div className="activity-filter-grid">
             <label>
               From
               <input
+                data-tutorial-id="activity-tour-from"
                 type="date"
                 value={draftQuery.fromDate ?? ''}
                 onChange={event => setDraftQuery(current => ({
@@ -115,6 +107,7 @@ export function ActivityPage() {
             <label>
               To
               <input
+                data-tutorial-id="activity-tour-to"
                 type="date"
                 value={draftQuery.toDate ?? ''}
                 onChange={event => setDraftQuery(current => ({
@@ -126,6 +119,7 @@ export function ActivityPage() {
             <label>
               Person
               <select
+                data-tutorial-id="activity-tour-person"
                 value={draftQuery.actorUserId ?? ''}
                 onChange={event => setDraftQuery(current => ({
                   ...current,
@@ -143,6 +137,7 @@ export function ActivityPage() {
             <label>
               Action
               <select
+                data-tutorial-id="activity-tour-action"
                 value={draftQuery.action ?? ''}
                 onChange={event => setDraftQuery(current => ({
                   ...current,
@@ -158,6 +153,7 @@ export function ActivityPage() {
             <label>
               Type
               <select
+                data-tutorial-id="activity-tour-type"
                 value={draftQuery.entityType ?? ''}
                 onChange={event => setDraftQuery(current => ({
                   ...current,
@@ -174,36 +170,35 @@ export function ActivityPage() {
             </label>
           </div>
           <div className="activity-filter-actions">
-            <button type="submit">Apply filters</button>
+            <button type="submit" data-tutorial-id="activity-tour-apply">Apply filters</button>
             <button
               className="secondary-button"
               type="button"
               onClick={resetFilters}
+              data-tutorial-id="activity-tour-reset"
             >
               Reset filters
             </button>
           </div>
         </form>
 
-        {!isLoading && (
-          <p className="activity-result-summary">
+        {loadState.hasData && (
+          <p className="activity-result-summary" data-tutorial-id="activity-tour-count">
             {totalCount === 1 ? '1 visible event' : `${totalCount} visible events`}
           </p>
         )}
 
-        {isLoading ? (
-          <p className="empty-state">Loading activity...</p>
-        ) : events.length === 0 ? (
-          <div className="empty-state">
+        {!loadState.hasData ? null : events.length === 0 ? (
+          <div className="empty-state" data-tutorial-id="activity-tour-empty">
             <h2>No activity found</h2>
             <p>There are no visible events matching these filters.</p>
           </div>
         ) : (
           <div className="activity-list">
-            {events.map(auditEvent => {
+            {events.map((auditEvent, index) => {
               const detailEntries = Object.entries(auditEvent.details)
               return (
-                <article className="activity-card" key={auditEvent.id}>
+                <article className="activity-card" key={auditEvent.id} data-tutorial-id={index === 0 ? 'activity-tour-entry' : undefined}>
                   <div className="activity-card-heading">
                     <div>
                       <div className="activity-card-meta">
@@ -225,7 +220,7 @@ export function ActivityPage() {
                   </div>
                   {detailEntries.length > 0 && (
                     <details className="activity-details">
-                      <summary>View details</summary>
+                      <summary data-tutorial-id="activity-tour-details">View details</summary>
                       <dl>
                         {detailEntries.map(([label, value]) => (
                           <div key={label}>
@@ -242,12 +237,13 @@ export function ActivityPage() {
           </div>
         )}
 
-        {totalPages > 1 && (
-          <nav className="transaction-pagination" aria-label="Activity pages">
+        {loadState.hasData && totalPages > 1 && (
+          <nav className="transaction-pagination" aria-label="Activity pages" data-tutorial-id="activity-tour-pages">
             <button
               className="secondary-button"
               type="button"
               disabled={(appliedQuery.page ?? 1) <= 1}
+              data-tutorial-id="activity-tour-previous"
               onClick={() => changePage((appliedQuery.page ?? 1) - 1)}
             >
               Previous
@@ -257,6 +253,7 @@ export function ActivityPage() {
               className="secondary-button"
               type="button"
               disabled={(appliedQuery.page ?? 1) >= totalPages}
+              data-tutorial-id="activity-tour-next"
               onClick={() => changePage((appliedQuery.page ?? 1) + 1)}
             >
               Next

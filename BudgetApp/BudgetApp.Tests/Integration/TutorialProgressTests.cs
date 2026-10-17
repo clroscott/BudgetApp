@@ -10,6 +10,21 @@ public sealed class TutorialProgressTests(BudgetAppWebApplicationFactory factory
     [InlineData("getting-started", 6)]
     [InlineData("import-review", 9)]
     [InlineData("build-first-budget", 9)]
+    [InlineData("annual-overview", 6)]
+    [InlineData("review-activity", 4)]
+    [InlineData("export-transactions", 4)]
+    [InlineData("customize-dashboard", 5)]
+    [InlineData("recurring-expenses", 8)]
+    [InlineData("check-spending-totals", 9)]
+    [InlineData("manage-import-profiles", 6)]
+    [InlineData("set-up-finances", 6)]
+    [InlineData("invite-household-member", 5)]
+    [InlineData("search-edit-transactions", 7)]
+    [InlineData("categorize-transactions", 8)]
+    [InlineData("fix-mistaken-import", 5)]
+    [InlineData("resolve-import-problems", 6)]
+    [InlineData("budget-lifecycle", 6)]
+    [InlineData("budget-from-annual-targets", 8)]
     public async Task Progress_CanBeResumedCompletedAndReplayed(string tutorialKey, int lastStep)
     {
         using var client = factory.CreateAuthenticatedTestClient();

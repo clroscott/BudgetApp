@@ -76,7 +76,12 @@ export function useTutorialFocus({ active, step, kind, target, layerRef, heading
     }
     const ownedInert = new Set<HTMLElement>()
     const described = new Map<HTMLElement, string | null>()
-    const allowed = (node: Node) => layer.contains(node) || !!target?.contains(node)
+    // The existing export helper creates a short-lived blob download link after
+    // the user's explicit export click. Never authorize arbitrary outside links.
+    const allowedDownload = (node: Node) => kind === 'LearnOnly' && node instanceof HTMLAnchorElement &&
+      node.dataset.tutorialId === 'transaction-tour-download' && step.readControls?.includes('transaction-tour-download') &&
+      node.hasAttribute('download') && node.href.startsWith(`blob:${window.location.origin}/`)
+    const allowed = (node: Node) => layer.contains(node) || !!target?.contains(node) || allowedDownload(node)
     const block = (element: HTMLElement) => {
       if (element.hasAttribute('inert')) return
       ownedInert.add(element)
@@ -84,7 +89,7 @@ export function useTutorialFocus({ active, step, kind, target, layerRef, heading
       element.setAttribute('inert', '')
     }
     const isolate = (element: HTMLElement) => {
-      if (element === layer || element === target) return
+      if (element === layer || element === target || allowedDownload(element)) return
       if (element.contains(layer) || target && element.contains(target)) {
         for (const child of element.children) if (child instanceof HTMLElement) isolate(child)
       } else block(element)
@@ -92,9 +97,14 @@ export function useTutorialFocus({ active, step, kind, target, layerRef, heading
     const reconcile = () => {
       isolate(document.body)
       // An informational Learn-only spotlight is for reading, not operating forms.
-      if (kind === 'LearnOnly' && step.advance === 'next' && target) {
-        if (target.matches(interactive)) block(target)
-        target.querySelectorAll<HTMLElement>(interactive).forEach(block)
+      if (kind === 'LearnOnly' && step.advance !== 'click' && target) {
+        for (const element of [target, ...target.querySelectorAll<HTMLElement>(interactive)]) {
+          if (!element.matches(interactive)) continue
+          // IDs must be on the actual control. A container ID cannot authorize
+          // a future Save/Delete button accidentally added inside that container.
+          const id = element.getAttribute('data-tutorial-id')
+          if (!id || !step.readControls?.includes(id)) block(element)
+        }
       }
     }
     reconcile()
@@ -142,9 +152,17 @@ export function useTutorialFocus({ active, step, kind, target, layerRef, heading
         event.stopImmediatePropagation()
       }
     }
+    const handleSubmit = (event: SubmitEvent) => {
+      if (kind !== 'LearnOnly') return
+      const id = event.target instanceof HTMLElement ? event.target.getAttribute('data-tutorial-id') : null
+      if (!id || !step.readControls?.includes(id)) {
+        event.preventDefault(); event.stopImmediatePropagation()
+      }
+    }
     document.addEventListener('focusin', handleFocus, true)
     document.addEventListener('keydown', handleKey, true)
     document.addEventListener('click', handleClick, true)
+    document.addEventListener('submit', handleSubmit, true)
     if (lastStep.current !== step || !allowed(document.activeElement ?? document.body)) focusCoach()
     lastStep.current = step
     return () => {
@@ -152,6 +170,7 @@ export function useTutorialFocus({ active, step, kind, target, layerRef, heading
       document.removeEventListener('focusin', handleFocus, true)
       document.removeEventListener('keydown', handleKey, true)
       document.removeEventListener('click', handleClick, true)
+      document.removeEventListener('submit', handleSubmit, true)
       for (const element of ownedInert) {
         element.removeAttribute('inert')
         element.removeAttribute('data-tutorial-inert')

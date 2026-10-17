@@ -35,6 +35,8 @@ import {
 } from '../routing/pageRegistry'
 import { tutorialByKey } from '../tutorials/tutorialDefinitions'
 import { useTutorials } from '../tutorials/useTutorials'
+import { useDashboardTutorialPage } from '../tutorials/dashboardTutorialState'
+import { ApiError } from '../api/apiClient'
 
 const panelByKey = new Map(dashboardPanels.map(panel => [panel.key, panel]))
 
@@ -57,6 +59,7 @@ export function DashboardPage() {
   const [draggedPanelKey, setDraggedPanelKey] = useState<string | null>(null)
   const [isCustomizing, setIsCustomizing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [layoutUncertain, setLayoutUncertain] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [period, setPeriod] = useState(() => dashboardPeriod(currentHousehold?.timeZoneId ?? 'UTC'))
   const [scope, setScope] = useState<BudgetScope>('Household')
@@ -70,6 +73,10 @@ export function DashboardPage() {
   const isDirty = isCustomizing && Boolean(layout) && (draftColumnCount !== layout!.preferredColumnCount ||
     JSON.stringify(draftPanelKeys) !== JSON.stringify(layout!.visiblePanelKeys))
   const confirmDiscard = useUnsavedChangesGuard(isDirty, 'Discard your unsaved dashboard layout changes?')
+  const dashboardTutorialActive = useDashboardTutorialPage(currentHousehold ? {
+    householdId: currentHousehold.id, fresh: layoutLoad.isFresh, hasLayout: Boolean(layout), editing: isCustomizing,
+    dirty: isDirty, busy: isSaving, uncertain: layoutUncertain,
+  } : null)
   const activeContext = useRef('')
   activeContext.current = `${user?.id}/${currentHousehold?.id}`
   const panelElements = useRef(new Map<string, HTMLElement>())
@@ -101,6 +108,7 @@ export function DashboardPage() {
     await runLayout(() => getDashboardLayout(currentHousehold.id), result => {
       const normalized = withClientDefaults(result)
       setLayout(normalized)
+      setLayoutUncertain(false)
       setDraftPanelKeys(normalized.visiblePanelKeys)
       setDraftColumnCount(normalized.preferredColumnCount)
     })
@@ -154,7 +162,7 @@ export function DashboardPage() {
   }
 
   const save = async () => {
-    if (isSaving || !layoutLoad.isFresh) return
+    if (isSaving || !layoutLoad.isFresh || layoutUncertain) return
     const context = activeContext.current
     setIsSaving(true)
     setErrors([])
@@ -171,14 +179,17 @@ export function DashboardPage() {
       returnToCustomize.current = true
       setIsCustomizing(false)
     } catch (error) {
-      if (activeContext.current === context) setErrors(getErrorMessages(error))
+      if (activeContext.current === context) {
+        setErrors(getErrorMessages(error))
+        if (dashboardTutorialActive && (!(error instanceof ApiError) || ![400, 422].includes(error.status))) setLayoutUncertain(true)
+      }
     } finally {
       if (activeContext.current === context) setIsSaving(false)
     }
   }
 
   const reset = async () => {
-    if (isSaving || !layoutLoad.isFresh || !confirmDiscard()) return
+    if (isSaving || !layoutLoad.isFresh || layoutUncertain || !confirmDiscard()) return
     const context = activeContext.current
     setIsSaving(true)
     setErrors([])
@@ -193,7 +204,10 @@ export function DashboardPage() {
       returnToCustomize.current = true
       setIsCustomizing(false)
     } catch (error) {
-      if (activeContext.current === context) setErrors(getErrorMessages(error))
+      if (activeContext.current === context) {
+        setErrors(getErrorMessages(error))
+        if (dashboardTutorialActive && (!(error instanceof ApiError) || ![400, 422].includes(error.status))) setLayoutUncertain(true)
+      }
     } finally {
       if (activeContext.current === context) setIsSaving(false)
     }
@@ -303,7 +317,7 @@ export function DashboardPage() {
     visibleKeys.every((key, index) => key === defaultDashboardPanelKeys[index])
 
   return (
-    <PageFrame>
+    <PageFrame footer={<div id="dashboard-tutorial-guide-host" />}>
         <div className="dashboard-title-row" data-tutorial-id="dashboard-welcome">
           <div>
             <p className="eyebrow">Dashboard</p>
@@ -317,6 +331,7 @@ export function DashboardPage() {
               className="secondary-button"
               type="button"
               ref={customizeButton}
+              data-tutorial-id="dashboard-tour-open"
               onClick={beginCustomizing}
             >
               Customize dashboard
@@ -324,7 +339,15 @@ export function DashboardPage() {
           )}
         </div>
 
-        <ErrorSummary errors={errors} revealOnChange />
+        {!layoutUncertain && <ErrorSummary errors={errors} revealOnChange />}
+        {layoutUncertain && <section role="alert" className="error-summary">
+          {errors.map(error => <p key={error}>{error}</p>)}
+          <p>Check the saved layout before trying again.</p>
+          <button type="button" disabled={isSaving} onClick={() => {
+            if (!confirmDiscard()) return
+            setIsCustomizing(false); setErrors([]); void loadLayout()
+          }}>Check saved layout</button>
+        </section>}
         <div className="dashboard-context-controls" aria-label="Financial summary context">
           <label>Summary month<input type="month" min="0001-01" max="9998-12" value={period}
             onChange={event => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(event.target.value) && Number(event.target.value.slice(0, 4)) >= 1 && Number(event.target.value.slice(0, 4)) <= 9998) setPeriod(event.target.value) }} /></label>
@@ -380,12 +403,12 @@ export function DashboardPage() {
         })()}
 
         {isCustomizing && (
-          <section className="dashboard-customizer" aria-label="Dashboard settings">
+          <section className="dashboard-customizer" aria-label="Dashboard settings" data-tutorial-id="dashboard-tour-editor">
             <div>
               <h2>Customize dashboard</h2>
               <p>Reorder cards by dragging or using Earlier/Later. Add or remove summaries and shortcuts.</p>
             </div>
-            <fieldset>
+            <fieldset data-tutorial-id="dashboard-tour-columns">
               <legend>Desktop columns</legend>
               {[2, 3, 4].map(count => (
                 <button
@@ -400,11 +423,11 @@ export function DashboardPage() {
                 </button>
               ))}
             </fieldset>
-            <div className="dashboard-customizer-actions">
+            <div className="dashboard-customizer-actions" data-tutorial-id="dashboard-tour-save">
               <button
                 className="text-button"
                 type="button"
-                disabled={isSaving}
+                disabled={isSaving || layoutUncertain}
                 onClick={() => void reset()}
               >
                 Reset to default
@@ -420,7 +443,7 @@ export function DashboardPage() {
               <button
                 className="primary-button"
                 type="button"
-                disabled={isSaving}
+                disabled={isSaving || layoutUncertain}
                 onClick={() => void save()}
               >
                 {isSaving ? 'Saving...' : 'Save layout'}
@@ -472,7 +495,7 @@ export function DashboardPage() {
                   onDrop={dropPanel}
                 >
                   {isCustomizing && (
-                    <div className="dashboard-panel-controls">
+                    <div className="dashboard-panel-controls" data-tutorial-id={index === 0 ? 'dashboard-tour-order' : undefined}>
                       <span title="Drag to reorder">Drag</span>
                       <div>
                         <button
@@ -530,7 +553,7 @@ export function DashboardPage() {
         ))}
 
         {isCustomizing && (
-          <section className="dashboard-add-panels">
+          <section className="dashboard-add-panels" data-tutorial-id="dashboard-tour-add">
             <h2 ref={addCardsHeading}>Add cards</h2>
             {hiddenPanels.length === 0 ? (
               <p>Every available card is already on your dashboard.</p>

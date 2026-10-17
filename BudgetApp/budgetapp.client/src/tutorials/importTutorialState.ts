@@ -11,10 +11,18 @@ export type ImportTutorialPage = {
   fileType: 'csv' | 'xlsx' | 'unsupported' | null
   busy: boolean
   stagedId: string | null
+  fileRevision?: number
+  uncertain?: boolean
+  uncertainKind?: 'profile' | 'upload' | null
 } | {
   page: 'review'
   householdId: string
   importId: string
+  url?: string
+  rulesFresh?: boolean
+  listFresh?: boolean
+  uncertain?: boolean
+  discardedImportId?: string | null
   fresh: boolean
   canEdit: boolean
   status: string
@@ -23,6 +31,8 @@ export type ImportTutorialPage = {
   pendingRows: number
   approvedRows: number
   totalRows: number
+  invalidRows?: number
+  duplicateRows?: number
 }
 
 export interface ImportTutorialTask { householdId: string; accountId?: string; importId?: string }

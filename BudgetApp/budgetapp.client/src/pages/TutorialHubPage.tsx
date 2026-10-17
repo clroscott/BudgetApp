@@ -13,78 +13,6 @@ const plannedTutorials = [
       'Understand account scope, budget scope, visibility, and shared categories.',
     kind: 'LearnOnly' as TutorialKind,
   },
-  {
-    title: 'Set up your finances',
-    description:
-      'Create accounts and organize categories and subcategories.',
-    kind: 'GuidedSetup' as TutorialKind,
-  },
-  {
-    title: 'Categorize transactions efficiently',
-    description:
-      'Correct categories, create rules, and apply them to matching transactions.',
-    kind: 'GuidedFinancialTask' as TutorialKind,
-  },
-  {
-    title: 'Recurring expenses',
-    description:
-      'Configure expected expenses and use them to build monthly budget drafts.',
-    kind: 'GuidedSetup' as TutorialKind,
-  },
-  {
-    title: 'Household setup and invitations',
-    description:
-      'Invite another person and understand roles, acceptance, and household access.',
-    kind: 'GuidedSetup' as TutorialKind,
-  },
-  {
-    title: 'Search and edit transactions',
-    description:
-      'Use date and category filters, correct transactions, and save multiple edits.',
-    kind: 'GuidedFinancialTask' as TutorialKind,
-  },
-  {
-    title: 'Copy, reset, and reopen budgets',
-    description:
-      'Reuse earlier plans and understand Draft, Active, and Closed budget states.',
-    kind: 'GuidedFinancialTask' as TutorialKind,
-  },
-  {
-    title: 'Read the Annual Overview',
-    description:
-      'Interpret budgeted, actual, remaining, income, and monthly category results.',
-    kind: 'LearnOnly' as TutorialKind,
-  },
-  {
-    title: 'Review household activity',
-    description:
-      'Use the activity log to see who changed important household information.',
-    kind: 'LearnOnly' as TutorialKind,
-  },
-  {
-    title: 'Customize your Dashboard',
-    description:
-      'Add, remove, reorder, and resize the shortcuts on your Dashboard.',
-    kind: 'GuidedSetup' as TutorialKind,
-  },
-  {
-    title: 'Manage CSV import profiles',
-    description:
-      'Save reusable column mappings for different banks and file structures.',
-    kind: 'GuidedSetup' as TutorialKind,
-  },
-  {
-    title: 'Export transaction data',
-    description:
-      'Export the currently filtered transaction results to a readable CSV file.',
-    kind: 'LearnOnly' as TutorialKind,
-  },
-  {
-    title: 'Recover your password',
-    description:
-      'Request and use a password-reset message without exposing recovery tokens.',
-    kind: 'GuidedSetup' as TutorialKind,
-  },
 ]
 
 const tutorialKinds: Record<TutorialKind, {
@@ -157,7 +85,7 @@ export function TutorialHubPage() {
               </div>
               <div className="tutorial-list">
                 {tutorialDefinitions
-                  .filter(tutorial => tutorial.kind === kind)
+                  .filter(tutorial => tutorial.kind === kind && tutorial.key !== 'budget-from-annual-targets')
                   .map(tutorial => {
                     const saved = progress.find(item =>
                       item.tutorialKey === tutorial.key &&
@@ -180,12 +108,16 @@ export function TutorialHubPage() {
                           </small>
                         </div>
                         <div className="tutorial-card-actions">
+                          {tutorial.key === 'build-first-budget' && <button type="button" className="secondary-button" disabled={isLoading}
+                            onClick={() => void start('budget-from-annual-targets')}>
+                            {progress.some(item => item.tutorialKey === 'budget-from-annual-targets' && item.tutorialVersion === 1 && item.status !== 'Dismissed') ? 'Start again from annual targets' : 'Start from annual targets'}
+                          </button>}
                           <button type="button" disabled={isLoading}
                             onClick={() => void start(
                               tutorial.key,
                               status === 'InProgress' && canResume,
                             )}>
-                            {status === 'InProgress'
+                            {tutorial.key === 'build-first-budget' ? status === 'InProgress' ? 'Quick monthly — start again' : status === 'Completed' ? 'Replay Quick monthly' : 'Quick monthly budget' : status === 'InProgress'
                               ? canResume ? 'Resume tutorial' : 'Start again'
                               : status === 'Completed'
                                 ? 'Replay tutorial'

@@ -20,8 +20,11 @@ import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 import { ImportParsingFields } from '../imports/ImportParsingFields'
 import { useImportTutorialPage } from '../tutorials/useImportTutorialPage'
+import { useProfileTutorialPage } from '../tutorials/profileTutorialState'
 import { TutorialContext } from '../tutorials/tutorialContext'
 import { importTutorialKey } from '../tutorials/importTutorialState'
+import { importProblemsTutorialKey } from '../tutorials/importProblemsTutorialState'
+import { ApiError } from '../api/apiClient'
 
 const maxFileSizeBytes = 10 * 1024 * 1024
 const standardCsvHeaders = new Set([
@@ -62,6 +65,8 @@ export function CsvImportPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [result, setResult] = useState<CsvImportResult | null>(null)
+  const [fileRevision, setFileRevision] = useState(0)
+  const [unknownWrite, setUnknownWrite] = useState<'profile' | 'upload' | null>(null)
   const revision = useRef(0)
   const pending = useRef(false)
   const isExcel = selectedFile?.name.toLowerCase().endsWith('.xlsx') ?? false
@@ -80,6 +85,8 @@ export function CsvImportPage() {
     setMapping(null)
     setResult(null)
     setAllowDuplicateFile(false)
+    setUnknownWrite(null)
+    setFileRevision(current => current + 1)
     setAccounts([])
     setProfiles([])
     setHasLoadedAccounts(false)
@@ -137,6 +144,12 @@ export function CsvImportPage() {
     canImport: Boolean(selectedAccount && (currentHousehold?.role !== 'Viewer' || selectedAccount.scope === 'Personal')),
     fileType: !selectedFile ? null : isExcel ? 'xlsx' : selectedFile.name.toLowerCase().endsWith('.csv') ? 'csv' : 'unsupported',
     busy: isUploading, stagedId: result?.importFileId ?? null,
+    fileRevision, uncertain: Boolean(unknownWrite), uncertainKind: unknownWrite,
+  } : null)
+
+  useProfileTutorialPage(householdId ? {
+    page: 'upload', householdId, fresh: hasLoadedAccounts && !isLoading, busy: isUploading, dirty: Boolean(selectedFile) && !result,
+    uncertain: false, selection: null, profileId: selectedProfileId || null, editing: false, canEdit: false,
   } : null)
 
   if (!currentHousehold) {
@@ -186,7 +199,7 @@ export function CsvImportPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (pending.current) return
+    if (pending.current || unknownWrite) return
     setErrors([])
     setResult(null)
 
@@ -207,6 +220,7 @@ export function CsvImportPage() {
 
     const request = startRequest()
     if (request === null) return
+    let attemptedWrite = false
     try {
       let inspected = inspection
       if ((isExcel && !inspected) || (!isExcel && !selectedProfileId)) {
@@ -226,32 +240,43 @@ export function CsvImportPage() {
         offerMapping(inspected)
         return
       }
+      attemptedWrite = true
       const staged = await upload(profileId, isExcel ? inspected?.selectedWorksheetId ?? undefined : undefined)
       if (request !== revision.current) return
       setMapping(null)
       setResult(staged)
     } catch (error) {
-      if (request === revision.current) setErrors(getErrorMessages(error))
+      if (request === revision.current) {
+        setErrors(getErrorMessages(error))
+        if (attemptedWrite && tutorial?.activeTutorial?.key === importProblemsTutorialKey &&
+          (!(error instanceof ApiError) || error.status === 0 || error.status >= 500)) setUnknownWrite('upload')
+      }
     } finally {
       finishRequest(request)
     }
   }
 
   const saveMappingAndUpload = async () => {
-    if (!mapping || !selectedFile) return
+    if (!mapping || !selectedFile || unknownWrite) return
     if (isExcel && !inspection?.selectedWorksheetId) return
     const request = startRequest()
     if (request === null) return
+    let writeStage: 'profile' | 'upload' = 'profile'
     try {
       const profile = await createImportProfile(currentHousehold.id, mapping)
       if (request !== revision.current) return
       setProfiles(current => [...current, profile])
       setSelectedProfileId(profile.id)
       setMapping(null)
+      writeStage = 'upload'
       const staged = await upload(profile.id, isExcel ? inspection?.selectedWorksheetId ?? undefined : undefined)
       if (request === revision.current) setResult(staged)
     } catch (error) {
-      if (request === revision.current) setErrors(getErrorMessages(error))
+      if (request === revision.current) {
+        setErrors(getErrorMessages(error))
+        if (tutorial?.activeTutorial?.key === importProblemsTutorialKey &&
+          (!(error instanceof ApiError) || error.status === 0 || error.status >= 500)) setUnknownWrite(writeStage)
+      }
     } finally {
       finishRequest(request)
     }
@@ -279,6 +304,14 @@ export function CsvImportPage() {
           <ContextualHelp topic="scope-privacy" />
         </div>
         <ErrorSummary errors={errors} revealOnChange floating />
+        {unknownWrite && <section role="alert" className="error-summary">
+          <p>{unknownWrite === 'upload' ? 'Upload result uncertain. Check saved imports before uploading again; do not enable repeated-file allowance as a retry shortcut.'
+            : 'Profile save uncertain. Check saved profiles before creating another copy. No successful upload is assumed.'}</p>
+          <AppLink to={unknownWrite === 'upload' ? '/imports/review' : '/settings/import-profiles'} onClick={event => {
+            if (unknownWrite !== 'upload' || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || !tutorial?.problemsGuide?.canInspectSaved) return
+            event.preventDefault(); tutorial.problemsGuide.inspectSavedImports()
+          }}>{unknownWrite === 'upload' ? 'Check saved imports' : 'Check saved profiles'}</AppLink>
+        </section>}
 
         {isLoading ? (
           <p className="empty-state">Loading accounts...</p>
@@ -305,6 +338,7 @@ export function CsvImportPage() {
                   if (mapping && !confirmDiscard()) return
                   revision.current++
                   setSelectedAccountId(event.target.value)
+                  setFileRevision(current => current + 1)
                   setInspection(null)
                   setMapping(null)
                   setResult(null)
@@ -331,6 +365,7 @@ export function CsvImportPage() {
                 onChange={event => {
                   revision.current++
                   setSelectedFile(event.target.files?.[0] ?? null)
+                  setFileRevision(current => current + 1)
                   setInspection(null)
                   setMapping(null)
                   setResult(null)
@@ -341,7 +376,7 @@ export function CsvImportPage() {
 
             <label>
               <span>Import profile</span>
-              <select value={selectedProfileId} disabled={isUploading}
+              <select data-tutorial-id="profile-tour-upload" value={selectedProfileId} disabled={isUploading}
                 onChange={event => {
                   if (mapping && !confirmDiscard()) return
                   revision.current++
@@ -377,7 +412,7 @@ export function CsvImportPage() {
             <label className="checkbox-row duplicate-file-confirmation">
               <input
                 type="checkbox"
-                disabled={isUploading}
+                disabled={isUploading || Boolean(unknownWrite)}
                 checked={allowDuplicateFile}
                 onChange={event => setAllowDuplicateFile(event.target.checked)}
               />
@@ -388,7 +423,7 @@ export function CsvImportPage() {
               className="primary-button import-submit"
               data-tutorial-id="import-stage-submit"
               type="submit"
-              disabled={isUploading || !selectedFile || !selectedAccount || Boolean(isExcel && inspection && !inspection.selectedWorksheetId) || Boolean(mapping)}
+              disabled={isUploading || Boolean(unknownWrite) || !selectedFile || !selectedAccount || Boolean(isExcel && inspection && !inspection.selectedWorksheetId) || Boolean(mapping)}
             >
               {isUploading ? 'Reading and checking...' : isExcel && !inspection ? 'Preview workbook' : 'Upload for review'}
             </button>
@@ -455,7 +490,7 @@ export function CsvImportPage() {
             </div>
             {!isExcel && <ImportPreview inspection={inspection} />}
             {currentHousehold.role === 'Viewer' && <p>Only a household Owner or Admin can save a shared import profile. Ask them to save this mapping, or choose an existing profile.</p>}
-            <button className="primary-button" type="button" disabled={isUploading || currentHousehold.role === 'Viewer'}
+            <button className="primary-button" type="button" disabled={isUploading || Boolean(unknownWrite) || currentHousehold.role === 'Viewer'}
               onClick={() => void saveMappingAndUpload()}>
               {isUploading ? 'Saving and uploading...' : 'Save profile and upload'}
             </button>
@@ -480,6 +515,9 @@ export function CsvImportPage() {
             </p>
             <AppLink to={`/imports/review?importId=${result.importFileId}`} onClick={event => {
               if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+              if (tutorial?.activeTutorial?.key === importProblemsTutorialKey && tutorial.activeStepIndex >= 1 && tutorial.activeStepIndex <= 3 && tutorial.problemsGuide?.canNext) {
+                event.preventDefault(); void tutorial.next(); return
+              }
               if (tutorial?.activeTutorial?.key !== importTutorialKey || tutorial.activeStepIndex !== 3 || !tutorial.importGuide?.canNext) return
               // Use the same guarded, outcome-checked handoff as the coach.
               // Prevent AppLink from navigating a second time or prompting twice.
@@ -492,6 +530,7 @@ export function CsvImportPage() {
         )}
         </div>
         <div id="import-tutorial-guide-host" />
+        <div id="import-problems-guide-host" />
     </PageFrame>
   )
 }

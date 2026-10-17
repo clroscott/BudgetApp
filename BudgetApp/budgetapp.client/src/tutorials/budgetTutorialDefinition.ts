@@ -2,12 +2,12 @@ import type { TutorialDefinition } from './tutorialDefinitions'
 
 export const budgetTutorialDefinition: TutorialDefinition = {
   key: 'build-first-budget', version: 1, kind: 'GuidedFinancialTask', title: 'Build your first budget',
-  description: 'Choose a month, plan spending and save. Activate now or keep it as a draft. Annual-target guidance comes later.',
+  description: 'Choose Quick monthly planning or the separate annual-target path. Save intended amounts, then activate or keep Draft.',
   estimatedMinutes: 7, resumeBehavior: 'restart',
   steps: [
     { title: 'Choose your month', targetId: 'budget-tutorial-period',
       body: 'Let’s plan one month. Choose Month, Year and Scope. This uses your real budget; nothing saves until you choose a page action.',
-      details: 'Quick monthly is the first part of this guide; annual-target allocation will be a separate path later. You need an Owner/Admin role and an active expense category. Household is the shared spending plan; Personal is your own plan. Check the household above. Start again returns here without undoing saved work. The guide never creates, saves, replaces or activates anything itself.' },
+      details: 'This is the Quick monthly path. Start from annual targets is a separate choice in the same tutorial card. You need budget-edit permission and an active expense category. Household is the shared spending plan; Personal is your own plan. Check the household above. Start again returns here without undoing saved work. The guide never creates, saves, replaces or activates anything itself.' },
     { title: 'Start with a draft', targetId: 'budget-tutorial-create', fallbackTargetIds: ['budget-tutorial-summary'],
       body: 'No budget yet? Choose Create blank budget. If this month already has a budget, keep it and continue—there’s no need to create another.',
       details: 'Create blank budget saves an empty Draft for this month and scope. Existing Draft or Active budgets can be reviewed and edited without creating a new one. Closed budgets need another month or a separate deliberate reopen outside this guide. Copying, recurring generation, deletion and replacement are not tutorial requirements.' },

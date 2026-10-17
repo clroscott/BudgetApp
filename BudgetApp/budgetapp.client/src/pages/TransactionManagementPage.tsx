@@ -1,11 +1,11 @@
-import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { getAccounts, type AccountItem } from '../accounts/accountApi'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useReadOwner } from '../api/useReadOwner'
 import { getCategories, type CategoryItem, type CategoryType } from '../categories/categoryApi'
 import { PageFrame } from '../components/PageFrame'
 import { budgetInclusionLabel } from '../transactions/budgetInclusion'
-import { BudgetInclusionEditor } from '../components/BudgetInclusionEditor'
+import { BudgetInclusionEditor, type BudgetInclusionEditState } from '../components/BudgetInclusionEditor'
 import { useRouter } from '../routing/useRouter'
 import { ErrorSummary } from '../components/ErrorSummary'
 import { TransactionsSectionNav } from '../components/TransactionsSectionNav'
@@ -17,6 +17,10 @@ import { buildTransactionQuery, createDefaultFilters, createInitialFilters, filt
 import { readTransactionLocation, transactionFilterLocation } from '../transactions/transactionLocation'
 import { buildTransactionParameters } from '../transactions/transactionQuery'
 import { AppLink } from '../routing/AppLink'
+import { useReadTutorialPage } from '../tutorials/readTutorialState'
+import { useTransactionTutorialPage, transactionTutorialKey } from '../tutorials/transactionTutorialState'
+import { TutorialContext } from '../tutorials/tutorialContext'
+import { ApiError } from '../api/apiClient'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 import { annualReportReturnLink, transactionFilterKey } from '../transactions/reportContext'
 import {
@@ -77,7 +81,21 @@ export function TransactionManagementPage() {
   const { currentHousehold } = useHouseholds()
   const location = useMemo(() => readTransactionLocation(search), [search])
   const { reportContext } = location
-  const { captureContext } = useReadOwner(`${currentHousehold?.id}/${search}`)
+  const contextKey = `${currentHousehold?.id}/${currentHousehold?.role}/${search}`
+  const { captureContext } = useReadOwner(contextKey)
+  const tutorials = useContext(TutorialContext)
+  const transactionGuideActive = [transactionTutorialKey, 'categorize-transactions'].includes(tutorials?.activeTutorial?.key ?? '')
+  const [guideSelection, setGuideSelection] = useState<string | null>(() => tutorials?.transactionGuide?.selection ?? tutorials?.categorizationGuide?.selection ?? null)
+  const [inclusionStates, setInclusionStates] = useState<Record<string, BudgetInclusionEditState>>({})
+  const observeInclusion = useCallback((id: string, state: BudgetInclusionEditState | null) => setInclusionStates(current => {
+    if (JSON.stringify(current[id] ?? null) === JSON.stringify(state)) return current
+    const next = { ...current }; if (state) next[id] = state; else delete next[id]; return next
+  }), [])
+  const [outcomes, setOutcomes] = useState<{ revision: number; records: Record<string, { revision: number; kind: 'saved' | 'reloaded' }> }>({ revision: 0, records: {} })
+  const recordOutcome = useCallback((id: string, kind: 'saved' | 'reloaded') => setOutcomes(current => ({ revision: current.revision + 1,
+    records: { ...current.records, [id]: { revision: current.revision + 1, kind } } })), [])
+  const [uncertainId, setUncertainId] = useState<string | null>(null)
+  const reconcileRead = useRef<{ id: string; context: string } | null>(null)
   const [transactions, setTransactions] = useState<TransactionItem[]>([])
   const [totalsByCurrency, setTotalsByCurrency] = useState<Record<string, number>>({})
   const [accounts, setAccounts] = useState<AccountItem[]>([])
@@ -102,6 +120,12 @@ export function TransactionManagementPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
+  const [loadedContext, setLoadedContext] = useState<string | null>(null)
+  const rowContext = `${contextKey}/${reloadGeneration}`
+  const lookupContext = `${currentHousehold?.id}/${currentHousehold?.role}`
+  const [loadedLookups, setLoadedLookups] = useState<string | null>(null)
+  const [lookupErrors, setLookupErrors] = useState<string[]>([])
+  const [lookupGeneration, setLookupGeneration] = useState(0)
 
   useEffect(() => {
     // Only accepted URL changes reach this effect. Typing a draft filter never
@@ -126,12 +150,14 @@ export function TransactionManagementPage() {
       if (!isCurrent) return
       setAccounts(accountItems)
       setCategories(categoryItems)
+      setLoadedLookups(lookupContext)
+      setLookupErrors([])
       setFilters(current => resolveFilterCategory(current, categoryItems))
     }).catch(error => {
-      if (isCurrent) setErrors(getErrorMessages(error))
+      if (isCurrent) { setLoadedLookups(null); setLookupErrors(getErrorMessages(error)) }
     })
     return () => { isCurrent = false }
-  }, [currentHousehold])
+  }, [currentHousehold, lookupContext, lookupGeneration])
 
   useEffect(() => {
     if (!currentHousehold) return
@@ -149,6 +175,10 @@ export function TransactionManagementPage() {
       .then(result => {
         if (!isCurrent) return
         setTransactions(result.items)
+        setLoadedContext(rowContext)
+        if (reconcileRead.current?.context === contextKey) {
+          recordOutcome(reconcileRead.current.id, 'reloaded'); reconcileRead.current = null; setUncertainId(null)
+        }
         setTotalsByCurrency(result.totalsByCurrency)
         setTotalsUnavailable(false)
         setPagination({
@@ -168,7 +198,7 @@ export function TransactionManagementPage() {
         if (isCurrent) setIsLoading(false)
       })
     return () => { isCurrent = false }
-  }, [appliedQuery, currentHousehold, reloadGeneration, location.error])
+  }, [appliedQuery, currentHousehold, reloadGeneration, location.error, rowContext, contextKey, recordOutcome])
 
   const isEditDirty = editRequest !== null && editBaseline !== null &&
     JSON.stringify(editRequest) !== JSON.stringify(editBaseline)
@@ -199,6 +229,20 @@ export function TransactionManagementPage() {
         ? categoryLabel(categories, appliedQuery.categoryId)
         : 'Selected category (unavailable)'
       : 'All categories'
+  const fresh = loadedContext === rowContext && loadedLookups === lookupContext && !isLoading && !loadFailed && !totalsUnavailable && !location.error
+  const selectedRecord = transactions.find(row => row.id === guideSelection)
+  const selectedOutcome = guideSelection ? outcomes.records[guideSelection] : undefined
+  const pendingInclusion = Object.values(inclusionStates)
+  const uncertainInclusion = Object.entries(inclusionStates).find(([, state]) => state.uncertain)?.[0]
+  useTransactionTutorialPage({ householdId: currentHousehold?.id ?? '', url: `/transactions${search}`, fresh,
+    busy: isSaving || isExporting || pendingInclusion.some(state => state.busy), dirty: isEditDirty || pendingInclusion.some(state => state.dirty),
+    uncertain: uncertainId !== null || Boolean(uncertainInclusion), pendingFilters: pendingFilterChanges,
+    selection: guideSelection, visible: Boolean(selectedRecord), canEdit: selectedRecord?.canEdit ?? false, editingId,
+    outcomeRevision: selectedOutcome?.revision ?? 0, outcomeKind: selectedOutcome?.kind ?? null,
+    attentionTarget: uncertainId ? 'transaction-task-recovery' : uncertainInclusion ? 'transaction-task-inclusion-attention' : undefined })
+  const readTutorial = useReadTutorialPage(fresh && !isExporting && !isEditDirty && !pendingFilterChanges,
+    isExporting ? 'Preparing your requested download…' : pendingFilterChanges ? 'Apply your filter changes before continuing.'
+      : isEditDirty ? 'Exit the guide and finish your unsaved transaction edit first.' : undefined)
 
   if (!currentHousehold) return null
 
@@ -274,6 +318,7 @@ export function TransactionManagementPage() {
   const retrySearch = () => {
     if (!confirmNavigation()) return
     cancelEditing()
+    if (uncertainId) reconcileRead.current = { id: uncertainId, context: contextKey }
     setReloadGeneration(current => current + 1)
   }
 
@@ -297,7 +342,7 @@ export function TransactionManagementPage() {
 
   const handleSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!editingId || !editRequest) return
+    if (!editingId || !editRequest || isSaving || uncertainId) return
     if (!editRequest.description.trim()) {
       setErrors(['Description is required.'])
       return
@@ -319,13 +364,17 @@ export function TransactionManagementPage() {
     try {
       await updateTransaction(currentHousehold.id, editingId, normalizedRequest)
       if (!stillInContext()) return
+      recordOutcome(editingId, 'saved')
       cancelEditing()
       try { await refreshSavedTransaction(editingId) }
       catch {
         if (stillInContext()) setErrors(['Transaction saved, but the list could not be refreshed. Retry the search before comparing totals.'])
       }
     } catch (error) {
-      if (stillInContext()) setErrors(getErrorMessages(error))
+      if (stillInContext()) {
+        setErrors(getErrorMessages(error))
+        if (transactionGuideActive && !(error instanceof ApiError && [400, 422].includes(error.status))) setUncertainId(editingId)
+      }
     } finally {
       if (stillInContext()) setIsSaving(false)
     }
@@ -380,7 +429,7 @@ export function TransactionManagementPage() {
   )
 
   return (
-    <PageFrame contentClassName="transaction-content">
+    <PageFrame contentClassName="transaction-content" footer={<><div id="read-tutorial-guide-host" /><div id="transaction-tutorial-guide-host" /><div id="categorization-tutorial-guide-host" /></>}>
         <TransactionsSectionNav />
         <div className="page-title-row">
           <div>
@@ -394,7 +443,19 @@ export function TransactionManagementPage() {
         </div>
 
         <ContextualHelp topic="scope-privacy" />
-        <ErrorSummary errors={errors} />
+        {lookupErrors.length > 0 && <section role="alert" className="error-summary">
+          {lookupErrors.map(error => <p key={error}>{error}</p>)}
+          <button type="button" data-tutorial-id="read-tour-reload" onClick={() => setLookupGeneration(current => current + 1)}>Retry account and category choices</button>
+        </section>}
+        {uncertainId ? <section role="alert" className="error-summary" data-tutorial-id="transaction-task-recovery">
+          <p>The save result is uncertain. Check saved data before another correction.</p>
+          {errors.map(error => <p key={error}>{error}</p>)}
+          <button type="button" disabled={isLoading} onClick={retrySearch}>Check saved transaction</button>
+        </section> :
+        readTutorial && errors.length > 0 ? <section role="alert" className="error-summary">
+          {errors.map(error => <p key={error}>{error}</p>)}
+          <button type="button" data-tutorial-id="read-tour-reload" onClick={retrySearch}>Retry search</button>
+        </section> : <ErrorSummary errors={errors} />}
 
         {reportContext && <aside className="transaction-report-context" aria-label="Annual report context">
           <strong>{matchesReport ? 'Annual overview drill-down'
@@ -421,18 +482,18 @@ export function TransactionManagementPage() {
           appliedFilters={appliedFilters} pendingFilterChanges={pendingFilterChanges}
           onApply={applySavedFilters} disabled={isLoading} needsCorrection={presetNeedsCorrection} />
 
-        <form className="transaction-filter-panel" onSubmit={handleApplyFilters}>
+        <form className="transaction-filter-panel" data-tutorial-id="transaction-tour-form" onSubmit={handleApplyFilters}>
           <div className="transaction-filter-grid">
             <label><span>Currency</span>
-              <input value={filters.currency} maxLength={3} placeholder="All currencies"
+              <input data-tutorial-id="transaction-tour-currency" value={filters.currency} maxLength={3} placeholder="All currencies"
                 onChange={event => setFilters({ ...filters, currency: event.target.value.toUpperCase() })} />
             </label>
-            <label className="checkbox-row"><input type="checkbox" checked={filters.spendingOnly}
+            <label className="checkbox-row"><input data-tutorial-id="transaction-tour-spending" type="checkbox" checked={filters.spendingOnly}
               onChange={event => setFilters({ ...filters, spendingOnly: event.target.checked })} />
               Spending only (includes expense refunds)</label>
             <label>
               <span>Budget inclusion</span>
-              <select value={filters.budgetInclusion} onChange={event =>
+              <select data-tutorial-id="transaction-tour-inclusion" value={filters.budgetInclusion} onChange={event =>
                 setFilters({ ...filters, budgetInclusion: event.target.value })}>
                 <option value="">All visible transactions</option>
                 <option value="Personal">My personal budget (including shared expenses)</option>
@@ -443,7 +504,7 @@ export function TransactionManagementPage() {
             </label>
             <label>
               <span>Account</span>
-              <select value={filters.accountId} onChange={event =>
+              <select data-tutorial-id="transaction-tour-account" value={filters.accountId} onChange={event =>
                 setFilters({ ...filters, accountId: event.target.value })}>
                 <option value="">All visible accounts</option>
                 {filters.accountId && !accounts.some(account => account.id === filters.accountId) &&
@@ -455,7 +516,7 @@ export function TransactionManagementPage() {
             </label>
             <label>
               <span>Date filter</span>
-              <select value={filters.dateMode} onChange={event =>
+              <select data-tutorial-id="transaction-tour-date-mode" value={filters.dateMode} onChange={event =>
                 setFilters({ ...filters, dateMode: event.target.value as DateFilterMode })}>
                 <option value="pastDays">Past X days</option>
                 <option value="specificDate">Specific date</option>
@@ -467,7 +528,7 @@ export function TransactionManagementPage() {
             {filters.dateMode === 'pastDays' && (
               <label>
                 <span>Number of days</span>
-                <input type="number" min="1" max="3650" step="1" required
+                <input data-tutorial-id="transaction-tour-days" type="number" min="1" max="3650" step="1" required
                   value={filters.pastDays} onChange={event =>
                     setFilters({ ...filters, pastDays: event.target.value })} />
               </label>
@@ -475,14 +536,14 @@ export function TransactionManagementPage() {
             {filters.dateMode === 'specificDate' && (
               <label>
                 <span>Date</span>
-                <input type="date" required value={filters.specificDate} onChange={event =>
+                <input data-tutorial-id="transaction-tour-date" type="date" required value={filters.specificDate} onChange={event =>
                   setFilters({ ...filters, specificDate: event.target.value })} />
               </label>
             )}
             {filters.dateMode === 'specificMonth' && (
               <label>
                 <span>Month</span>
-                <input type="month" required value={filters.specificMonth} onChange={event =>
+                <input data-tutorial-id="transaction-tour-month" type="month" required value={filters.specificMonth} onChange={event =>
                   setFilters({ ...filters, specificMonth: event.target.value })} />
               </label>
             )}
@@ -490,19 +551,19 @@ export function TransactionManagementPage() {
               <>
                 <label>
                   <span>From</span>
-                  <input type="date" required value={filters.fromDate} onChange={event =>
+                  <input data-tutorial-id="transaction-tour-from" type="date" required value={filters.fromDate} onChange={event =>
                     setFilters({ ...filters, fromDate: event.target.value })} />
                 </label>
                 <label>
                   <span>To</span>
-                  <input type="date" required value={filters.toDate} onChange={event =>
+                  <input data-tutorial-id="transaction-tour-to" type="date" required value={filters.toDate} onChange={event =>
                     setFilters({ ...filters, toDate: event.target.value })} />
                 </label>
               </>
             )}
             <label>
               <span>Category type</span>
-              <select value={filters.categoryType} onChange={event => setFilters({
+              <select data-tutorial-id="transaction-tour-type" value={filters.categoryType} onChange={event => setFilters({
                 ...filters,
                 categoryType: event.target.value as CategoryType | '',
                 categoryId: '',
@@ -516,7 +577,7 @@ export function TransactionManagementPage() {
             </label>
             <label>
               <span>Category</span>
-              <select value={filters.categoryId} onChange={event => setFilters({
+              <select data-tutorial-id="transaction-tour-category" value={filters.categoryId} onChange={event => setFilters({
                 ...filters,
                 categoryId: event.target.value,
                 subcategoryId: '',
@@ -538,7 +599,7 @@ export function TransactionManagementPage() {
             </label>
             <label>
               <span>Subcategory</span>
-              <select value={filters.subcategoryId} disabled={
+              <select data-tutorial-id="transaction-tour-subcategory" value={filters.subcategoryId} disabled={
                 !filters.categoryId ||
                 filters.categoryId === uncategorizedFilterValue
               }
@@ -555,27 +616,27 @@ export function TransactionManagementPage() {
             </label>
             <label className="transaction-description-filter">
               <span>Description contains</span>
-              <input maxLength={250} value={filters.description} onChange={event =>
+              <input data-tutorial-id="transaction-tour-description" maxLength={250} value={filters.description} onChange={event =>
                 setFilters({ ...filters, description: event.target.value })}
                 placeholder="Merchant or description" />
             </label>
           </div>
           <div className="transaction-filter-actions">
-            <button className="primary-button" type="submit" disabled={isLoading}>
+            <button data-tutorial-id="transaction-tour-apply" className="primary-button" type="submit" disabled={isLoading}>
               {isLoading ? 'Searching...' : 'Apply filters'}
             </button>
-            <button className="secondary-button" type="button" disabled={isLoading}
+            <button data-tutorial-id="transaction-tour-reset" className="secondary-button" type="button" disabled={isLoading}
               onClick={handleResetFilters}>
               Reset filters
             </button>
-            <button className="secondary-button" type="button"
+            <button data-tutorial-id="transaction-tour-export" className="secondary-button" type="button"
               disabled={isLoading || isExporting || Boolean(location.error)} onClick={() => void handleExport()}>
               {isExporting ? 'Preparing export...' : 'Export matching transactions'}
             </button>
           </div>
         </form>
 
-        <section className="transaction-active-filters" aria-label={reportContext ? 'Active report filters' : 'Active transaction filters'}>
+        <section className="transaction-active-filters" data-tutorial-id="transaction-tour-active" aria-label={reportContext ? 'Active report filters' : 'Active transaction filters'}>
           <h2>Active filters</h2>
           <dl>
             <div><dt>Household</dt><dd>{currentHousehold.name}</dd></div>
@@ -611,7 +672,7 @@ export function TransactionManagementPage() {
           <button className="secondary-button" type="button" onClick={retrySearch}>Retry search</button>
         </div>}
         {!isLoading && !loadFailed && !totalsUnavailable && <section className="transaction-matching-totals"
-          aria-label="Matching totals across all pages" aria-live="polite">
+          aria-label="Matching totals across all pages" aria-live="polite" data-tutorial-id="transaction-tour-totals">
           <h2>Matched amount</h2>
           <p>All {pagination.totalCount} matching transactions, across every page.</p>
           <div>{Object.entries(totalsByCurrency).sort(([a], [b]) => a.localeCompare(b))
@@ -624,10 +685,31 @@ export function TransactionManagementPage() {
         </section>}
 
         {!isLoading && !loadFailed && (
-          <p className="transaction-result-summary">
+          <p className="transaction-result-summary" data-tutorial-id="transaction-tour-count">
             Showing {firstResult}–{lastResult} of {pagination.totalCount} matching transactions
           </p>
         )}
+
+        {transactionGuideActive && <section className="transaction-filter-panel" data-tutorial-id="transaction-task-picker">
+          <label><span>Transaction to review</span><select value={guideSelection ?? ''} disabled={!fresh || isSaving || Boolean(uncertainId) || Boolean(uncertainInclusion)}
+            onChange={event => {
+              if (!confirmNavigation()) return
+              cancelEditing(); setGuideSelection(event.target.value || null)
+            }}>
+            <option value="">Choose a transaction…</option>
+            <option value="review">Review results without editing</option>
+            {guideSelection && guideSelection !== 'review' && !selectedRecord && <option value={guideSelection}>Selected record—not in this result page</option>}
+            {transactions.map(row => <option key={row.id} value={row.id}>{row.transactionDate} · {row.description} · {row.currency} {row.amount}{row.canEdit ? '' : ' · Read only'}</option>)}
+          </select></label>
+          <p>Choosing a record does not change it. Use the page’s normal Edit and Save controls only if a correction is needed.</p>
+        </section>}
+        {transactionGuideActive && <section className="transaction-active-filters" data-tutorial-id="transaction-task-outcome" aria-live="polite">
+          <h2>Selected transaction result</h2>
+          {selectedOutcome?.kind === 'saved' ? <p>Save confirmed. {selectedRecord ? 'Check the current saved values below.' : 'The record is no longer in this result page. Broaden the search to inspect it.'}</p>
+            : selectedOutcome?.kind === 'reloaded' ? <p>Saved results reloaded. Check actual values; this does not prove the original request succeeded.</p>
+              : <p>No saved correction is required to review a correct record. Keep its saved values unchanged.</p>}
+          {!fresh && <p>Current results are not verified yet. Retry the failed read before comparing.</p>}
+        </section>}
 
         {loadFailed ? (
           <div className="empty-state">
@@ -647,6 +729,7 @@ export function TransactionManagementPage() {
             {transactions.map(transaction => (
               <Fragment key={transaction.id}>
                 <article
+                  data-tutorial-id={transaction.id === guideSelection ? 'transaction-task-record' : undefined}
                   className={`transaction-row${transaction.isVoided ? ' transaction-row-voided' : ''}`}
                 >
                   <div className="transaction-date">
@@ -674,20 +757,24 @@ export function TransactionManagementPage() {
 
                 <BudgetInclusionEditor key={transaction.id} householdId={currentHousehold.id}
                   transaction={transaction} disabled={editingId === transaction.id}
-                  onSaved={() => refreshSavedTransaction(transaction.id)} />
+                  onStateChange={transactionGuideActive ? observeInclusion : undefined}
+                  tutorialTargetId={transaction.id === uncertainInclusion ? 'transaction-task-inclusion-attention' : undefined}
+                  onSaved={async reason => {
+                    const stillInContext = captureContext()
+                    if (!stillInContext()) throw new Error('The transaction context changed. Reload the current search before editing.')
+                    if (reason !== 'reload') recordOutcome(transaction.id, 'saved')
+                    await refreshSavedTransaction(transaction.id)
+                    if (reason === 'reload' && stillInContext()) recordOutcome(transaction.id, 'reloaded')
+                  }} />
 
                 {editingId === transaction.id && editRequest && (
-                  <form className="transaction-edit-form transaction-inline-edit"
+                  <form className="transaction-edit-form transaction-inline-edit" data-tutorial-id={transaction.id === guideSelection ? 'transaction-task-editor' : undefined}
                     onSubmit={(event) => void handleSave(event)}>
                     <div className="page-title-row">
                       <div>
                         <p className="eyebrow">Edit transaction</p>
                         <h2>{transaction.description}</h2>
                       </div>
-                      <button className="text-button" type="button"
-                        onClick={() => void confirmDiscardEdit()}>
-                        Cancel
-                      </button>
                     </div>
 
                     <div className="transaction-edit-grid">
@@ -709,7 +796,7 @@ export function TransactionManagementPage() {
                       </label>
                       <label>
                         <span>Amount</span>
-                        <input type="number" step="0.0001" required value={editRequest.amount}
+                        <input aria-label="Amount" type="number" step="0.0001" required value={editRequest.amount}
                           onChange={event => setEditRequest({
                             ...editRequest,
                             amount: event.target.valueAsNumber,
@@ -779,12 +866,16 @@ export function TransactionManagementPage() {
                       </label>
                     </div>
 
-                    <p>Budget inclusion is edited separately using “Include in budgets”.
+                    <p data-tutorial-id={transaction.id === guideSelection ? 'transaction-task-effects' : undefined}>Budget inclusion is edited separately using “Include in budgets”.
                       Financial corrections affect every budget that includes this transaction.</p>
 
-                    <button className="primary-button" type="submit" disabled={isSaving}>
+                    <div className="transaction-filter-actions" data-tutorial-id={transaction.id === guideSelection ? 'transaction-task-save' : undefined}>
+                    <button className="text-button" type="button" disabled={isSaving}
+                      onClick={() => void confirmDiscardEdit()}>Cancel</button>
+                    <button className="primary-button" type="submit" disabled={isSaving || Boolean(uncertainId)}>
                       {isSaving ? 'Saving...' : 'Save transaction'}
                     </button>
+                    </div>
                   </form>
                 )}
               </Fragment>

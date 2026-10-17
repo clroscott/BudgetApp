@@ -2,8 +2,10 @@ import { ImportBatchControls } from '../imports/ImportBatchControls'
 import { ImportReversalPreviewPanel } from '../imports/ImportReversalPreviewPanel'
 import { useImportDraftCache, useImportReviewGuard } from '../imports/useImportDraftCache'
 import { useImportTutorialPage } from '../tutorials/useImportTutorialPage'
+import { useReadTutorialPage } from '../tutorials/readTutorialState'
 import { DraftRow } from '../imports/ImportDraftRow'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { TutorialContext } from '../tutorials/tutorialContext'
 import { getErrorMessages } from '../auth/errorMessages'
 import { ApiError } from '../api/apiClient'
 import { useReadOwner } from '../api/useReadOwner'
@@ -52,6 +54,7 @@ type RuleApplicationMode = 'fill' | 'reapply'
 const emptyDrafts: ImportDraftItem[] = []
 
 export function ImportReviewPage() {
+  const recoveryTutorial = useContext(TutorialContext)?.activeTutorial?.key === 'fix-mistaken-import'
   const { currentHousehold } = useHouseholds()
   const { search, navigate, confirmNavigation } = useRouter()
   const selection = useMemo(() => readImportReviewLocation(search), [search])
@@ -75,6 +78,7 @@ export function ImportReviewPage() {
   const [isReversing, setIsReversing] = useState(false)
   useUnsavedChangesGuard(isReversing, 'Import undo is still running. Leaving will not cancel it. Leave and check its saved status later?')
   const [isDiscarding, setIsDiscarding] = useState(false)
+  const [discardedImportId, setDiscardedImportId] = useState<string | null>(null)
   const [applyingRuleMode, setApplyingRuleMode] =
     useState<RuleApplicationMode | null>(null)
   const [rulePreview, setRulePreview] =
@@ -330,13 +334,18 @@ export function ImportReviewPage() {
   const mutationBusy = isReversing || isSavingAll || isCompleting || isDiscarding || isCheckingDuplicates || isRemovingDraft ||
     bulkDecision !== null || applyingRuleMode !== null || busyDraftIds.size > 0
   const bulkActionsBusy = isLoading || writeNeedsReload || !categoryLoad.isFresh || (Boolean(selectedImportId) && !detailLoad.isFresh) || mutationBusy
+  useReadTutorialPage(listLoad.isFresh && categoryLoad.isFresh && (!selectedImportId || detailLoad.isFresh)
+    && !hasUnsavedRows && !hasDirtyRules && !mutationBusy && !writeNeedsReload,
+    hasUnsavedRows || hasDirtyRules ? 'Resolve your existing unsaved import corrections outside this read-only guide before continuing.' : undefined)
 
   useImportTutorialPage(householdId ? {
-    page: 'review', householdId, importId: selectedImportId,
-    fresh: detailLoad.isFresh && detail?.id === selectedImportId && detail.loadedHouseholdId === householdId && !writeNeedsReload,
+    page: 'review', householdId, importId: selectedImportId, url: `/imports/review${search}`, rulesFresh: rulePreviewLoad.isFresh,
+    listFresh: listLoad.isFresh && categoryLoad.isFresh, uncertain: writeNeedsReload, discardedImportId,
+    fresh: detailLoad.isFresh && categoryLoad.isFresh && detail?.id === selectedImportId && detail.loadedHouseholdId === householdId && !writeNeedsReload,
     canEdit: detail?.canEdit ?? false, status: detail?.status ?? '',
     busy: mutationBusy || isRefreshingSelected, dirty: hasUnsavedRows || hasDirtyRules,
     pendingRows, approvedRows: detail?.approvedRows ?? 0, totalRows: detail?.totalRows ?? 0,
+    invalidRows: detail?.invalidRows, duplicateRows: detail?.duplicateRows,
   } : null)
 
   const handleWriteError = useCallback((error: unknown) => {
@@ -575,6 +584,7 @@ export function ImportReviewPage() {
     try {
       await discardImport(currentHousehold.id, detail.id)
       if (!isSelectedContextCurrent()) return
+      setDiscardedImportId(detail.id)
       setDetail(null)
       setDraftPage(1)
       clearDrafts()
@@ -583,7 +593,7 @@ export function ImportReviewPage() {
     } catch (error) {
       handleWriteError(error)
     } finally {
-      if (isSelectedContextCurrent()) setIsDiscarding(false)
+      setIsDiscarding(false)
     }
   }
 
@@ -631,7 +641,7 @@ export function ImportReviewPage() {
         <section className="import-file-picker" aria-labelledby="import-file-heading" data-tutorial-id="import-file-picker">
           <div className="import-section-heading">
             <h2 id="import-file-heading">Choose an uploaded file</h2>
-            {listLoad.isFresh && <button className="text-button" type="button"
+            {listLoad.isFresh && <button data-tutorial-id="import-tour-refresh" className="text-button" type="button"
               onClick={() => void refreshList(currentHousehold.id)}>Refresh import list</button>}
           </div>
           <p className="field-help">Find an upload here, then review the transactions inside it below.</p>
@@ -640,7 +650,7 @@ export function ImportReviewPage() {
           <div className="import-selector-row">
             <label className="import-selector">
               <span>File status</span>
-              <select value={importFilter} disabled={mutationBusy} onChange={event => {
+              <select data-tutorial-id="import-tour-status" value={importFilter} disabled={mutationBusy} onChange={event => {
                 const filter = event.target.value as ImportListFilter
                 if (filter === importFilter || !confirmNavigation()) return
                 // An intentional filter change opens a matching file. Ordinary
@@ -659,7 +669,7 @@ export function ImportReviewPage() {
             </label>
             <label className="import-selector">
               <span>Uploaded file</span>
-              <select value={selectedImportId} disabled={listLoad.isPending || mutationBusy}
+              <select data-tutorial-id="import-tour-file" value={selectedImportId} disabled={listLoad.isPending || mutationBusy}
                 onChange={event => {
                   const id = event.target.value
                   if (id === selectedImportId || !confirmNavigation()) return
@@ -683,12 +693,12 @@ export function ImportReviewPage() {
           </div>
 
           {importList && importList.totalPages > 1 && <nav className="import-pagination" aria-label="Import files">
-            <button className="secondary-button" type="button" disabled={!listLoad.hasData || listLoad.isPending || importPage <= 1 || mutationBusy}
+            <button data-tutorial-id="import-tour-previous" className="secondary-button" type="button" disabled={!listLoad.hasData || listLoad.isPending || importPage <= 1 || mutationBusy}
               onClick={() => { if (confirmNavigation()) setImportPage(current => current - 1) }}>Previous files</button>
             <span role="status">{listLoad.hasData
               ? `File page ${importList.page} of ${importList.totalPages} · ${importList.totalCount} matching files`
               : listLoad.isPending ? 'Loading file page…' : 'File page unavailable'}</span>
-            <button className="secondary-button" type="button" disabled={!listLoad.hasData || listLoad.isPending || importPage >= importList.totalPages || mutationBusy}
+            <button data-tutorial-id="import-tour-next" className="secondary-button" type="button" disabled={!listLoad.hasData || listLoad.isPending || importPage >= importList.totalPages || mutationBusy}
               onClick={() => { if (confirmNavigation()) setImportPage(current => current + 1) }}>Next files</button>
           </nav>}
           {listLoad.isFresh && importList && importList.totalPages <= 1 &&
@@ -712,7 +722,7 @@ export function ImportReviewPage() {
         ) : (detailLoad.hasData || detailLoad.isPending && detail?.id === selectedImportId &&
           detail.loadedHouseholdId === householdId) && detail && (
           <>
-            <section className="import-review-summary">
+            <section className="import-review-summary" data-tutorial-id="import-review-summary">
               <div className="import-section-heading">
                 <div>
                   <p className="eyebrow">{detail.status}</p>
@@ -891,6 +901,16 @@ export function ImportReviewPage() {
         )}
         </div>
         <div id="import-tutorial-guide-host" />
+        <div id="read-tutorial-guide-host" />
+        <div id="categorization-tutorial-guide-host" />
+        {recoveryTutorial && <section data-tutorial-id="import-recovery-result" aria-live="polite">
+          <h2>Recovery status</h2>
+          <p>Check the chosen file’s saved status. An uncertain result needs a fresh read before another action.</p>
+          {completionMessage && <p>{completionMessage}</p>}
+          {discardedImportId && <p>Staged import discard confirmed. Its staging cannot be restored; no official transactions were removed by discarding it.</p>}
+        </section>}
+        <div id="import-recovery-guide-host" />
+        <div id="import-problems-guide-host" />
     </PageFrame>
   )
 }

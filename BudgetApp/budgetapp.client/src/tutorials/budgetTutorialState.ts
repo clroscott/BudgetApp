@@ -24,6 +24,7 @@ export interface BudgetTutorialPage {
   breakdownDetailed: boolean
   hasSecondCategory: boolean
   hasThirdCategory: boolean
+  copySource?: string
 }
 export interface BudgetTutorialTask {
   householdId: string

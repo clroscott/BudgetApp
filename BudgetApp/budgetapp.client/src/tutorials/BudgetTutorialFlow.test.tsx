@@ -120,7 +120,7 @@ describe('guided monthly planning on the real budget page', () => {
       fireEvent.click(screen.getByRole('link', { name: 'Leave budget page' }))
     }
     expect(window.location.pathname).toBe('/tutorials')
-    fireEvent.click(screen.getByRole('button', { name: 'Replay tutorial' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Replay Quick monthly' }))
     await screen.findByRole('heading', { name: 'Choose your month' })
     assertNoWrites()
   })

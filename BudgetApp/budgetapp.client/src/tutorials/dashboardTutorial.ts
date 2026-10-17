@@ -1,0 +1,25 @@
+import type { TutorialDefinition } from './tutorialDefinitions'
+export const dashboardTutorial: TutorialDefinition = {
+  key: 'customize-dashboard', version: 1, kind: 'GuidedSetup', title: 'Customize your Dashboard', resumeBehavior: 'restart',
+  description: 'Choose useful cards and a comfortable layout, without changing financial records.', estimatedMinutes: 4,
+  steps: [
+    { title: 'Make this dashboard yours', targetId: 'dashboard-tour-open', fallbackTargetIds: ['dashboard-tour-editor'],
+      body: 'Open Customize dashboard. This changes your own layout for this household—not anyone’s financial data. Already customizing? Keep your current choices and continue.',
+      details: 'The saved layout belongs to your user and selected household. Starting or replaying the guide never resets cards or changes preferences. Nothing is saved until you choose a normal page action.' },
+    { title: 'Choose useful cards', targetId: 'dashboard-tour-add', fallbackTargetIds: ['dashboard-welcome'],
+      body: 'Add a useful card, or keep the cards you already have. Remove hides a card from this dashboard; it does not delete accounts, budgets or transactions.',
+      details: 'An empty dashboard is allowed. If every card is already shown, there is nothing to add. You do not have to invent a layout change to complete this guide.' },
+    { title: 'Put the important cards first', targetId: 'dashboard-tour-order', fallbackTargetIds: ['dashboard-tour-add', 'dashboard-welcome'],
+      body: 'Use Earlier or Later to move a card, or drag on a suitable screen. Already happy with the order? Continue without changing it.',
+      details: 'Keyboard buttons provide the same reorder operation as dragging. Changes stay in the editor until saved; the guide never moves a card for you.' },
+    { title: 'Choose desktop columns', targetId: 'dashboard-tour-columns', fallbackTargetIds: ['dashboard-welcome'],
+      body: 'Choose two, three or four desktop columns if useful. Smaller screens still stack cards to fit. These are layout preferences, not changes to financial totals.',
+      details: 'Card widths respond to available space. This page does not offer arbitrary per-card resizing. Keep the current column count if it suits you.' },
+    { title: 'Save—or keep the current layout', targetId: 'dashboard-tour-save', fallbackTargetIds: ['dashboard-welcome'],
+      body: 'Choose Save layout to keep your changes. If you changed nothing, Cancel keeps the existing layout. Reset to default is optional and saves a reset—not a tutorial requirement.',
+      details: 'Save and Reset are real preference writes. Cancel retains the previously saved preferences and asks before discarding dirty edits. The guide waits for a confirmed saved/read state and never saves, resets or cancels automatically.' },
+    { title: 'Your dashboard is ready', targetId: 'dashboard-welcome',
+      body: 'Your saved layout is ready. Continue to Dashboard closes this guide and leaves you here. Return to tutorials opens the tutorial list.',
+      details: 'You can customize again later. Finishing saves tutorial progress only. Replay starts from your current layout, not defaults, and never repeats a previous save or reset.' },
+  ].map(step => ({ ...step, route: '/dashboard', advance: 'outcome' as const })),
+}

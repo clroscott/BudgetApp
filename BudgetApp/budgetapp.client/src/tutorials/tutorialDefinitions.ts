@@ -1,5 +1,20 @@
 import { importTutorialDefinition } from './importTutorialDefinition'
 import { budgetTutorialDefinition } from './budgetTutorialDefinition'
+import { annualOverviewTutorial } from './annualOverviewTutorial'
+import { activityTutorial } from './activityTutorial'
+import { exportTutorial } from './exportTutorial'
+import { dashboardTutorial } from './dashboardTutorial'
+import { recurringTutorial } from './recurringTutorial'
+import { totalsTutorial } from './totalsTutorial'
+import { profileTutorial } from './profileTutorial'
+import { setupTutorial } from './setupTutorial'
+import { invitationTutorial } from './invitationTutorial'
+import { transactionTutorial } from './transactionTutorial'
+import { categorizationTutorial } from './categorizationTutorial'
+import { importRecoveryTutorial } from './importRecoveryTutorial'
+import { importProblemsTutorial } from './importProblemsTutorial'
+import { lifecycleTutorial } from './lifecycleTutorial'
+import { annualBudgetTutorial } from './annualBudgetTutorial'
 
 export type TutorialAdvance = 'next' | 'click' | 'outcome'
 export type TutorialKind = 'LearnOnly' | 'GuidedSetup' | 'GuidedFinancialTask'
@@ -16,6 +31,8 @@ export interface TutorialStep {
   advance: TutorialAdvance
   // Guided recovery can skip informational steps only, never required actions.
   canSkipWhenUnavailable?: boolean
+  // Explicit stable IDs of safe read controls, never a whole form wildcard.
+  readControls?: readonly string[]
 }
 
 export interface TutorialDefinition {
@@ -27,6 +44,8 @@ export interface TutorialDefinition {
   estimatedMinutes: number
   // Default: resume at the saved step. Tasks without persisted context restart.
   resumeBehavior?: 'step' | 'restart'
+  presentation?: 'read-companion'
+  continueLabel?: string
   steps: TutorialStep[]
 }
 
@@ -100,6 +119,21 @@ export const tutorialDefinitions: TutorialDefinition[] = [
   },
   importTutorialDefinition,
   budgetTutorialDefinition,
+  annualOverviewTutorial,
+  activityTutorial,
+  exportTutorial,
+  dashboardTutorial,
+  recurringTutorial,
+  totalsTutorial,
+  profileTutorial,
+  setupTutorial,
+  invitationTutorial,
+  transactionTutorial,
+  categorizationTutorial,
+  importRecoveryTutorial,
+  importProblemsTutorial,
+  lifecycleTutorial,
+  annualBudgetTutorial,
 ]
 
 export const tutorialByKey = new Map(

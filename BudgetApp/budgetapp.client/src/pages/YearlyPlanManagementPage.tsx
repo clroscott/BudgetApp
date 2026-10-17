@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import {
   getBudgetMonthOptions,
@@ -22,6 +22,9 @@ import { ContextualHelp } from '../components/ContextualHelp'
 import { helpWarnings } from '../help/helpTopics'
 import { AppLink } from '../routing/AppLink'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
+import { useAnnualTutorialPage } from '../tutorials/annualTutorialState'
+import { ApiError } from '../api/apiClient'
+import { TutorialContext } from '../tutorials/tutorialContext'
 
 type SectionMode = 'overall' | 'detailed'
 type Amounts = Record<string, string>
@@ -84,21 +87,26 @@ function planPeriod(startYear: number, startMonth: number) {
 
 export function YearlyPlanManagementPage() {
   const { currentHousehold } = useHouseholds()
-  const [year, setYear] = useState(new Date().getFullYear())
-  const [scope, setScope] = useState<BudgetScope>('Household')
+  const tutorial = useContext(TutorialContext)
+  const selection = tutorial?.annualGuide?.selection ?? tutorial?.lifecycleGuide?.annualSelection
+  const [year, setYear] = useState(() => selection?.year ?? new Date().getFullYear())
+  const [scope, setScope] = useState<BudgetScope>(() => selection?.scope ?? 'Household')
   const [plan, setPlan] = useState<YearlyPlanData | null>(null)
   const [budgetOptions, setBudgetOptions] = useState<BudgetMonthOption[]>([])
   const [amounts, setAmounts] = useState<Amounts>({})
   const [modes, setModes] = useState<Modes>({})
   const [savedSnapshot, setSavedSnapshot] = useState('')
-  const [planStartMonth, setPlanStartMonth] = useState(1)
+  const [planStartMonth, setPlanStartMonth] = useState(() => selection?.startMonth ?? 1)
   const [savedPlanStartMonth, setSavedPlanStartMonth] = useState(1)
   const [selectedPeriods, setSelectedPeriods] = useState<Set<string>>(new Set())
   const [replaceDrafts, setReplaceDrafts] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [notice, setNotice] = useState<string | null>(null)
-  const loadState = usePageLoad(`${currentHousehold?.id}/${year}/${scope}`)
+  const [writeUncertain, setWriteUncertain] = useState(false)
+  const [allocationEvidence, setAllocationEvidence] = useState({ revision: 0, key: '', periods: [] as string[], replaces: false, replaced: 0 })
+  const annualKey = `${currentHousehold?.id}/${year}/${planStartMonth}/${scope}`
+  const loadState = usePageLoad(`${currentHousehold?.id}/${currentHousehold?.role}/${year}/${scope}`)
   const { run, markReady, invalidate } = loadState
 
   const currentSnapshot = useMemo(() => snapshot(amounts), [amounts])
@@ -107,7 +115,7 @@ export function YearlyPlanManagementPage() {
   const confirmDiscard = useUnsavedChangesGuard(
     isDirty, 'Discard your unsaved annual targets or plan-period changes?',
   )
-  const canManage = currentHousehold?.role !== 'Viewer' && loadState.isFresh && !isSaving
+  const canManage = currentHousehold?.role !== 'Viewer' && loadState.isFresh && !isSaving && !writeUncertain
 
   const applyPlan = useCallback((data: YearlyPlanData) => {
     const state = stateFromPlan(data)
@@ -117,6 +125,7 @@ export function YearlyPlanManagementPage() {
     setSavedSnapshot(snapshot(state.amounts))
     setPlanStartMonth(data.fiscalYearStartMonth)
     setSavedPlanStartMonth(data.fiscalYearStartMonth)
+    setWriteUncertain(false)
     setSelectedPeriods(new Set(
       fiscalMonths(data, data.fiscalYearStartMonth).map(fiscalPeriodKey),
     ))
@@ -136,6 +145,15 @@ export function YearlyPlanManagementPage() {
   }, [applyPlan, currentHousehold, scope, year, run])
 
   useEffect(() => { void load() }, [load])
+
+  const observingTutorial = Boolean(tutorial?.annualGuide || tutorial?.lifecycleGuide)
+  const currentPeriods = observingTutorial && plan ? fiscalMonths(plan, planStartMonth).map(fiscalPeriodKey) : []
+  const evidenceCurrent = allocationEvidence.key === annualKey
+  const tutorialActive = useAnnualTutorialPage(observingTutorial ? { householdId: currentHousehold?.id ?? '', year, startMonth: planStartMonth, scope, planId: plan?.id ?? null,
+    fresh: loadState.isFresh, busy: isSaving, dirty: isDirty, uncertain: writeUncertain, canManage: currentHousehold?.role !== 'Viewer', hasCategories: Boolean(plan?.categories.some(root => root.isActive)),
+    selectedPeriods: [...selectedPeriods].sort(), replaceDrafts, budgets: budgetOptions.filter(option => currentPeriods.includes(fiscalPeriodKey(option))),
+    allocationRevision: evidenceCurrent ? allocationEvidence.revision : 0, allocationPeriods: evidenceCurrent ? allocationEvidence.periods : [],
+    allocationReplaces: evidenceCurrent && allocationEvidence.replaces, allocationReplacedCount: evidenceCurrent ? allocationEvidence.replaced : 0 } : null)
 
   if (!currentHousehold) return null
 
@@ -186,13 +204,19 @@ export function YearlyPlanManagementPage() {
     setIsSaving(true)
     setErrors([])
     setNotice(null)
+    const stillCurrent = loadState.captureContext()
     try {
-      applyPlan(await saveYearlyPlan(
+      const saved = await saveYearlyPlan(
         currentHousehold.id, year, scope, planStartMonth, lines,
-      ))
+      )
+      if (!stillCurrent()) return
+      applyPlan(saved)
       setNotice('Annual targets were saved.')
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (stillCurrent()) {
+        setErrors(getErrorMessages(error))
+        if (tutorialActive && (!(error instanceof ApiError) || error.status === 0 || error.status === 409 || error.status >= 500)) setWriteUncertain(true)
+      }
     } finally {
       setIsSaving(false)
     }
@@ -239,6 +263,7 @@ export function YearlyPlanManagementPage() {
     setIsSaving(true)
     setErrors([])
     setNotice(null)
+    const stillCurrent = loadState.captureContext()
     try {
       const result = await allocateYearlyPlan(
         currentHousehold.id,
@@ -247,6 +272,9 @@ export function YearlyPlanManagementPage() {
         selected,
         replaceDrafts,
       )
+      if (!stillCurrent()) return
+      setAllocationEvidence(current => ({ revision: current.revision + 1, key: annualKey,
+        periods: selected.map(fiscalPeriodKey).sort(), replaces: replaceDrafts, replaced: result.replacedDraftCount }))
       setNotice(
         `${result.createdCount} created, ${result.replacedDraftCount} draft ` +
         `replaced, and ${result.skippedCount} skipped.`,
@@ -254,7 +282,10 @@ export function YearlyPlanManagementPage() {
       // Allocation has already succeeded. A read retry must never allocate again.
       await run(() => getBudgetMonthOptions(currentHousehold.id, scope), setBudgetOptions)
     } catch (error) {
-      setErrors(getErrorMessages(error))
+      if (stillCurrent()) {
+        setErrors(getErrorMessages(error))
+        if (tutorialActive && (!(error instanceof ApiError) || error.status === 0 || error.status === 409 || error.status >= 500)) setWriteUncertain(true)
+      }
     } finally {
       setIsSaving(false)
     }
@@ -315,9 +346,9 @@ export function YearlyPlanManagementPage() {
     0,
   )
 
-  return <PageFrame contentClassName="yearly-plan-content">
+  return <PageFrame className={tutorialActive ? 'yearly-tutorial-active' : undefined} contentClassName="yearly-plan-content" footer={<><div id="lifecycle-tutorial-guide-host" /><div id="annual-tutorial-guide-host" /></>}>
       <BudgetingSectionNav current="annual-targets" />
-      <div className="page-title-row">
+      <div className="page-title-row" data-tutorial-id="annual-tour-title">
         <div>
           <p className="eyebrow">Budgeting</p>
           <h1>Annual targets</h1>
@@ -329,11 +360,15 @@ export function YearlyPlanManagementPage() {
       </div>
 
       <ErrorSummary errors={errors} />
+      {writeUncertain && <section role="alert" className="error-summary">
+        <p>The annual save or allocation result is uncertain. Check saved targets and monthly budgets before another write. A read is not proof that the original request succeeded.</p>
+        <button type="button" disabled={isSaving || loadState.isPending} onClick={reloadPlan}>Check saved annual plan</button>
+      </section>}
       <PageLoadFeedback subject="annual targets" status={loadState.status} errors={loadState.errors}
         disabled={isSaving} onReload={reloadPlan} />
       {notice && <p className="success-message">{notice}</p>}
 
-      <section className="panel yearly-plan-controls">
+      <section className="panel yearly-plan-controls" data-tutorial-id="annual-tour-selection">
         <label>
           <span>Fiscal year starting year</span>
           <input
@@ -400,7 +435,7 @@ export function YearlyPlanManagementPage() {
       </p>
 
       {loadState.hasData && plan && (
-        <section className="yearly-target-sections">
+        <section className="yearly-target-sections" data-tutorial-id="annual-tour-targets">
           {plan.categories.length === 0 && <div className="empty-state">
             <h2>No expense categories</h2>
             <p>Add expense categories before entering annual targets.</p>
@@ -459,14 +494,14 @@ export function YearlyPlanManagementPage() {
         </section>
       )}
 
-      {loadState.isFresh && plan && <section className="panel yearly-allocation-panel">
+      {loadState.isFresh && plan && <section className="panel yearly-allocation-panel" data-tutorial-id="annual-tour-allocation">
         <div className="yearly-allocation-heading">
           <h2>Create monthly drafts</h2>
           <p>
             Annual targets are copied once. Later monthly edits never change this plan.
           </p>
         </div>
-        <div className="yearly-allocation-preview">
+        <div className="yearly-allocation-preview" data-tutorial-id="annual-tour-months">
           <div className="yearly-allocation-preview-heading">
             <div>
               <strong>Choose fiscal months</strong>
@@ -525,6 +560,11 @@ export function YearlyPlanManagementPage() {
                     className="yearly-allocation-budget-link"
                     to={`/budgeting?year=${encodeURIComponent(impact.year)}&month=${encodeURIComponent(impact.month)}&scope=${encodeURIComponent(scope)}`}
                     title={`Open the ${impact.monthLabel} ${scope.toLowerCase()} budget`}
+                    onClick={event => {
+                      if (!tutorial?.annualGuide || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+                      event.preventDefault()
+                      if (!tutorial.annualGuide.openMonthly(impact.year, impact.month)) setNotice('Month not opened. Keep the selected tutorial plan, resolve unsaved changes, or Exit to navigate normally.')
+                    }}
                   >
                     <time>{impact.monthLabel}</time>
                     <div>
@@ -557,14 +597,16 @@ export function YearlyPlanManagementPage() {
             <input
               type="checkbox"
               checked={replaceDrafts}
+              disabled={Boolean(tutorial?.annualGuide && !replaceDrafts)}
               onChange={event => setReplaceDrafts(event.target.checked)}
             />
             <span>Replace amounts in existing Draft budgets after confirmation</span>
           </label>
         </div>
+        {tutorial?.annualGuide && <p className="field-help">This guide keeps existing Drafts. Use the separate Return/replace guide for intended replacement.</p>}
         {replaceDrafts && <p className="action-consequence">{helpWarnings.replaceDrafts}</p>}
         <ContextualHelp topic="destructive-actions" />
-        <div className="yearly-allocation-submit">
+        <div className="yearly-allocation-submit" data-tutorial-id="annual-tour-allocate">
           <div>
             <strong>
               Create {selectedPeriods.size} selected monthly
@@ -588,7 +630,7 @@ export function YearlyPlanManagementPage() {
         </div>
       </section>}
 
-      {loadState.hasData && plan && <div className="yearly-save-bar" role="region" aria-label="Annual target actions">
+      {loadState.hasData && plan && <div className="yearly-save-bar" role="region" aria-label="Annual target actions" data-tutorial-id="annual-tour-save">
         <div>
           <span>{!loadState.isFresh ? 'Previously loaded annual targets'
             : isDirty ? 'Unsaved annual targets' : plan.id ? 'Annual targets saved' : 'No saved annual targets'}</span>

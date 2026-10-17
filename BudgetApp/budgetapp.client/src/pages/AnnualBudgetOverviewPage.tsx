@@ -14,6 +14,7 @@ import { usePageLoad } from './usePageLoad'
 import { useHouseholds } from '../households/useHouseholds'
 import { AppLink } from '../routing/AppLink'
 import { useRouter } from '../routing/useRouter'
+import { useReadTutorialPage } from '../tutorials/readTutorialState'
 
 const monthNames = Array.from({ length: 12 }, (_, index) =>
   new Intl.DateTimeFormat(undefined, { month: 'short' })
@@ -36,6 +37,7 @@ export function AnnualBudgetOverviewPage() {
     if (!currentHousehold) return
     void run(() => getAnnualBudgetOverview(currentHousehold.id, year, scope), setOverview)
   }, [currentHousehold, scope, year, run, reloadVersion])
+  useReadTutorialPage(loadState.isFresh)
 
   if (!currentHousehold) return null
 
@@ -47,7 +49,7 @@ export function AnnualBudgetOverviewPage() {
   const remainingClass = (amount: number | null) =>
     amount !== null && amount < 0 ? 'budget-over' : ''
 
-  return <PageFrame contentClassName="annual-overview-content">
+  return <PageFrame contentClassName="annual-overview-content" footer={<div id="read-tutorial-guide-host" />}>
       <BudgetingSectionNav current="annual-overview" />
       <div className="page-title-row">
         <div>
@@ -62,10 +64,11 @@ export function AnnualBudgetOverviewPage() {
         </div>
       </div>
 
-      <section className="panel annual-overview-controls">
+      <section className="panel annual-overview-controls" data-tutorial-id="annual-tour-selection">
         <label>
           <span>Calendar year</span>
           <input
+            data-tutorial-id="annual-tour-year"
             type="number"
             min="1"
             max="9999"
@@ -80,6 +83,7 @@ export function AnnualBudgetOverviewPage() {
         <label>
           <span>Scope</span>
           <select
+            data-tutorial-id="annual-tour-scope"
             value={scope}
             onChange={event => choosePeriod(year, event.target.value as BudgetScope)}
           >
@@ -96,10 +100,12 @@ export function AnnualBudgetOverviewPage() {
       <PageLoadFeedback subject="annual overview" status={loadState.status} errors={loadState.errors}
         onReload={() => setReloadVersion(version => version + 1)} />
       {loadState.hasData && overview && <>
-        <section className="annual-summary-grid" aria-label="Annual summary">
+        <p data-tutorial-id="annual-tour-context">{overview.year} · {overview.scope} · {overview.currency}</p>
+        <section className="annual-summary-grid" aria-label="Annual summary" data-tutorial-id="annual-tour-totals">
           <Summary label="Budgeted" value={formatAmount(overview.annualBudgetedAmount)}
             detail={`${overview.budgetedMonthCount} of 12 months have budgets`} />
           <Summary label="Actual spending" value={formatAmount(overview.actualSpendingAmount)}
+            tutorialId="annual-tour-transactions"
             link={transactionLink(overview.year, overview.scope, overview.currency, undefined, undefined, currentHousehold.id)} detail="Official, budget-included transactions" />
           <Summary label="Remaining"
             value={overview.remainingAmount === null
@@ -130,7 +136,7 @@ export function AnnualBudgetOverviewPage() {
             {' '}excluded because currency conversion is not available.
           </p>}
 
-        <section className="panel annual-month-section">
+        <section className="panel annual-month-section" data-tutorial-id="annual-tour-months">
           <div className="annual-section-heading">
             <div>
               <h2>Month by month</h2>
@@ -138,8 +144,8 @@ export function AnnualBudgetOverviewPage() {
             </div>
           </div>
           <div className="annual-month-grid">
-            {overview.months.map(month => (
-              <article className="annual-month-card" key={month.month}>
+            {overview.months.map((month, index) => (
+              <article className="annual-month-card" key={month.month} data-tutorial-id={index === 0 ? 'annual-tour-month' : undefined}>
                 <div>
                   <strong>{monthNames[month.month - 1]}</strong>
                   {month.status
@@ -176,7 +182,7 @@ export function AnnualBudgetOverviewPage() {
           </div>
         </section>
 
-        <section className="panel annual-category-section">
+        <section className="panel annual-category-section" data-tutorial-id="annual-tour-categories">
           <div className="annual-section-heading">
             <div>
               <h2>Category performance</h2>
@@ -206,16 +212,18 @@ function Summary({
   detail,
   link,
   className = '',
+  tutorialId,
 }: {
   label: string
   value: string
   detail: string
   link?: string
   className?: string
+  tutorialId?: string
 }) {
   return <article className={`annual-summary-card ${className}`}>
     <span>{label}</span>
-    <strong>{link ? <AppLink to={link}>{value}</AppLink> : value}</strong>
+    <strong>{link ? <AppLink to={link} data-tutorial-id={tutorialId}>{value}</AppLink> : value}</strong>
     <small>{detail}</small>
   </article>
 }

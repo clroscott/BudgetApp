@@ -16,6 +16,6 @@ export function PageLoadFeedback({ subject, status, errors, onReload, disabled =
       ? 'Previously loaded data is shown below and may be out of date. Changes are unavailable until it is refreshed.'
       : 'The data is unavailable. This does not mean there are no records.'}</p>
     {errors.map(error => <p key={error}>{error}</p>)}
-    <button className="secondary-button" type="button" disabled={disabled} onClick={onReload}>Retry loading</button>
+    <button data-tutorial-id="read-tour-reload" className="secondary-button" type="button" disabled={disabled} onClick={onReload}>Retry loading</button>
   </section>
 }

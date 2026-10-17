@@ -79,7 +79,7 @@ try {
     })
     await page.goto('http://127.0.0.1:4195/tutorials')
     const card = page.locator('.tutorial-card').filter({ has: page.getByRole('heading', { name: 'Build your first budget', exact: true }) })
-    await card.getByRole('button', { name: 'Start tutorial', exact: true }).click()
+    await card.getByRole('button', { name: 'Quick monthly budget', exact: true }).click()
     const guide = page.getByRole('region', { name: 'Build your first budget tutorial controls' })
     const click = name => guide.getByRole('button', { name, exact: true }).click()
     const checkBottomHelp = async label => {
@@ -195,7 +195,7 @@ try {
       await page.waitForURL('**/tutorials')
       await completion
       assert.equal(checkpoint.status, 'Completed')
-      await card.getByRole('button', { name: 'Replay tutorial', exact: true }).click()
+      await card.getByRole('button', { name: 'Replay Quick monthly', exact: true }).click()
       await guide.getByRole('heading', { name: 'Choose your month', exact: true }).waitFor()
       await page.keyboard.press('Escape')
     }

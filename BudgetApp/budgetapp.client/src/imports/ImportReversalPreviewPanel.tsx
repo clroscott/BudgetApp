@@ -5,6 +5,7 @@ import { getErrorMessages } from '../auth/errorMessages'
 import { ApiError } from '../api/apiClient'
 import { usePageLoad } from '../pages/usePageLoad'
 import { getImportReversalPreview, reverseImport, type ImportReversalPreview, type ReverseImportResult } from './importApi'
+import { useRecoveryPreviewPage } from '../tutorials/importRecoveryTutorialState'
 
 interface Props {
   householdId: string
@@ -16,7 +17,7 @@ export function ImportReversalPreviewPanel(props: Props) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const id = useId()
-  return <div className="import-reversal-preview">
+  return <div className="import-reversal-preview" data-tutorial-id="import-undo-preview">
     <button type="button" className="secondary-button" aria-expanded={open} aria-controls={id} disabled={busy}
       onClick={() => setOpen(value => !value)}>{open ? 'Close undo preview' : 'Preview undo'}</button>
     <div id={id} hidden={!open}>
@@ -34,6 +35,8 @@ function PreviewDetails({ householdId, importId, onBusyChange, onReversed }: Pro
   const [preview, setPreview] = useState<ImportReversalPreview | null>(null)
   const state = usePageLoad(`${householdId}/${importId}/${page}`)
   const { run } = state
+  useRecoveryPreviewPage({ householdId, importId, fresh: state.isFresh && Boolean(preview), busy,
+    uncertain: needsReload, canReverse: preview?.canReverse ?? false })
   const load = useCallback(() => run(signal => getImportReversalPreview(householdId, importId, page, signal), value => {
     setPreview(value); setNeedsReload(false); setWriteErrors([])
     if (value.status === 'Reversed') onReversed({ importFileId: value.importFileId, status: value.status,
@@ -66,7 +69,7 @@ function PreviewDetails({ householdId, importId, onBusyChange, onReversed }: Pro
   const headingId = useId()
   const money = preview ? new Intl.NumberFormat(undefined, { style: 'currency', currency: preview.currency,
     minimumFractionDigits: 2, maximumFractionDigits: 4 }) : null
-  return <section className="import-reversal-details" aria-labelledby={headingId}>
+  return <section className="import-reversal-details" aria-labelledby={headingId} data-tutorial-id="import-undo-controls">
     <h3 id={headingId}>Undo preview</h3>
     <p>Checking this preview changes nothing. Undo voids the whole batch and keeps its history.</p>
     <ErrorSummary errors={writeErrors} revealOnChange />

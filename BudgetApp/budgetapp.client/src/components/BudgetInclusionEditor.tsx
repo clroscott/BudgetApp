@@ -1,14 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { getErrorMessages } from '../auth/errorMessages'
 import { useUnsavedForm } from '../routing/useUnsavedForm'
 import { updateBudgetInclusion, type TransactionItem } from '../transactions/transactionApi'
 import { ErrorSummary } from './ErrorSummary'
 import { ContextualHelp } from './ContextualHelp'
 import { helpWarnings } from '../help/helpTopics'
+import { ApiError } from '../api/apiClient'
 
-export function BudgetInclusionEditor({ householdId, transaction, onSaved, disabled = false }: {
-  householdId: string, transaction: TransactionItem, onSaved: () => Promise<void>,
+export interface BudgetInclusionEditState { dirty: boolean; busy: boolean; uncertain: boolean }
+
+export function BudgetInclusionEditor({ householdId, transaction, onSaved, disabled = false, onStateChange, tutorialTargetId }: {
+  householdId: string, transaction: TransactionItem, onSaved: (reason?: 'saved' | 'reload') => Promise<void>,
   disabled?: boolean,
+  onStateChange?: (id: string, state: BudgetInclusionEditState | null) => void,
+  tutorialTargetId?: string,
 }) {
   const [value, setValue] = useState({
     household: transaction.includeInHouseholdBudget ?? false,
@@ -27,8 +32,12 @@ export function BudgetInclusionEditor({ householdId, transaction, onSaved, disab
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [notice, setNotice] = useState('')
+  const [writeUncertain, setWriteUncertain] = useState(false)
+  useLayoutEffect(() => { onStateChange?.(transaction.id, { dirty: isDirty, busy: saving, uncertain: writeUncertain }) },
+    [onStateChange, transaction.id, isDirty, saving, writeUncertain])
+  useLayoutEffect(() => () => onStateChange?.(transaction.id, null), [onStateChange, transaction.id])
   const save = async () => {
-    if (!version) return
+    if (!version || writeUncertain) return
     setSaving(true)
     setErrors([])
     try {
@@ -38,20 +47,23 @@ export function BudgetInclusionEditor({ householdId, transaction, onSaved, disab
       })
       markClean(value)
       setNotice('Budget inclusion saved.')
-      try { await onSaved() }
+      try { await onSaved('saved') }
       catch { setErrors(['Saved, but the list could not be refreshed. Reload before making another change.']) }
-    } catch (error) { setErrors(getErrorMessages(error)) }
+    } catch (error) {
+      setErrors(getErrorMessages(error))
+      if (onStateChange && !(error instanceof ApiError && [400, 422].includes(error.status))) setWriteUncertain(true)
+    }
     finally { setSaving(false) }
   }
-  return <details className="transaction-inline-edit">
+  return <details className="transaction-inline-edit" data-tutorial-id={tutorialTargetId}>
     <summary>Include in budgets</summary>
     {disabled && <p>Save or cancel the transaction edit before changing budget inclusion.</p>}
     <fieldset className="budget-inclusion-controls" disabled={saving || disabled}>
       <legend>{transaction.description}</legend>
-      <label className="checkbox-row"><input type="checkbox" checked={value.personal}
+      <label className="checkbox-row"><input type="checkbox" checked={value.personal} disabled={writeUncertain}
         onChange={event => setValue({ ...value, personal: event.target.checked })} />My personal budget</label>
       <label className="checkbox-row"><input type="checkbox" checked={value.household}
-        disabled={!transaction.canEditHouseholdInclusion}
+        disabled={!transaction.canEditHouseholdInclusion || writeUncertain}
         onChange={event => setValue({ ...value, household: event.target.checked })} />Household budget</label>
       <p>The full amount counts toward each selected budget. The transaction is recorded only once.</p>
       {transaction.canEditHouseholdInclusion && <p>{helpWarnings.sharePersonalExpense}</p>}
@@ -59,17 +71,17 @@ export function BudgetInclusionEditor({ householdId, transaction, onSaved, disab
       {transaction.canEditHouseholdInclusion && transaction.includeInHouseholdBudget && !value.household &&
         <p>For a personal-account transaction, removing Household inclusion also hides it from other
           members and removes it from their Personal actuals.</p>}
-      <button className="primary-button" type="button" disabled={!isDirty || !version}
+      <button className="primary-button" type="button" disabled={!isDirty || !version || writeUncertain}
         onClick={() => void save()}>{saving ? 'Saving...' : 'Save budget inclusion'}</button>
       <button className="text-button" type="button" onClick={() => {
         if (!confirmDiscard()) return
         const original = { household: transaction.includeInHouseholdBudget ?? false, personal: transaction.includeInPersonalBudget ?? false }
         setValue(original); markClean(original); setVersion(transaction.updatedAtUtc); setErrors([]); setNotice('')
       }}>Reset</button>
-      {errors.length > 0 && <button className="text-button" type="button" onClick={async () => {
+      {(errors.length > 0 || writeUncertain) && <button className="text-button" type="button" onClick={async () => {
         if (!confirmDiscard()) return
         setSaving(true)
-        try { await onSaved(); markClean(value); setErrors([]); setNotice('Reloaded. Check the choices before saving.') }
+        try { await onSaved('reload'); markClean(value); setWriteUncertain(false); setErrors([]); setNotice('Reloaded. Check the choices before saving.') }
         catch (error) { setErrors(getErrorMessages(error)) }
         finally { setSaving(false) }
       }}>Reload saved choices</button>}

@@ -57,7 +57,7 @@ export function ImportBatchControls({ dirtyCount, pendingRows, validPendingRows,
           {hasUnsavedRows && <p className="field-help">Save all corrections before approving or applying rules.</p>}
           {bulkSaveMessage && <p className="field-help" role="status">{bulkSaveMessage}</p>}
         </div>
-        <div className="import-control-actions">
+        <div className="import-control-actions" data-tutorial-id="import-rule-actions">
           {hasUncheckedDuplicates && (
             <button className="secondary-button" type="button"
               disabled={bulkActionsBusy}
@@ -145,7 +145,7 @@ export function ImportBatchControls({ dirtyCount, pendingRows, validPendingRows,
           </button>
         </div>
       </div>
-      <div className="import-control-group import-control-danger">
+      <div className="import-control-group import-control-danger" data-tutorial-id="import-discard-action">
         <strong>Staged data</strong>
         <p className="action-consequence">{helpWarnings.discardImport}</p>
         <ContextualHelp topic="destructive-actions" />

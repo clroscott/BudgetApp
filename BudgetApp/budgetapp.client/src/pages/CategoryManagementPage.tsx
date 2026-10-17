@@ -23,6 +23,10 @@ import { BudgetingSectionNav } from '../components/BudgetingSectionNav'
 import { useHouseholds } from '../households/useHouseholds'
 import { useUnsavedChangesGuard } from '../routing/useUnsavedChangesGuard'
 import { useUnsavedNativeForm } from '../routing/useUnsavedForm'
+import { ApiError } from '../api/apiClient'
+import { PageLoadFeedback } from '../components/PageLoadFeedback'
+import { usePageLoad } from './usePageLoad'
+import { useSetupTutorialPage } from '../tutorials/setupTutorialState'
 
 const categoryTypes: CategoryType[] = ['Expense', 'Income', 'Transfer']
 type DropPosition = 'before' | 'after'
@@ -63,7 +67,6 @@ function applySiblingOrder(
 export function CategoryManagementPage() {
   const { currentHousehold } = useHouseholds()
   const [categories, setCategories] = useState<CategoryItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [showDeactivated, setShowDeactivated] = useState(false)
@@ -88,22 +91,23 @@ export function CategoryManagementPage() {
     Boolean(addingToId) && subcategoryName !== '', 'Discard the new subcategory details?',
   )
   const createGuard = useUnsavedNativeForm('Discard the new category details you entered?')
+  const [uncertain, setUncertain] = useState(false)
+  const [needsRead, setNeedsRead] = useState(false)
+  const loadState = usePageLoad(`${currentHousehold?.id}/${currentHousehold?.role}`)
+  const { run, captureContext } = loadState
+  const blocked = isSaving || uncertain || !loadState.isFresh
+  const tutorialActive = useSetupTutorialPage(currentHousehold ? {
+    page: 'categories', householdId: currentHousehold.id, fresh: loadState.isFresh && !needsRead, busy: isSaving || loadState.isPending,
+    dirty: createGuard.isDirty || editingId !== null || addingToId !== null, uncertain, selection: null, accountId: null,
+  } : null)
 
-  const loadCategories = useCallback(async (showLoadingState = true) => {
+  const loadCategories = useCallback(async () => {
     if (!currentHousehold) {
-      return
+      return false
     }
 
-    if (showLoadingState) setIsLoading(true)
-    setErrors([])
-    try {
-      setCategories(await getCategories(currentHousehold.id))
-    } catch (error) {
-      setErrors(getErrorMessages(error))
-    } finally {
-      if (showLoadingState) setIsLoading(false)
-    }
-  }, [currentHousehold])
+    return run(() => getCategories(currentHousehold.id), items => { setCategories(items); setNeedsRead(false) })
+  }, [currentHousehold, run])
 
   useEffect(() => {
     void loadCategories()
@@ -118,15 +122,20 @@ export function CategoryManagementPage() {
     return null
   }
 
-  const performChange = async (change: () => Promise<unknown>): Promise<boolean> => {
+  const performChange = async <T,>(change: () => Promise<T>, confirmed?: (result: T) => void): Promise<boolean> => {
+    if (blocked || !canManage) return false
+    const isCurrent = captureContext()
     setIsSaving(true)
     setErrors([])
     try {
-      await change()
-      await loadCategories(false)
-      return true
+      const result = await change()
+      if (!isCurrent()) return false
+      confirmed?.(result)
+      return await loadCategories()
     } catch (error) {
+      if (!isCurrent()) return false
       setErrors(getErrorMessages(error))
+      if (tutorialActive && !(error instanceof ApiError && [400, 422].includes(error.status))) { setUncertain(true); setNeedsRead(true) }
       return false
     } finally {
       setIsSaving(false)
@@ -137,37 +146,34 @@ export function CategoryManagementPage() {
     event.preventDefault()
     const form = event.currentTarget
     const data = new FormData(form)
-    const succeeded = await performChange(() => createCategory(currentHousehold.id, {
+    await performChange(() => createCategory(currentHousehold.id, {
       name: String(data.get('name') ?? ''),
       type: String(data.get('type') ?? 'Expense') as CategoryType,
-    }))
-    if (succeeded) {
+    }), () => {
       form.reset()
       createGuard.markClean()
-    }
+    })
   }
 
   const handleCreateSubcategory = async (parentId: string) => {
-    const succeeded = await performChange(() => createCategory(currentHousehold.id, {
+    await performChange(() => createCategory(currentHousehold.id, {
       name: subcategoryName,
       parentCategoryId: parentId,
-    }))
-    if (succeeded) {
+    }), () => {
       setAddingToId(null)
       setSubcategoryName('')
-    }
+    })
   }
 
   const handleRename = async (categoryId: string) => {
-    const succeeded = await performChange(() => updateCategory(
+    await performChange(() => updateCategory(
       currentHousehold.id,
       categoryId,
       editingName,
-    ))
-    if (succeeded) {
+    ), () => {
       setEditingId(null)
       setEditingName('')
-    }
+    })
   }
 
   const saveOrder = async (
@@ -176,6 +182,8 @@ export function CategoryManagementPage() {
     targetId: string,
     position: DropPosition,
   ) => {
+    if (blocked || !canManage) return
+    const isCurrent = captureContext()
     const orderedIds = siblings.map(category => category.id)
     if (!orderedIds.includes(draggedId) || !orderedIds.includes(targetId) ||
         draggedId === targetId) return
@@ -191,8 +199,10 @@ export function CategoryManagementPage() {
     try {
       await reorderCategories(currentHousehold.id, orderedIds)
     } catch (error) {
+      if (!isCurrent()) return
       setCategories(previousCategories)
       setErrors(getErrorMessages(error))
+      if (tutorialActive && !(error instanceof ApiError && [400, 422].includes(error.status))) { setUncertain(true); setNeedsRead(true) }
     } finally {
       setIsSaving(false)
     }
@@ -284,8 +294,8 @@ export function CategoryManagementPage() {
             <button
               className="category-drag-handle"
               type="button"
-              draggable={!isSaving}
-              disabled={isSaving}
+              draggable={!blocked}
+              disabled={blocked}
               aria-label={`Drag ${category.name} to reorder`}
               title="Drag to reorder. Use Alt+Up or Alt+Down with the keyboard."
               onDragStart={event => handleDragStart(event, category.id)}
@@ -295,7 +305,7 @@ export function CategoryManagementPage() {
           )}
           <div className="category-name-block">
             {editingId === category.id ? (
-              <div className="category-rename-editor">
+              <div className="category-rename-editor" data-tutorial-id={!addingToId ? 'setup-tour-category-edit' : undefined}>
                 <div className="inline-edit">
                   <input
                     aria-label={`Rename ${category.name}`}
@@ -305,7 +315,7 @@ export function CategoryManagementPage() {
                   />
                   <button
                     type="button"
-                    disabled={isSaving || !editingName.trim()}
+                    disabled={blocked || !editingName.trim()}
                     onClick={() => void handleRename(category.id)}
                   >Rename everywhere</button>
                   <button className="text-button" type="button" onClick={() => {
@@ -333,7 +343,7 @@ export function CategoryManagementPage() {
             <button
               className="text-button"
               type="button"
-              disabled={isSaving}
+              disabled={blocked}
               onClick={() => {
                 if (!confirmRenameDiscard()) return
                 setEditingId(category.id)
@@ -344,7 +354,7 @@ export function CategoryManagementPage() {
               <button
                 className="text-button"
                 type="button"
-                disabled={isSaving}
+                disabled={blocked}
                 onClick={() => {
                   if (addingToId === category.id || !confirmSubcategoryDiscard()) return
                   setAddingToId(category.id)
@@ -355,7 +365,7 @@ export function CategoryManagementPage() {
             <button
               className="text-button"
               type="button"
-              disabled={isSaving || (category.isActive && activeChildCount > 0)}
+              disabled={blocked || (category.isActive && activeChildCount > 0)}
               title={category.isActive && activeChildCount > 0
                 ? 'Deactivate active subcategories first.'
                 : undefined}
@@ -372,9 +382,9 @@ export function CategoryManagementPage() {
   }
 
   return (
-    <PageFrame>
+    <PageFrame footer={<div id="setup-tutorial-guide-host" />}>
         <BudgetingSectionNav current="categories" />
-        <div className="page-title-row">
+        <div className="page-title-row" data-tutorial-id="setup-tour-categories-title">
           <div>
             <p className="eyebrow">Budgeting</p>
             <h1>Categories</h1>
@@ -390,10 +400,20 @@ export function CategoryManagementPage() {
           </label>
         </div>
 
-        <ErrorSummary errors={errors} />
+        {!uncertain && <ErrorSummary errors={errors} />}
+        <PageLoadFeedback subject="categories" status={loadState.status} errors={loadState.errors} onReload={() => void loadCategories()} disabled={isSaving} />
+        {uncertain && <div className="error-summary" role="alert"><p>The category change may have saved. Check the list before trying again.</p>
+          <button type="button" disabled={isSaving || loadState.isPending} onClick={() => { setErrors([]); void loadCategories() }}>Check saved categories</button>
+          <button type="button" disabled={needsRead || !loadState.isFresh || isSaving} onClick={() => {
+            if (!createGuard.confirmDiscard() || !confirmRenameDiscard() || !confirmSubcategoryDiscard()) return
+            const form = document.getElementById('setup-category-create') as HTMLFormElement | null
+            form?.reset(); createGuard.markClean(); setEditingId(null); setEditingName(''); setAddingToId(null); setSubcategoryName('')
+            setUncertain(false); setErrors([])
+          }}>Use the checked saved list</button>
+          <p>Inspect the result first. Continuing clears unsaved form details after confirmation; it does not repeat the change.</p></div>}
 
-        {canManage && (
-          <form {...createGuard.formProps} className="add-category-form" onSubmit={(event) => void handleCreateRoot(event)}>
+        {canManage && loadState.hasData && (
+          <form {...createGuard.formProps} id="setup-category-create" data-tutorial-id="setup-tour-category-form" className="add-category-form" onSubmit={(event) => void handleCreateRoot(event)}>
             <div>
               <label htmlFor="new-category-name">New root category</label>
               <input id="new-category-name" name="name" maxLength={100} required />
@@ -404,21 +424,19 @@ export function CategoryManagementPage() {
                 {categoryTypes.map(type => <option key={type}>{type}</option>)}
               </select>
             </div>
-            <button className="primary-button" type="submit" disabled={isSaving}>
+            <button className="primary-button" type="submit" disabled={blocked}>
               Add category
             </button>
           </form>
         )}
 
-        {isLoading ? (
-          <p className="empty-state">Loading categories...</p>
-        ) : visibleCategories.length === 0 ? (
-          <div className="empty-state">
+        {loadState.hasData && (visibleCategories.length === 0 ? (
+          <div className="empty-state" data-tutorial-id="setup-tour-category-empty">
             <h2>No categories to show</h2>
             <p>Add a category or show deactivated categories.</p>
           </div>
         ) : (
-          <div className="category-sections">
+          <div className="category-sections" data-tutorial-id="setup-tour-category-list">
             {categoryTypes.map(type => {
               const roots = visibleCategories.filter(category => category.type === type)
               const allRoots = categories.filter(category => category.type === type)
@@ -433,7 +451,7 @@ export function CategoryManagementPage() {
                     <div className="category-group" key={root.id}>
                       {renderRow(root, allRoots, false)}
                       {addingToId === root.id && (
-                        <div className="inline-add-subcategory">
+                        <div className="inline-add-subcategory" data-tutorial-id="setup-tour-category-edit">
                           <input
                             aria-label={`New subcategory under ${root.name}`}
                             value={subcategoryName}
@@ -442,7 +460,7 @@ export function CategoryManagementPage() {
                           />
                           <button
                             type="button"
-                            disabled={isSaving || !subcategoryName.trim()}
+                            disabled={blocked || !subcategoryName.trim()}
                             onClick={() => void handleCreateSubcategory(root.id)}
                           >Add</button>
                           <button className="text-button" type="button" onClick={() => {
@@ -463,7 +481,7 @@ export function CategoryManagementPage() {
               )
             })}
           </div>
-        )}
+        ))}
     </PageFrame>
   )
 }

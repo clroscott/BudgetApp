@@ -71,7 +71,7 @@ export function useTutorialTarget(step: TutorialStep | undefined, kind: Tutorial
         }
       }
       if (kind === 'LearnOnly' && step.advance === 'click' && element &&
-          (!step.targetId.startsWith('nav-') || !isInternalNavigation(element))) element = null
+          (!(step.targetId.startsWith('nav-') || step.readControls?.includes(step.targetId)) || !isInternalNavigation(element))) element = null
       const rawElement = element ?? candidates[0] ?? null
       if (rawElement !== observedElement) {
         resizeObserver?.disconnect()
